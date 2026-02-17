@@ -38,12 +38,29 @@ This format enables tests to:
 
 This Lambda is deployed only in test/development environments as part of the integration test infrastructure.
 
-Configuration:
+Quick deployment:
+
+```bash
+# 1. Build the lambda
+npm install
+npm run lambda-build
+
+# 2. Enable in environment tfvars
+# Set deploy_mock_webhook = true in your environment's .tfvars file
+
+# 3. Apply Terraform
+cd infrastructure/terraform/components/callbacks
+terraform apply -var-file=etc/dev.tfvars
+```
+
+**Configuration**:
 
 - **Runtime**: Node.js 22
 - **Handler**: `index.handler`
-- **Trigger**: API Gateway (or configured as EventBridge API Destination target)
-- **Environment**: dev/test only
+- **Memory**: 256 MB
+- **Timeout**: 10 seconds
+- **Trigger**: Function URL or API Gateway
+- **Environment**: dev/test only (controlled via `deploy_mock_webhook` variable)
 
 ## Scripts
 
@@ -51,7 +68,3 @@ Configuration:
 - `npm test` - Run unit tests
 - `npm run typecheck` - Type check without emit
 - `npm run lint` - Lint code
-
-## Based On
-
-This implementation follows the pattern from `comms-mgr/comms/components/nhs-notify-callbacks/message-status-subscription-mock`, adapted for the nhs-notify-client-callbacks architecture.

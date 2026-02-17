@@ -112,3 +112,9 @@ variable "pipe_sqs_max_batch_window" {
   type    = number
   default = 2
 }
+
+variable "deploy_mock_webhook" {
+  type        = bool
+  description = "Flag to deploy mock webhook lambda for integration testing (test/dev environments only)"
+  default     = false
+}
