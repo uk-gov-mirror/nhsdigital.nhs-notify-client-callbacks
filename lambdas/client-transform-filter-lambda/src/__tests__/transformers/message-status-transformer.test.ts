@@ -10,8 +10,6 @@ import type { MessageStatus } from "models/status-types";
 describe("message-status-transformer", () => {
   describe("transformMessageStatus", () => {
     const messageStatusEvent: StatusTransitionEvent<MessageStatusData> = {
-      profileversion: "1.0.0",
-      profilepublished: "2025-10",
       specversion: "1.0",
       id: "661f9510-f39c-52e5-b827-557766551111",
       source:
@@ -20,49 +18,31 @@ describe("message-status-transformer", () => {
         "customer/920fca11-596a-4eca-9c47-99f624614658/message/msg-789-xyz",
       type: "uk.nhs.notify.client-callbacks.message.status.transitioned.v1",
       time: "2026-02-05T14:30:00.000Z",
-      recordedtime: "2026-02-05T14:30:00.150Z",
       datacontenttype: "application/json",
       dataschema: "https://nhs.uk/schemas/notify/message-status-data.v1.json",
-      severitynumber: 2,
-      severitytext: "INFO",
       traceparent: "00-4d678967f96e353c07a0a31c1849b500-07f83ba58dd8df70-01",
       data: {
-        "notify-payload": {
-          "notify-data": {
-            clientId: "client-abc-123",
-            messageId: "msg-789-xyz",
-            messageReference: "client-ref-12345",
-            messageStatus: "DELIVERED",
-            messageStatusDescription: "Message successfully delivered",
-            channels: [
-              {
-                type: "NHSAPP",
-                channelStatus: "DELIVERED",
-              },
-              {
-                type: "SMS",
-                channelStatus: "SKIPPED",
-              },
-            ],
-            timestamp: "2026-02-05T14:29:55Z",
-            routingPlan: {
-              id: "routing-plan-123",
-              name: "NHS App with SMS fallback",
-              version: "ztoe2qRAM8M8vS0bqajhyEBcvXacrGPp",
-              createdDate: "2023-11-17T14:27:51.413Z",
-            },
+        clientId: "client-abc-123",
+        messageId: "msg-789-xyz",
+        messageReference: "client-ref-12345",
+        messageStatus: "DELIVERED",
+        messageStatusDescription: "Message successfully delivered",
+        channels: [
+          {
+            type: "NHSAPP",
+            channelStatus: "DELIVERED",
           },
-          "notify-metadata": {
-            teamResponsible: "Team 1",
-            notifyDomain: "Delivering",
-            microservice: "core-event-publisher",
-            repositoryUrl: "https://github.com/NHSDigital/comms-mgr",
-            accountId: "123456789012",
-            environment: "development",
-            instance: "primary",
-            microserviceInstanceId: "lambda-abc123",
-            microserviceVersion: "1.0.0",
+          {
+            type: "SMS",
+            channelStatus: "SKIPPED",
           },
+        ],
+        timestamp: "2026-02-05T14:29:55Z",
+        routingPlan: {
+          id: "routing-plan-123",
+          name: "NHS App with SMS fallback",
+          version: "ztoe2qRAM8M8vS0bqajhyEBcvXacrGPp",
+          createdDate: "2023-11-17T14:27:51.413Z",
         },
       },
     };
@@ -171,13 +151,8 @@ describe("message-status-transformer", () => {
       const eventWithoutDescription = {
         ...messageStatusEvent,
         data: {
-          "notify-payload": {
-            ...messageStatusEvent.data["notify-payload"],
-            "notify-data": {
-              ...messageStatusEvent.data["notify-payload"]["notify-data"],
-              messageStatusDescription: undefined,
-            },
-          },
+          ...messageStatusEvent.data,
+          messageStatusDescription: undefined,
         },
       };
 
@@ -191,14 +166,9 @@ describe("message-status-transformer", () => {
       const eventWithFailure = {
         ...messageStatusEvent,
         data: {
-          "notify-payload": {
-            ...messageStatusEvent.data["notify-payload"],
-            "notify-data": {
-              ...messageStatusEvent.data["notify-payload"]["notify-data"],
-              messageStatus: "FAILED" as MessageStatus,
-              messageFailureReasonCode: "DELIVERY_TIMEOUT",
-            },
-          },
+          ...messageStatusEvent.data,
+          messageStatus: "FAILED" as MessageStatus,
+          messageFailureReasonCode: "DELIVERY_TIMEOUT",
         },
       };
 
@@ -235,13 +205,8 @@ describe("message-status-transformer", () => {
       const eventWithOperationalFields = {
         ...messageStatusEvent,
         data: {
-          "notify-payload": {
-            ...messageStatusEvent.data["notify-payload"],
-            "notify-data": {
-              ...messageStatusEvent.data["notify-payload"]["notify-data"],
-              previousMessageStatus: "SENDING" as MessageStatus,
-            },
-          },
+          ...messageStatusEvent.data,
+          previousMessageStatus: "SENDING" as MessageStatus,
         },
       };
 

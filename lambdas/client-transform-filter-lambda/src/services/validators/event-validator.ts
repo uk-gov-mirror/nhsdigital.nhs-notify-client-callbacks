@@ -57,43 +57,6 @@ function isChannelStatusEvent(type: string): boolean {
  * Validates NHS Notify-specific CloudEvents extension attributes
  */
 function validateNHSNotifyExtensions(event: any): void {
-  // profileversion
-  if (!event.profileversion) {
-    throw new Error("profileversion is required");
-  }
-  if (event.profileversion !== "1.0.0") {
-    throw new Error("profileversion must be '1.0.0'");
-  }
-
-  // profilepublished
-  if (!event.profilepublished) {
-    throw new Error("profilepublished is required");
-  }
-  if (!/^\d{4}-\d{2}$/.test(event.profilepublished)) {
-    throw new Error("profilepublished must be in format YYYY-MM");
-  }
-
-  // recordedtime (optional in CloudEvents, required in NHS Notify)
-  if (!event.recordedtime) {
-    throw new Error("recordedtime is required");
-  }
-  if (!isValidRFC3339(event.recordedtime)) {
-    throw new Error("recordedtime must be a valid RFC 3339 timestamp");
-  }
-  if (new Date(event.recordedtime) < new Date(event.time)) {
-    throw new Error("recordedtime must be >= time");
-  }
-
-  // severitynumber
-  if (event.severitynumber === undefined || event.severitynumber === null) {
-    throw new Error("severitynumber is required");
-  }
-
-  // severitytext
-  if (!event.severitytext) {
-    throw new Error("severitytext is required");
-  }
-
   // traceparent
   if (!event.traceparent) {
     throw new Error("traceparent is required");
@@ -112,46 +75,32 @@ function validateEventTypeNamespace(type: string): void {
 }
 
 /**
- * Validates notify-payload wrapper structure
+ * Validates data exists
  */
-function validateNotifyPayloadWrapper(data: any): void {
+function validateDataExists(data: any): void {
   if (!data) {
     throw new Error("data is required");
-  }
-
-  if (!data["notify-payload"]) {
-    throw new Error("data.notify-payload is required");
-  }
-
-  if (!data["notify-payload"]["notify-data"]) {
-    throw new Error("data.notify-payload.notify-data is required");
-  }
-
-  if (!data["notify-payload"]["notify-metadata"]) {
-    throw new Error("data.notify-payload.notify-metadata is required");
   }
 }
 
 /**
- * Validates required fields in notify-data for filtering
+ * Validates required fields in data for filtering
  */
-function validateNotifyDataRequiredFields(data: any): void {
-  const notifyData = data["notify-payload"]["notify-data"];
-
-  if (!notifyData.clientId) {
-    throw new Error("notify-data.clientId is required");
+function validateDataRequiredFields(data: any): void {
+  if (!data.clientId) {
+    throw new Error("data.clientId is required");
   }
 
-  if (!notifyData.messageId) {
-    throw new Error("notify-data.messageId is required");
+  if (!data.messageId) {
+    throw new Error("data.messageId is required");
   }
 
-  if (!notifyData.timestamp) {
-    throw new Error("notify-data.timestamp is required");
+  if (!data.timestamp) {
+    throw new Error("data.timestamp is required");
   }
 
-  if (!isValidRFC3339(notifyData.timestamp)) {
-    throw new Error("notify-data.timestamp must be a valid RFC 3339 timestamp");
+  if (!isValidRFC3339(data.timestamp)) {
+    throw new Error("data.timestamp must be a valid RFC 3339 timestamp");
   }
 }
 
@@ -159,39 +108,31 @@ function validateNotifyDataRequiredFields(data: any): void {
  * Validates message status specific fields
  */
 function validateMessageStatusFields(data: any): void {
-  const notifyData = data["notify-payload"]["notify-data"];
-
-  if (!notifyData.messageStatus) {
-    throw new Error(
-      "notify-data.messageStatus is required for message status events",
-    );
+  if (!data.messageStatus) {
+    throw new Error("data.messageStatus is required for message status events");
   }
 
-  if (!notifyData.channels) {
-    throw new Error(
-      "notify-data.channels is required for message status events",
-    );
+  if (!data.channels) {
+    throw new Error("data.channels is required for message status events");
   }
 
-  if (!Array.isArray(notifyData.channels)) {
-    throw new TypeError("notify-data.channels must be an array");
+  if (!Array.isArray(data.channels)) {
+    throw new TypeError("data.channels must be an array");
   }
 
-  if (notifyData.channels.length === 0) {
-    throw new Error("notify-data.channels must have at least one channel");
+  if (data.channels.length === 0) {
+    throw new Error("data.channels must have at least one channel");
   }
 
   // Validate each channel in the array
-  for (let index = 0; index < notifyData.channels.length; index++) {
+  for (let index = 0; index < data.channels.length; index++) {
     // eslint-disable-next-line security/detect-object-injection
-    const channel = notifyData.channels[index];
+    const channel = data.channels[index];
     if (!channel?.type) {
-      throw new Error(`notify-data.channels[${index}].type is required`);
+      throw new Error(`data.channels[${index}].type is required`);
     }
     if (!channel.channelStatus) {
-      throw new Error(
-        `notify-data.channels[${index}].channelStatus is required`,
-      );
+      throw new Error(`data.channels[${index}].channelStatus is required`);
     }
   }
 }
@@ -200,23 +141,17 @@ function validateMessageStatusFields(data: any): void {
  * Validates channel status specific fields
  */
 function validateChannelStatusFields(data: any): void {
-  const notifyData = data["notify-payload"]["notify-data"];
-
-  if (!notifyData.channel) {
-    throw new Error(
-      "notify-data.channel is required for channel status events",
-    );
+  if (!data.channel) {
+    throw new Error("data.channel is required for channel status events");
   }
 
-  if (!notifyData.channelStatus) {
-    throw new Error(
-      "notify-data.channelStatus is required for channel status events",
-    );
+  if (!data.channelStatus) {
+    throw new Error("data.channelStatus is required for channel status events");
   }
 
-  if (!notifyData.supplierStatus) {
+  if (!data.supplierStatus) {
     throw new Error(
-      "notify-data.supplierStatus is required for channel status events",
+      "data.supplierStatus is required for channel status events",
     );
   }
 }
@@ -253,11 +188,11 @@ export function validateStatusTransitionEvent(event: any): void {
       throw new Error("datacontenttype must be 'application/json'");
     }
 
-    // Validate notify-payload wrapper structure
-    validateNotifyPayloadWrapper(ce.data);
+    // Validate data exists
+    validateDataExists(ce.data);
 
-    // Validate notify-data required fields
-    validateNotifyDataRequiredFields(ce.data);
+    // Validate data required fields
+    validateDataRequiredFields(ce.data);
 
     // Validate event type-specific fields
     if (isMessageStatusEvent(ce.type)) {

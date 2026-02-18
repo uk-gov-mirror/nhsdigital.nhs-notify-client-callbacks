@@ -85,7 +85,7 @@ async function processSingleEvent(rawEvent: any): Promise<any> {
     );
   }
 
-  const clientId = rawEvent.data?.["notify-payload"]?.["notify-data"]?.clientId;
+  const clientId = rawEvent.data?.clientId;
 
   // Emit metric for event received
   await metricsService.emitEventReceived(

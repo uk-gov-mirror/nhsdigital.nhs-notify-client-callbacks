@@ -21,15 +21,17 @@ import type {
 export function transformMessageStatus(
   event: StatusTransitionEvent<MessageStatusData>,
 ): ClientCallbackPayload {
-  const notifyData = event.data["notify-payload"]["notify-data"];
+  const notifyData = event.data;
   const { messageId } = notifyData;
   const messageStatus =
     notifyData.messageStatus.toLowerCase() as ClientMessageStatus;
-  const channels = notifyData.channels.map((channel) => ({
-    ...channel,
-    type: channel.type.toLowerCase() as ClientChannel,
-    channelStatus: channel.channelStatus.toLowerCase() as ClientChannelStatus,
-  }));
+  const channels = notifyData.channels.map(
+    (channel: { type: string; channelStatus: string }) => ({
+      ...channel,
+      type: channel.type.toLowerCase() as ClientChannel,
+      channelStatus: channel.channelStatus.toLowerCase() as ClientChannelStatus,
+    }),
+  );
 
   // Build attributes object with required fields
   const attributes: MessageStatusAttributes = {

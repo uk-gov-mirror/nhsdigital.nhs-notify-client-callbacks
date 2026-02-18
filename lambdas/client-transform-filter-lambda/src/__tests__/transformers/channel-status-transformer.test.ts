@@ -11,49 +11,29 @@ import type { Channel } from "models/channel-types";
 describe("channel-status-transformer", () => {
   describe("transformChannelStatus", () => {
     const channelStatusEvent: StatusTransitionEvent<ChannelStatusData> = {
-      profileversion: "1.0.0",
-      profilepublished: "2025-10",
       specversion: "1.0",
-      id: "771f9510-f39c-52e5-b827-557766552222",
+      id: "SOME-GUID-a123-556677889999",
       source:
         "/nhs/england/notify/development/primary/data-plane/client-callbacks",
       subject:
-        "customer/920fca11-596a-4eca-9c47-99f624614658/message/msg-789-xyz/channel/nhsapp",
+        "customer/920fca11-596a-4eca-9c47-99f624614658/message/msg-456-abc/channel/nhsapp",
       type: "uk.nhs.notify.client-callbacks.channel.status.transitioned.v1",
       time: "2026-02-05T14:30:00.000Z",
-      recordedtime: "2026-02-05T14:30:00.150Z",
       datacontenttype: "application/json",
       dataschema: "https://nhs.uk/schemas/notify/channel-status-data.v1.json",
-      severitynumber: 2,
-      severitytext: "INFO",
       traceparent: "00-4d678967f96e353c07a0a31c1849b500-07f83ba58dd8df70-02",
       data: {
-        "notify-payload": {
-          "notify-data": {
-            clientId: "client-abc-123",
-            messageId: "msg-789-xyz",
-            messageReference: "client-ref-12345",
-            channel: "NHSAPP",
-            channelStatus: "DELIVERED",
-            channelStatusDescription: "Successfully delivered to NHS App",
-            supplierStatus: "DELIVERED",
-            cascadeType: "primary",
-            cascadeOrder: 1,
-            timestamp: "2026-02-05T14:29:55Z",
-            retryCount: 0,
-          },
-          "notify-metadata": {
-            teamResponsible: "Team 1",
-            notifyDomain: "Delivering",
-            microservice: "core-event-publisher",
-            repositoryUrl: "https://github.com/NHSDigital/comms-mgr",
-            accountId: "123456789012",
-            environment: "development",
-            instance: "primary",
-            microserviceInstanceId: "lambda-abc123",
-            microserviceVersion: "1.0.0",
-          },
-        },
+        clientId: "client-abc-123",
+        messageId: "msg-789-xyz",
+        messageReference: "client-ref-12345",
+        channel: "NHSAPP",
+        channelStatus: "DELIVERED",
+        channelStatusDescription: "Successfully delivered to NHS App",
+        supplierStatus: "DELIVERED",
+        cascadeType: "primary",
+        cascadeOrder: 1,
+        timestamp: "2026-02-05T14:29:55Z",
+        retryCount: 0,
       },
     };
 
@@ -81,7 +61,7 @@ describe("channel-status-transformer", () => {
               message: "/v1/message-batches/messages/msg-789-xyz",
             },
             meta: {
-              idempotencyKey: "771f9510-f39c-52e5-b827-557766552222",
+              idempotencyKey: "SOME-GUID-a123-556677889999",
             },
           },
         ],
@@ -158,13 +138,8 @@ describe("channel-status-transformer", () => {
       const eventWithoutDescription = {
         ...channelStatusEvent,
         data: {
-          "notify-payload": {
-            ...channelStatusEvent.data["notify-payload"],
-            "notify-data": {
-              ...channelStatusEvent.data["notify-payload"]["notify-data"],
-              channelStatusDescription: undefined,
-            },
-          },
+          ...channelStatusEvent.data,
+          channelStatusDescription: undefined,
         },
       };
 
@@ -178,14 +153,9 @@ describe("channel-status-transformer", () => {
       const eventWithFailure = {
         ...channelStatusEvent,
         data: {
-          "notify-payload": {
-            ...channelStatusEvent.data["notify-payload"],
-            "notify-data": {
-              ...channelStatusEvent.data["notify-payload"]["notify-data"],
-              channelStatus: "FAILED" as ChannelStatus,
-              channelFailureReasonCode: "RECIPIENT_INVALID",
-            },
-          },
+          ...channelStatusEvent.data,
+          channelStatus: "FAILED" as ChannelStatus,
+          channelFailureReasonCode: "RECIPIENT_INVALID",
         },
       };
 
@@ -206,13 +176,8 @@ describe("channel-status-transformer", () => {
       const eventWithPrevious = {
         ...channelStatusEvent,
         data: {
-          "notify-payload": {
-            ...channelStatusEvent.data["notify-payload"],
-            "notify-data": {
-              ...channelStatusEvent.data["notify-payload"]["notify-data"],
-              previousChannelStatus: "SENDING" as ChannelStatus,
-            },
-          },
+          ...channelStatusEvent.data,
+          previousChannelStatus: "SENDING" as ChannelStatus,
         },
       };
 
@@ -228,13 +193,8 @@ describe("channel-status-transformer", () => {
       const eventWithPrevious = {
         ...channelStatusEvent,
         data: {
-          "notify-payload": {
-            ...channelStatusEvent.data["notify-payload"],
-            "notify-data": {
-              ...channelStatusEvent.data["notify-payload"]["notify-data"],
-              previousSupplierStatus: "RECEIVED" as SupplierStatus,
-            },
-          },
+          ...channelStatusEvent.data,
+          previousSupplierStatus: "RECEIVED" as SupplierStatus,
         },
       };
 
@@ -258,7 +218,7 @@ describe("channel-status-transformer", () => {
       const result = transformChannelStatus(channelStatusEvent);
 
       expect(result.data[0].meta.idempotencyKey).toBe(
-        "771f9510-f39c-52e5-b827-557766552222",
+        "SOME-GUID-a123-556677889999",
       );
     });
 
@@ -279,13 +239,8 @@ describe("channel-status-transformer", () => {
       const eventWithRetries = {
         ...channelStatusEvent,
         data: {
-          "notify-payload": {
-            ...channelStatusEvent.data["notify-payload"],
-            "notify-data": {
-              ...channelStatusEvent.data["notify-payload"]["notify-data"],
-              retryCount: 3,
-            },
-          },
+          ...channelStatusEvent.data,
+          retryCount: 3,
         },
       };
 
@@ -299,15 +254,10 @@ describe("channel-status-transformer", () => {
       const fallbackEvent = {
         ...channelStatusEvent,
         data: {
-          "notify-payload": {
-            ...channelStatusEvent.data["notify-payload"],
-            "notify-data": {
-              ...channelStatusEvent.data["notify-payload"]["notify-data"],
-              channel: "SMS" as Channel,
-              cascadeType: "secondary" as "primary" | "secondary",
-              cascadeOrder: 2,
-            },
-          },
+          ...channelStatusEvent.data,
+          channel: "SMS" as Channel,
+          cascadeType: "secondary" as "primary" | "secondary",
+          cascadeOrder: 2,
         },
       };
 

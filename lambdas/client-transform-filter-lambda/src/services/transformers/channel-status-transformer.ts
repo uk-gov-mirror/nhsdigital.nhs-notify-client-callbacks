@@ -21,7 +21,7 @@ import type {
 export function transformChannelStatus(
   event: StatusTransitionEvent<ChannelStatusData>,
 ): ClientCallbackPayload {
-  const notifyData = event.data["notify-payload"]["notify-data"];
+  const notifyData = event.data;
   const { messageId } = notifyData;
   const channel = notifyData.channel.toLowerCase() as ClientChannel;
   const channelStatus =

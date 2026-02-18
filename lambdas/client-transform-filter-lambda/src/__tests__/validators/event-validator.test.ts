@@ -2,12 +2,16 @@
 import { validateStatusTransitionEvent } from "services/validators/event-validator";
 import type { StatusTransitionEvent } from "models/status-transition-event";
 import type { MessageStatusData } from "models/message-status-data";
+import type { ChannelStatusData } from "models/channel-status-data";
+
+// Make traceparent optional for tests that need to delete it
+type TestEvent<T> = Omit<StatusTransitionEvent<T>, "traceparent"> & {
+  traceparent?: string;
+};
 
 describe("event-validator", () => {
   describe("validateStatusTransitionEvent", () => {
-    const validMessageStatusEvent: StatusTransitionEvent<MessageStatusData> = {
-      profileversion: "1.0.0",
-      profilepublished: "2025-10",
+    const validMessageStatusEvent: TestEvent<MessageStatusData> = {
       specversion: "1.0",
       id: "661f9510-f39c-52e5-b827-557766551111",
       source:
@@ -16,45 +20,27 @@ describe("event-validator", () => {
         "customer/920fca11-596a-4eca-9c47-99f624614658/message/msg-789-xyz",
       type: "uk.nhs.notify.client-callbacks.message.status.transitioned.v1",
       time: "2026-02-05T14:30:00.000Z",
-      recordedtime: "2026-02-05T14:30:00.150Z",
       datacontenttype: "application/json",
       dataschema: "https://nhs.uk/schemas/notify/message-status-data.v1.json",
-      severitynumber: 2,
-      severitytext: "INFO",
       traceparent: "00-4d678967f96e353c07a0a31c1849b500-07f83ba58dd8df70-01",
       data: {
-        "notify-payload": {
-          "notify-data": {
-            clientId: "client-abc-123",
-            messageId: "msg-789-xyz",
-            messageReference: "client-ref-12345",
-            messageStatus: "DELIVERED",
-            messageStatusDescription: "Message successfully delivered",
-            channels: [
-              {
-                type: "NHSAPP",
-                channelStatus: "DELIVERED",
-              },
-            ],
-            timestamp: "2026-02-05T14:29:55Z",
-            routingPlan: {
-              id: "routing-plan-123",
-              name: "NHS App with SMS fallback",
-              version: "ztoe2qRAM8M8vS0bqajhyEBcvXacrGPp",
-              createdDate: "2023-11-17T14:27:51.413Z",
-            },
+        clientId: "client-abc-123",
+        messageId: "msg-789-xyz",
+        messageReference: "client-ref-12345",
+        messageStatus: "DELIVERED",
+        messageStatusDescription: "Message successfully delivered",
+        channels: [
+          {
+            type: "NHSAPP",
+            channelStatus: "DELIVERED",
           },
-          "notify-metadata": {
-            teamResponsible: "Team 1",
-            notifyDomain: "Delivering",
-            microservice: "core-event-publisher",
-            repositoryUrl: "https://github.com/NHSDigital/comms-mgr",
-            accountId: "123456789012",
-            environment: "development",
-            instance: "primary",
-            microserviceInstanceId: "lambda-abc123",
-            microserviceVersion: "1.0.0",
-          },
+        ],
+        timestamp: "2026-02-05T14:29:55Z",
+        routingPlan: {
+          id: "routing-plan-123",
+          name: "NHS App with SMS fallback",
+          version: "ztoe2qRAM8M8vS0bqajhyEBcvXacrGPp",
+          createdDate: "2023-11-17T14:27:51.413Z",
         },
       },
     };
@@ -66,104 +52,8 @@ describe("event-validator", () => {
     });
 
     describe("NHS Notify extension attributes validation", () => {
-      it("should throw error if profileversion is missing", () => {
-        const invalidEvent = { ...validMessageStatusEvent };
-        // @ts-expect-error - Testing invalid event
-        delete invalidEvent.profileversion;
-
-        expect(() => validateStatusTransitionEvent(invalidEvent)).toThrow(
-          "profileversion is required",
-        );
-      });
-
-      it("should throw error if profileversion is not '1.0.0'", () => {
-        const invalidEvent = {
-          ...validMessageStatusEvent,
-          profileversion: "2.0.0",
-        };
-
-        expect(() => validateStatusTransitionEvent(invalidEvent)).toThrow(
-          "profileversion must be '1.0.0'",
-        );
-      });
-
-      it("should throw error if profilepublished is missing", () => {
-        const invalidEvent = { ...validMessageStatusEvent };
-        // @ts-expect-error - Testing invalid event
-        delete invalidEvent.profilepublished;
-
-        expect(() => validateStatusTransitionEvent(invalidEvent)).toThrow(
-          "profilepublished is required",
-        );
-      });
-
-      it("should throw error if profilepublished format is invalid", () => {
-        const invalidEvent = {
-          ...validMessageStatusEvent,
-          profilepublished: "2025",
-        };
-
-        expect(() => validateStatusTransitionEvent(invalidEvent)).toThrow(
-          "profilepublished must be in format YYYY-MM",
-        );
-      });
-
-      it("should throw error if recordedtime is missing", () => {
-        const invalidEvent = { ...validMessageStatusEvent };
-        // @ts-expect-error - Testing invalid event
-        delete invalidEvent.recordedtime;
-
-        expect(() => validateStatusTransitionEvent(invalidEvent)).toThrow(
-          "recordedtime is required",
-        );
-      });
-
-      it("should throw error if recordedtime is not valid RFC 3339 format", () => {
-        const invalidEvent = {
-          ...validMessageStatusEvent,
-          recordedtime: "2026-02-05",
-        };
-
-        expect(() => validateStatusTransitionEvent(invalidEvent)).toThrow(
-          "recordedtime must be a valid RFC 3339 timestamp",
-        );
-      });
-
-      it("should throw error if recordedtime is before time", () => {
-        const invalidEvent = {
-          ...validMessageStatusEvent,
-          time: "2026-02-05T14:30:00.000Z",
-          recordedtime: "2026-02-05T14:29:00.000Z",
-        };
-
-        expect(() => validateStatusTransitionEvent(invalidEvent)).toThrow(
-          "recordedtime must be >= time",
-        );
-      });
-
-      it("should throw error if severitynumber is missing", () => {
-        const invalidEvent = { ...validMessageStatusEvent };
-        // @ts-expect-error - Testing invalid event
-        delete invalidEvent.severitynumber;
-
-        expect(() => validateStatusTransitionEvent(invalidEvent)).toThrow(
-          "severitynumber is required",
-        );
-      });
-
-      it("should throw error if severitytext is missing", () => {
-        const invalidEvent = { ...validMessageStatusEvent };
-        // @ts-expect-error - Testing invalid event
-        delete invalidEvent.severitytext;
-
-        expect(() => validateStatusTransitionEvent(invalidEvent)).toThrow(
-          "severitytext is required",
-        );
-      });
-
       it("should throw error if traceparent is missing", () => {
         const invalidEvent = { ...validMessageStatusEvent };
-        // @ts-expect-error - Testing invalid event
         delete invalidEvent.traceparent;
 
         expect(() => validateStatusTransitionEvent(invalidEvent)).toThrow(
@@ -198,157 +88,60 @@ describe("event-validator", () => {
       });
     });
 
-    describe("notify-payload wrapper validation", () => {
-      it("should throw error if data is missing", () => {
-        const invalidEvent = { ...validMessageStatusEvent };
-        // @ts-expect-error - Testing invalid event
-        delete invalidEvent.data;
-
-        expect(() => validateStatusTransitionEvent(invalidEvent)).toThrow(
-          "data is required",
-        );
-      });
-
-      it("should throw error if notify-payload is missing", () => {
-        const invalidEvent = {
-          ...validMessageStatusEvent,
-          data: {} as any,
-        };
-
-        expect(() => validateStatusTransitionEvent(invalidEvent)).toThrow(
-          "data.notify-payload is required",
-        );
-      });
-
-      it("should throw error if notify-data is missing", () => {
+    describe("data required fields validation", () => {
+      it("should throw error if data.clientId is missing", () => {
         const invalidEvent = {
           ...validMessageStatusEvent,
           data: {
-            "notify-payload": {
-              "notify-metadata":
-                validMessageStatusEvent.data["notify-payload"][
-                  "notify-metadata"
-                ],
-            } as any,
+            ...validMessageStatusEvent.data,
+            clientId: undefined,
           },
         };
 
         expect(() => validateStatusTransitionEvent(invalidEvent)).toThrow(
-          "data.notify-payload.notify-data is required",
+          "data.clientId is required",
         );
       });
 
-      it("should throw error if notify-metadata is missing", () => {
+      it("should throw error if data.messageId is missing", () => {
         const invalidEvent = {
           ...validMessageStatusEvent,
           data: {
-            "notify-payload": {
-              "notify-data":
-                validMessageStatusEvent.data["notify-payload"]["notify-data"],
-            } as any,
+            ...validMessageStatusEvent.data,
+            messageId: undefined,
           },
         };
 
         expect(() => validateStatusTransitionEvent(invalidEvent)).toThrow(
-          "data.notify-payload.notify-metadata is required",
+          "data.messageId is required",
         );
       });
-    });
 
-    describe("notify-data required fields validation", () => {
-      it("should throw error if notify-data.clientId is missing", () => {
+      it("should throw error if data.timestamp is missing", () => {
         const invalidEvent = {
           ...validMessageStatusEvent,
           data: {
-            "notify-payload": {
-              "notify-data": {
-                ...validMessageStatusEvent.data["notify-payload"][
-                  "notify-data"
-                ],
-                clientId: undefined,
-              },
-              "notify-metadata":
-                validMessageStatusEvent.data["notify-payload"][
-                  "notify-metadata"
-                ],
-            },
+            ...validMessageStatusEvent.data,
+            timestamp: undefined,
           },
         };
 
         expect(() => validateStatusTransitionEvent(invalidEvent)).toThrow(
-          "notify-data.clientId is required",
+          "data.timestamp is required",
         );
       });
 
-      it("should throw error if notify-data.messageId is missing", () => {
+      it("should throw error if data.timestamp is not valid RFC 3339 format", () => {
         const invalidEvent = {
           ...validMessageStatusEvent,
           data: {
-            "notify-payload": {
-              "notify-data": {
-                ...validMessageStatusEvent.data["notify-payload"][
-                  "notify-data"
-                ],
-                messageId: undefined,
-              },
-              "notify-metadata":
-                validMessageStatusEvent.data["notify-payload"][
-                  "notify-metadata"
-                ],
-            },
+            ...validMessageStatusEvent.data,
+            timestamp: "2026-02-05",
           },
         };
 
         expect(() => validateStatusTransitionEvent(invalidEvent)).toThrow(
-          "notify-data.messageId is required",
-        );
-      });
-
-      it("should throw error if notify-data.timestamp is missing", () => {
-        const invalidEvent = {
-          ...validMessageStatusEvent,
-          data: {
-            "notify-payload": {
-              "notify-data": {
-                ...validMessageStatusEvent.data["notify-payload"][
-                  "notify-data"
-                ],
-                timestamp: undefined,
-              },
-              "notify-metadata":
-                validMessageStatusEvent.data["notify-payload"][
-                  "notify-metadata"
-                ],
-            },
-          },
-        };
-
-        expect(() => validateStatusTransitionEvent(invalidEvent)).toThrow(
-          "notify-data.timestamp is required",
-        );
-      });
-
-      it("should throw error if notify-data.timestamp is not valid RFC 3339 format", () => {
-        const invalidEvent = {
-          ...validMessageStatusEvent,
-          data: {
-            "notify-payload": {
-              "notify-data": {
-                ...validMessageStatusEvent.data["notify-payload"][
-                  "notify-data"
-                ],
-                timestamp: "2026-02-05",
-              },
-              "notify-metadata":
-                validMessageStatusEvent.data["notify-payload"][
-                  "notify-metadata"
-                ],
-            },
-          },
-        };
-
-        expect(() => validateStatusTransitionEvent(invalidEvent)).toThrow(
-          "notify-data.timestamp must be a valid RFC 3339 timestamp",
+          "data.timestamp must be a valid RFC 3339 timestamp",
         );
       });
     });
@@ -358,23 +151,13 @@ describe("event-validator", () => {
         const invalidEvent = {
           ...validMessageStatusEvent,
           data: {
-            "notify-payload": {
-              "notify-data": {
-                ...validMessageStatusEvent.data["notify-payload"][
-                  "notify-data"
-                ],
-                messageStatus: undefined,
-              },
-              "notify-metadata":
-                validMessageStatusEvent.data["notify-payload"][
-                  "notify-metadata"
-                ],
-            },
+            ...validMessageStatusEvent.data,
+            messageStatus: undefined,
           },
         };
 
         expect(() => validateStatusTransitionEvent(invalidEvent)).toThrow(
-          "notify-data.messageStatus is required for message status events",
+          "data.messageStatus is required for message status events",
         );
       });
 
@@ -382,23 +165,13 @@ describe("event-validator", () => {
         const invalidEvent = {
           ...validMessageStatusEvent,
           data: {
-            "notify-payload": {
-              "notify-data": {
-                ...validMessageStatusEvent.data["notify-payload"][
-                  "notify-data"
-                ],
-                channels: undefined,
-              },
-              "notify-metadata":
-                validMessageStatusEvent.data["notify-payload"][
-                  "notify-metadata"
-                ],
-            },
+            ...validMessageStatusEvent.data,
+            channels: undefined,
           },
         };
 
         expect(() => validateStatusTransitionEvent(invalidEvent)).toThrow(
-          "notify-data.channels is required for message status events",
+          "data.channels is required for message status events",
         );
       });
 
@@ -406,23 +179,13 @@ describe("event-validator", () => {
         const invalidEvent = {
           ...validMessageStatusEvent,
           data: {
-            "notify-payload": {
-              "notify-data": {
-                ...validMessageStatusEvent.data["notify-payload"][
-                  "notify-data"
-                ],
-                channels: [],
-              },
-              "notify-metadata":
-                validMessageStatusEvent.data["notify-payload"][
-                  "notify-metadata"
-                ],
-            },
+            ...validMessageStatusEvent.data,
+            channels: [],
           },
         };
 
         expect(() => validateStatusTransitionEvent(invalidEvent)).toThrow(
-          "notify-data.channels must have at least one channel",
+          "data.channels must have at least one channel",
         );
       });
 
@@ -430,23 +193,13 @@ describe("event-validator", () => {
         const invalidEvent = {
           ...validMessageStatusEvent,
           data: {
-            "notify-payload": {
-              "notify-data": {
-                ...validMessageStatusEvent.data["notify-payload"][
-                  "notify-data"
-                ],
-                channels: [{ channelStatus: "delivered" } as any],
-              },
-              "notify-metadata":
-                validMessageStatusEvent.data["notify-payload"][
-                  "notify-metadata"
-                ],
-            },
+            ...validMessageStatusEvent.data,
+            channels: [{ channelStatus: "delivered" } as any],
           },
         };
 
         expect(() => validateStatusTransitionEvent(invalidEvent)).toThrow(
-          "notify-data.channels[0].type is required",
+          "data.channels[0].type is required",
         );
       });
 
@@ -454,54 +207,32 @@ describe("event-validator", () => {
         const invalidEvent = {
           ...validMessageStatusEvent,
           data: {
-            "notify-payload": {
-              "notify-data": {
-                ...validMessageStatusEvent.data["notify-payload"][
-                  "notify-data"
-                ],
-                channels: [{ type: "nhsapp" } as any],
-              },
-              "notify-metadata":
-                validMessageStatusEvent.data["notify-payload"][
-                  "notify-metadata"
-                ],
-            },
+            ...validMessageStatusEvent.data,
+            channels: [{ type: "nhsapp" } as any],
           },
         };
 
         expect(() => validateStatusTransitionEvent(invalidEvent)).toThrow(
-          "notify-data.channels[0].channelStatus is required",
+          "data.channels[0].channelStatus is required",
         );
       });
     });
 
     describe("channel status specific validation", () => {
-      const validChannelStatusEvent: StatusTransitionEvent = {
+      const validChannelStatusEvent: TestEvent<ChannelStatusData> = {
         ...validMessageStatusEvent,
         type: "uk.nhs.notify.client-callbacks.channel.status.transitioned.v1",
         data: {
-          "notify-payload": {
-            "notify-data": {
-              clientId: "client-abc-123",
-              messageId: "msg-789-xyz",
-              messageReference: "client-ref-12345",
-              channel: "NHSAPP",
-              channelStatus: "DELIVERED",
-              supplierStatus: "DELIVERED",
-              cascadeType: "primary",
-              cascadeOrder: 1,
-              timestamp: "2026-02-05T14:29:55Z",
-              retryCount: 0,
-              routingPlan: {
-                id: "routing-plan-123",
-                name: "NHS App with SMS fallback",
-                version: "ztoe2qRAM8M8vS0bqajhyEBcvXacrGPp",
-                createdDate: "2023-11-17T14:27:51.413Z",
-              },
-            },
-            "notify-metadata":
-              validMessageStatusEvent.data["notify-payload"]["notify-metadata"],
-          },
+          clientId: "client-abc-123",
+          messageId: "msg-789-xyz",
+          messageReference: "client-ref-12345",
+          channel: "NHSAPP",
+          channelStatus: "DELIVERED",
+          supplierStatus: "DELIVERED",
+          cascadeType: "primary",
+          cascadeOrder: 1,
+          timestamp: "2026-02-05T14:29:55Z",
+          retryCount: 0,
         },
       };
 
@@ -515,23 +246,13 @@ describe("event-validator", () => {
         const invalidEvent = {
           ...validChannelStatusEvent,
           data: {
-            "notify-payload": {
-              "notify-data": {
-                ...validChannelStatusEvent.data["notify-payload"][
-                  "notify-data"
-                ],
-                channel: undefined,
-              },
-              "notify-metadata":
-                validChannelStatusEvent.data["notify-payload"][
-                  "notify-metadata"
-                ],
-            },
+            ...validChannelStatusEvent.data,
+            channel: undefined,
           },
         };
 
         expect(() => validateStatusTransitionEvent(invalidEvent)).toThrow(
-          "notify-data.channel is required for channel status events",
+          "data.channel is required for channel status events",
         );
       });
 
@@ -539,23 +260,13 @@ describe("event-validator", () => {
         const invalidEvent = {
           ...validChannelStatusEvent,
           data: {
-            "notify-payload": {
-              "notify-data": {
-                ...validChannelStatusEvent.data["notify-payload"][
-                  "notify-data"
-                ],
-                channelStatus: undefined,
-              },
-              "notify-metadata":
-                validChannelStatusEvent.data["notify-payload"][
-                  "notify-metadata"
-                ],
-            },
+            ...validChannelStatusEvent.data,
+            channelStatus: undefined,
           },
         };
 
         expect(() => validateStatusTransitionEvent(invalidEvent)).toThrow(
-          "notify-data.channelStatus is required for channel status events",
+          "data.channelStatus is required for channel status events",
         );
       });
 
@@ -563,23 +274,13 @@ describe("event-validator", () => {
         const invalidEvent = {
           ...validChannelStatusEvent,
           data: {
-            "notify-payload": {
-              "notify-data": {
-                ...validChannelStatusEvent.data["notify-payload"][
-                  "notify-data"
-                ],
-                supplierStatus: undefined,
-              },
-              "notify-metadata":
-                validChannelStatusEvent.data["notify-payload"][
-                  "notify-metadata"
-                ],
-            },
+            ...validChannelStatusEvent.data,
+            supplierStatus: undefined,
           },
         };
 
         expect(() => validateStatusTransitionEvent(invalidEvent)).toThrow(
-          "notify-data.supplierStatus is required for channel status events",
+          "data.supplierStatus is required for channel status events",
         );
       });
     });
