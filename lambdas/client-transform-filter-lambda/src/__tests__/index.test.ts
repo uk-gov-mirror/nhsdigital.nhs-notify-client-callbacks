@@ -49,8 +49,16 @@ describe("Lambda handler", () => {
     },
   };
 
-  it("should transform a valid message status event", async () => {
-    const result = await handler(validMessageStatusEvent);
+  it("should transform a valid message status event from SQS", async () => {
+    const sqsMessage = {
+      messageId: "sqs-msg-id-12345",
+      receiptHandle: "receipt-handle-xyz",
+      body: JSON.stringify(validMessageStatusEvent),
+      attributes: {},
+      messageAttributes: {},
+    };
+
+    const result = await handler([sqsMessage]);
 
     expect(result).toHaveLength(1);
     expect(result[0]).toHaveProperty("transformedPayload");
@@ -60,20 +68,29 @@ describe("Lambda handler", () => {
     );
   });
 
-  it("should handle array of events", async () => {
-    const events = [validMessageStatusEvent];
-    const result = await handler(events);
+  it("should handle batch of SQS messages from EventBridge Pipes", async () => {
+    const sqsMessages = [
+      {
+        messageId: "sqs-msg-id-1",
+        receiptHandle: "receipt-handle-1",
+        body: JSON.stringify(validMessageStatusEvent),
+        attributes: {},
+        messageAttributes: {},
+      },
+      {
+        messageId: "sqs-msg-id-2",
+        receiptHandle: "receipt-handle-2",
+        body: JSON.stringify(validMessageStatusEvent),
+        attributes: {},
+        messageAttributes: {},
+      },
+    ];
 
-    expect(result).toHaveLength(1);
+    const result = await handler(sqsMessages);
+
+    expect(result).toHaveLength(2);
     expect(result[0]).toHaveProperty("transformedPayload");
-  });
-
-  it("should handle stringified event", async () => {
-    const eventStr = JSON.stringify(validMessageStatusEvent);
-    const result = await handler(eventStr);
-
-    expect(result).toHaveLength(1);
-    expect(result[0]).toHaveProperty("transformedPayload");
+    expect(result[1]).toHaveProperty("transformedPayload");
   });
 
   it("should throw error for unsupported event type", async () => {
@@ -82,7 +99,15 @@ describe("Lambda handler", () => {
       type: "uk.nhs.notify.client-callbacks.unsupported.v1",
     };
 
-    await expect(handler(unsupportedEvent)).rejects.toThrow(
+    const sqsMessage = {
+      messageId: "sqs-msg-id-error",
+      receiptHandle: "receipt-handle-error",
+      body: JSON.stringify(unsupportedEvent),
+      attributes: {},
+      messageAttributes: {},
+    };
+
+    await expect(handler([sqsMessage])).rejects.toThrow(
       "Unsupported event type",
     );
   });

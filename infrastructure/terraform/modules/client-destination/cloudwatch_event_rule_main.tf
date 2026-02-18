@@ -19,6 +19,7 @@ resource "aws_cloudwatch_event_target" "main" {
   target_id      = "${local.csi}-${var.connection_name}"
   role_arn       = aws_iam_role.api_target_role.arn
   event_bus_name = var.client_bus_name
+  input_path     = "$.detail.transformedPayload"
 
   dead_letter_config {
     arn = module.target_dlq.sqs_queue_arn

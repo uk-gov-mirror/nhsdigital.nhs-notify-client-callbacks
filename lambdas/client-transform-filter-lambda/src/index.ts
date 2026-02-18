@@ -26,16 +26,14 @@ import {
 import { metricsService } from "services/metrics";
 
 /**
- * Parse incoming event payload into array of events
+ * Parse incoming event payload from EventBridge Pipes with SQS source
+ * EventBridge Pipes always sends an array of SQS message records
  */
-function parseEventPayload(event: any): any[] {
-  if (Array.isArray(event)) {
-    return event;
-  }
-  if (typeof event === "string") {
-    return [JSON.parse(event)];
-  }
-  return [event];
+function parseEventPayload(event: any[]): any[] {
+  return event.map((sqsMessage) => {
+    // Extract CloudEvent from SQS message body
+    return JSON.parse(sqsMessage.body);
+  });
 }
 
 /**
