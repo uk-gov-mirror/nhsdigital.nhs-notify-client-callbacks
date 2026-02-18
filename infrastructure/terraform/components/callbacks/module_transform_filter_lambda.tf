@@ -65,4 +65,17 @@ data "aws_iam_policy_document" "client_transform_filter_lambda" {
       "${module.client_config_bucket.arn}/*",
     ]
   }
+
+  statement {
+    sid    = "CloudWatchMetrics"
+    effect = "Allow"
+
+    actions = [
+      "cloudwatch:PutMetricData",
+    ]
+
+    resources = [
+      "*",
+    ]
+  }
 }
