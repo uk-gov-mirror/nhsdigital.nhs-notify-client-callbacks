@@ -114,6 +114,30 @@ export class TransformationError extends LambdaError {
 }
 
 /**
+ * Converts an unknown error value to a string message
+ * Handles primitives, objects, and unknown types safely
+ */
+function errorToString(error: unknown): string {
+  if (typeof error === "string") {
+    return error;
+  }
+
+  if (typeof error === "object" && error !== null) {
+    try {
+      return JSON.stringify(error);
+    } catch {
+      return "Unknown error (unable to serialize)";
+    }
+  }
+
+  if (typeof error === "number" || typeof error === "boolean") {
+    return `${error}`;
+  }
+
+  return "Unknown error";
+}
+
+/**
  * Wraps an unknown error in structured format
  */
 export function wrapUnknownError(
@@ -135,9 +159,12 @@ export function wrapUnknownError(
     );
   }
 
+  // For non-Error objects, convert to string message
+  const errorMessage = errorToString(error);
+
   return new LambdaError(
     ErrorType.UNKNOWN_ERROR,
-    String(error),
+    errorMessage,
     correlationId,
     eventId,
     false,
@@ -183,9 +210,12 @@ export function formatErrorForLogging(error: unknown): {
     };
   }
 
+  // Handle non-Error objects
+  const errorMessage = errorToString(error);
+
   return {
     errorType: ErrorType.UNKNOWN_ERROR,
-    message: String(error),
+    message: errorMessage,
     retryable: false,
   };
 }

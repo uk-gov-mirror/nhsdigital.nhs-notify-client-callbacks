@@ -151,7 +151,7 @@ async function handleEventError(
   if (error instanceof ValidationError) {
     logger.error("Event validation failed", {
       correlationId: eventCorrelationId,
-      error: error instanceof Error ? error : new Error(String(error)),
+      error,
     });
     await metricsService.emitValidationError(eventErrorType);
     throw error;
@@ -161,7 +161,7 @@ async function handleEventError(
     logger.error("Event transformation failed", {
       correlationId: eventCorrelationId,
       eventType: eventErrorType,
-      error: error instanceof Error ? error : new Error(String(error)),
+      error,
     });
     await metricsService.emitTransformationFailure(
       eventErrorType,
