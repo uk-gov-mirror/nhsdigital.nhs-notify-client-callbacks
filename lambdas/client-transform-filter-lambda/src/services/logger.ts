@@ -96,14 +96,24 @@ export const logger = new Logger();
 /**
  * Extract correlation ID from CloudEvents event
  */
-export function extractCorrelationId(event: any): string | undefined {
+export function extractCorrelationId(event: unknown): string | undefined {
   // CloudEvents id field serves as correlation ID
-  if (event?.id) {
+  if (
+    event &&
+    typeof event === "object" &&
+    "id" in event &&
+    typeof event.id === "string"
+  ) {
     return event.id;
   }
 
   // Fallback to traceparent if id not present
-  if (event?.traceparent) {
+  if (
+    event &&
+    typeof event === "object" &&
+    "traceparent" in event &&
+    typeof event.traceparent === "string"
+  ) {
     return event.traceparent;
   }
 

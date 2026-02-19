@@ -6,10 +6,12 @@
  *
  */
 
+import type { SQSRecord } from "aws-lambda";
 import type { StatusTransitionEvent } from "models/status-transition-event";
 import { EventTypes } from "models/status-transition-event";
 import type { MessageStatusData } from "models/message-status-data";
 import type { ChannelStatusData } from "models/channel-status-data";
+import type { ClientCallbackPayload } from "models/client-callback-payload";
 import { validateStatusTransitionEvent } from "services/validators/event-validator";
 import { transformMessageStatus } from "services/transformers/message-status-transformer";
 import { transformChannelStatus } from "services/transformers/channel-status-transformer";
@@ -26,24 +28,21 @@ import {
 import { metricsService } from "services/metrics";
 
 /**
- * Parse incoming event payload from EventBridge Pipes with SQS source
- * EventBridge Pipes always sends an array of SQS message records
+ * Transformed event returned by the enrichment lambda.
+ * Contains the original event plus the transformed callback payload.
  */
-function parseEventPayload(event: any[]): any[] {
-  return event.map((sqsMessage) => {
-    // Extract CloudEvent from SQS message body
-    return JSON.parse(sqsMessage.body);
-  });
+interface TransformedEvent extends StatusTransitionEvent {
+  transformedPayload: ClientCallbackPayload;
 }
 
 /**
  * Transform event based on its type
  */
 function transformEvent(
-  rawEvent: any,
+  rawEvent: StatusTransitionEvent,
   eventType: string,
   correlationId: string | undefined,
-): any {
+): ClientCallbackPayload {
   if (eventType === EventTypes.MESSAGE_STATUS_TRANSITIONED) {
     const typedEvent = rawEvent as StatusTransitionEvent<MessageStatusData>;
     return transformMessageStatus(typedEvent);
@@ -62,28 +61,45 @@ function transformEvent(
 /**
  * Process a single event: validate, transform, emit metrics
  */
-async function processSingleEvent(rawEvent: any): Promise<any> {
+async function processSingleEvent(
+  sqsRecord: SQSRecord,
+): Promise<TransformedEvent> {
+  // Parse SQS message body as JSON
+  let rawEvent: unknown;
+  try {
+    rawEvent = JSON.parse(sqsRecord.body);
+  } catch (error) {
+    throw new ValidationError(
+      `Failed to parse SQS message body as JSON: ${error instanceof Error ? error.message : String(error)}`,
+      undefined,
+      sqsRecord.messageId,
+    );
+  }
+
   const correlationId = extractCorrelationId(rawEvent);
   logger.addContext({ correlationId });
 
   logLifecycleEvent("received", {
     correlationId,
-    eventType: rawEvent.type,
+    eventType: (rawEvent as StatusTransitionEvent).type,
   });
 
-  // Validate event schema
+  // Validate event schema - this ensures rawEvent conforms to StatusTransitionEvent structure
   validateStatusTransitionEvent(rawEvent);
 
-  const eventType = rawEvent.type;
+  // After validation, we can safely treat rawEvent as StatusTransitionEvent
+  const validatedEvent = rawEvent as StatusTransitionEvent;
+
+  const eventType = validatedEvent.type;
   if (!eventType) {
     throw new ValidationError(
       "Event type is required",
       correlationId,
-      rawEvent.id,
+      validatedEvent.id,
     );
   }
 
-  const clientId = rawEvent.data?.clientId;
+  const clientId = validatedEvent.data?.clientId;
 
   // Emit metric for event received
   await metricsService.emitEventReceived(
@@ -98,7 +114,11 @@ async function processSingleEvent(rawEvent: any): Promise<any> {
   });
 
   // Transform based on event type
-  const callbackPayload = transformEvent(rawEvent, eventType, correlationId);
+  const callbackPayload = transformEvent(
+    validatedEvent,
+    eventType,
+    correlationId,
+  );
 
   logLifecycleEvent("transformation-completed", {
     correlationId,
@@ -114,8 +134,8 @@ async function processSingleEvent(rawEvent: any): Promise<any> {
 
   // For US1, we pass all transformed events through
   // US2 will add subscription filtering logic here
-  const transformedEvent = {
-    ...rawEvent,
+  const transformedEvent: TransformedEvent = {
+    ...validatedEvent,
     transformedPayload: callbackPayload,
   };
 
@@ -139,16 +159,12 @@ async function processSingleEvent(rawEvent: any): Promise<any> {
  */
 async function handleEventError(
   error: unknown,
-  correlationId: string,
-  eventType: string,
-  rawEvent: any,
+  correlationId = "unknown",
+  eventErrorType = "unknown",
 ): Promise<never> {
-  const eventCorrelationId = correlationId || "unknown";
-  const eventErrorType = eventType || "unknown";
-
   if (error instanceof ValidationError) {
     logger.error("Event validation failed", {
-      correlationId: eventCorrelationId,
+      correlationId,
       error,
     });
     await metricsService.emitValidationError(eventErrorType);
@@ -157,7 +173,7 @@ async function handleEventError(
 
   if (error instanceof TransformationError) {
     logger.error("Event transformation failed", {
-      correlationId: eventCorrelationId,
+      correlationId,
       eventType: eventErrorType,
       error,
     });
@@ -169,13 +185,9 @@ async function handleEventError(
   }
 
   // Unknown errors
-  const wrappedError = wrapUnknownError(
-    error,
-    eventCorrelationId,
-    rawEvent?.id,
-  );
+  const wrappedError = wrapUnknownError(error, correlationId);
   logger.error("Unexpected error processing event", {
-    correlationId: eventCorrelationId,
+    correlationId,
     error: wrappedError,
   });
   await metricsService.emitTransformationFailure(
@@ -191,29 +203,32 @@ async function handleEventError(
  * Processes events from EventBridge Pipe (SQS source).
  * Returns transformed events for routing to Callbacks Event Bus.
  */
-export const handler = async (event: any): Promise<any> => {
+export const handler = async (
+  event: SQSRecord[],
+): Promise<TransformedEvent[]> => {
   const startTime = Date.now();
   let correlationId: string | undefined;
   let eventType: string | undefined;
 
   try {
-    const parsedEvents = parseEventPayload(event);
-    const transformedEvents: any[] = [];
+    const transformedEvents: TransformedEvent[] = [];
 
-    // Process each event in the batch
-    for (const rawEvent of parsedEvents) {
+    for (const sqsRecord of event) {
       try {
-        correlationId = extractCorrelationId(rawEvent);
-        eventType = rawEvent.type;
-        const transformedEvent = await processSingleEvent(rawEvent);
+        const transformedEvent = await processSingleEvent(sqsRecord);
         transformedEvents.push(transformedEvent);
+        // Extract for metrics - these are set during processSingleEvent
+        eventType = transformedEvent.type;
       } catch (error) {
-        await handleEventError(
-          error,
-          correlationId || "unknown",
-          eventType || "unknown",
-          rawEvent,
-        );
+        // Extract correlation ID and event type from error if available
+        if (
+          error instanceof ValidationError ||
+          error instanceof TransformationError
+        ) {
+          correlationId = error.correlationId;
+          // Event type may not be available if parsing/validation failed early
+        }
+        await handleEventError(error, correlationId, eventType);
       }
     }
 

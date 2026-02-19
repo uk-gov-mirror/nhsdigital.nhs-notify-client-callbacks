@@ -35,7 +35,7 @@ export class MetricsService {
       region: process.env.AWS_REGION || "eu-west-2",
     });
     this.namespace =
-      process.env.METRICS_NAMESPACE || "NHS-Notify/ClientCallbacks";
+      process.env.METRICS_NAMESPACE || "NHS-Notify/ClientCallbacks"; // TODO - CCM-14200 - what should the namespace be for these metrics?
     this.environment = process.env.ENVIRONMENT || "development";
   }
 

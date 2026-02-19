@@ -166,7 +166,7 @@ function validateChannelStatusFields(data: any): void {
  * @param event - The event to validate
  * @throws Error if validation fails with detailed error message
  */
-export function validateStatusTransitionEvent(event: any): void {
+export function validateStatusTransitionEvent(event: unknown): void {
   try {
     // CloudEvent constructor validates standard CloudEvents attributes:
     // - specversion (must be "1.0")
