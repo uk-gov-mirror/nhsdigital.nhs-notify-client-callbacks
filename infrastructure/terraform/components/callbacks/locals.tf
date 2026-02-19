@@ -4,8 +4,29 @@ locals {
   root_domain_name              = "${var.environment}.${local.acct.route53_zone_names["client-callbacks"]}" # e.g. [main|dev|abxy0].smsnudge.[dev|nonprod|prod].nhsnotify.national.nhs.uk
   root_domain_id                = local.acct.route53_zone_ids["client-callbacks"]
 
+  # Clients from variable
   clients_by_name = {
     for client in var.clients :
     client.connection_name => client
   }
+
+  # Automatic test client when mock webhook is deployed
+  test_client = var.deploy_mock_webhook ? {
+    "test-client" = {
+      connection_name                  = "test-client"
+      destination_name                 = "test-destination"
+      invocation_endpoint              = aws_lambda_function_url.mock_webhook[0].function_url
+      invocation_rate_limit_per_second = 10
+      http_method                      = "POST"
+      header_name                      = "x-api-key"
+      header_value                     = "test-api-key-placeholder"
+      client_detail = [
+        "uk.nhs.notify.client-callbacks.message.status.transitioned.v1",
+        "uk.nhs.notify.client-callbacks.channel.status.transitioned.v1"
+      ]
+    }
+  } : {}
+
+  # Merge configured clients with test client
+  all_clients = merge(local.clients_by_name, local.test_client)
 }

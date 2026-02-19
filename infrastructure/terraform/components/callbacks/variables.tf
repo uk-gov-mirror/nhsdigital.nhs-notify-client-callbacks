@@ -116,5 +116,5 @@ variable "pipe_sqs_max_batch_window" {
 variable "deploy_mock_webhook" {
   type        = bool
   description = "Flag to deploy mock webhook lambda for integration testing (test/dev environments only)"
-  default     = false
+  default     = true # TODO: CCM-14200 -Revert to false after testing
 }

@@ -1,6 +1,6 @@
 module "client_destination" {
   source   = "../../modules/client-destination"
-  for_each = local.clients_by_name
+  for_each = local.all_clients
 
   project         = var.project
   aws_account_id  = var.aws_account_id
