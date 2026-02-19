@@ -93,3 +93,11 @@ When proposing a change, agents should:
 ## Escalation / Blockers
 
 If you are blocked by an unavailable secret, unclear architectural constraint, missing upstream module, or failing tooling you cannot safely fix, stop and ask a single clear clarifying question rather than guessing.
+
+## Comment Policy
+
+- No JSDoc unless it's a public API with non-obvious behavior
+- No inline comments that just describe what the next line does
+- Only comment when explaining WHY, not WHAT
+- Prefer better naming over comments
+- Trust developers can read TypeScript
