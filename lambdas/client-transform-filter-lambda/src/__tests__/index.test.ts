@@ -1,5 +1,7 @@
+import type { SQSRecord } from "aws-lambda";
 import type { StatusTransitionEvent } from "models/status-transition-event";
 import type { MessageStatusData } from "models/message-status-data";
+import type { MessageStatusAttributes } from "models/client-callback-payload";
 import { handler } from "..";
 
 // Mock the metrics service to avoid actual CloudWatch calls
@@ -50,39 +52,67 @@ describe("Lambda handler", () => {
   };
 
   it("should transform a valid message status event from SQS", async () => {
-    const sqsMessage = {
+    const sqsMessage: SQSRecord = {
       messageId: "sqs-msg-id-12345",
       receiptHandle: "receipt-handle-xyz",
       body: JSON.stringify(validMessageStatusEvent),
-      attributes: {},
+      attributes: {
+        ApproximateReceiveCount: "1",
+        SentTimestamp: "1519211230",
+        SenderId: "ABCDEFGHIJ",
+        ApproximateFirstReceiveTimestamp: "1519211230",
+      },
       messageAttributes: {},
+      md5OfBody: "mock-md5",
+      eventSource: "aws:sqs",
+      eventSourceARN: "arn:aws:sqs:eu-west-2:123456789:mock-queue",
+      awsRegion: "eu-west-2",
     };
 
     const result = await handler([sqsMessage]);
 
     expect(result).toHaveLength(1);
     expect(result[0]).toHaveProperty("transformedPayload");
-    expect(result[0].transformedPayload.data[0].type).toBe("MessageStatus");
-    expect(result[0].transformedPayload.data[0].attributes.messageStatus).toBe(
+    const dataItem = result[0].transformedPayload.data[0];
+    expect(dataItem.type).toBe("MessageStatus");
+    expect((dataItem.attributes as MessageStatusAttributes).messageStatus).toBe(
       "delivered",
     );
   });
 
   it("should handle batch of SQS messages from EventBridge Pipes", async () => {
-    const sqsMessages = [
+    const sqsMessages: SQSRecord[] = [
       {
         messageId: "sqs-msg-id-1",
         receiptHandle: "receipt-handle-1",
         body: JSON.stringify(validMessageStatusEvent),
-        attributes: {},
+        attributes: {
+          ApproximateReceiveCount: "1",
+          SentTimestamp: "1519211230",
+          SenderId: "ABCDEFGHIJ",
+          ApproximateFirstReceiveTimestamp: "1519211230",
+        },
         messageAttributes: {},
+        md5OfBody: "mock-md5",
+        eventSource: "aws:sqs",
+        eventSourceARN: "arn:aws:sqs:eu-west-2:123456789:mock-queue",
+        awsRegion: "eu-west-2",
       },
       {
         messageId: "sqs-msg-id-2",
         receiptHandle: "receipt-handle-2",
         body: JSON.stringify(validMessageStatusEvent),
-        attributes: {},
+        attributes: {
+          ApproximateReceiveCount: "1",
+          SentTimestamp: "1519211230",
+          SenderId: "ABCDEFGHIJ",
+          ApproximateFirstReceiveTimestamp: "1519211230",
+        },
         messageAttributes: {},
+        md5OfBody: "mock-md5",
+        eventSource: "aws:sqs",
+        eventSourceARN: "arn:aws:sqs:eu-west-2:123456789:mock-queue",
+        awsRegion: "eu-west-2",
       },
     ];
 
@@ -99,16 +129,25 @@ describe("Lambda handler", () => {
       type: "uk.nhs.notify.client-callbacks.unsupported.v1",
     };
 
-    const sqsMessage = {
+    const sqsMessage: SQSRecord = {
       messageId: "sqs-msg-id-error",
       receiptHandle: "receipt-handle-error",
       body: JSON.stringify(unsupportedEvent),
-      attributes: {},
+      attributes: {
+        ApproximateReceiveCount: "1",
+        SentTimestamp: "1519211230",
+        SenderId: "ABCDEFGHIJ",
+        ApproximateFirstReceiveTimestamp: "1519211230",
+      },
       messageAttributes: {},
+      md5OfBody: "mock-md5",
+      eventSource: "aws:sqs",
+      eventSourceARN: "arn:aws:sqs:eu-west-2:123456789:mock-queue",
+      awsRegion: "eu-west-2",
     };
 
     await expect(handler([sqsMessage])).rejects.toThrow(
-      "Unsupported event type",
+      "Validation failed: type: Invalid enum value",
     );
   });
 });

@@ -57,7 +57,7 @@ describe("event-validator", () => {
         delete invalidEvent.traceparent;
 
         expect(() => validateStatusTransitionEvent(invalidEvent)).toThrow(
-          "traceparent is required",
+          "Validation failed: traceparent: Required",
         );
       });
     });
@@ -70,7 +70,7 @@ describe("event-validator", () => {
         };
 
         expect(() => validateStatusTransitionEvent(invalidEvent)).toThrow(
-          "type must match namespace uk.nhs.notify.client-callbacks.*",
+          "Validation failed: type: Invalid enum value",
         );
       });
     });
@@ -83,7 +83,7 @@ describe("event-validator", () => {
         };
 
         expect(() => validateStatusTransitionEvent(invalidEvent)).toThrow(
-          "datacontenttype must be 'application/json'",
+          'Validation failed: datacontenttype: Invalid literal value, expected "application/json"',
         );
       });
     });
@@ -99,7 +99,7 @@ describe("event-validator", () => {
         };
 
         expect(() => validateStatusTransitionEvent(invalidEvent)).toThrow(
-          "data.clientId is required",
+          "Validation failed: clientId: Required",
         );
       });
 
@@ -113,7 +113,7 @@ describe("event-validator", () => {
         };
 
         expect(() => validateStatusTransitionEvent(invalidEvent)).toThrow(
-          "data.messageId is required",
+          "Validation failed: messageId: Required",
         );
       });
 
@@ -127,7 +127,7 @@ describe("event-validator", () => {
         };
 
         expect(() => validateStatusTransitionEvent(invalidEvent)).toThrow(
-          "data.timestamp is required",
+          "Validation failed: timestamp: Required",
         );
       });
 
@@ -157,7 +157,7 @@ describe("event-validator", () => {
         };
 
         expect(() => validateStatusTransitionEvent(invalidEvent)).toThrow(
-          "data.messageStatus is required for message status events",
+          "Validation failed: messageStatus: Required",
         );
       });
 
@@ -171,7 +171,7 @@ describe("event-validator", () => {
         };
 
         expect(() => validateStatusTransitionEvent(invalidEvent)).toThrow(
-          "data.channels is required for message status events",
+          "Validation failed: channels: Required",
         );
       });
 
@@ -199,7 +199,7 @@ describe("event-validator", () => {
         };
 
         expect(() => validateStatusTransitionEvent(invalidEvent)).toThrow(
-          "data.channels[0].type is required",
+          "Validation failed: channels.0.type: Required",
         );
       });
 
@@ -213,7 +213,7 @@ describe("event-validator", () => {
         };
 
         expect(() => validateStatusTransitionEvent(invalidEvent)).toThrow(
-          "data.channels[0].channelStatus is required",
+          "Validation failed: channels.0.channelStatus: Required",
         );
       });
     });
@@ -252,7 +252,7 @@ describe("event-validator", () => {
         };
 
         expect(() => validateStatusTransitionEvent(invalidEvent)).toThrow(
-          "data.channel is required for channel status events",
+          "Validation failed: channel: Required",
         );
       });
 
@@ -266,7 +266,7 @@ describe("event-validator", () => {
         };
 
         expect(() => validateStatusTransitionEvent(invalidEvent)).toThrow(
-          "data.channelStatus is required for channel status events",
+          "Validation failed: channelStatus: Required",
         );
       });
 
@@ -280,7 +280,7 @@ describe("event-validator", () => {
         };
 
         expect(() => validateStatusTransitionEvent(invalidEvent)).toThrow(
-          "data.supplierStatus is required for channel status events",
+          "Validation failed: supplierStatus: Required",
         );
       });
     });
