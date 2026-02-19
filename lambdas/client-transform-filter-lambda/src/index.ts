@@ -58,23 +58,22 @@ function transformEvent(
   );
 }
 
-/**
- * Process a single event: validate, transform, emit metrics
- */
-async function processSingleEvent(
-  sqsRecord: SQSRecord,
-): Promise<TransformedEvent> {
-  // Parse SQS message body as JSON
-  let rawEvent: unknown;
+function parseSqsMessageBody(sqsRecord: SQSRecord): unknown {
   try {
-    rawEvent = JSON.parse(sqsRecord.body);
+    return JSON.parse(sqsRecord.body);
   } catch (error) {
     throw new ValidationError(
-      `Failed to parse SQS message body as JSON: ${error instanceof Error ? error.message : String(error)}`,
+      `Failed to parse SQS message body as JSON: ${error instanceof Error ? error.message : "Unknown error"}`,
       undefined,
       sqsRecord.messageId,
     );
   }
+}
+
+async function processSingleEvent(
+  sqsRecord: SQSRecord,
+): Promise<TransformedEvent> {
+  const rawEvent = parseSqsMessageBody(sqsRecord);
 
   const correlationId = extractCorrelationId(rawEvent);
   logger.addContext({ correlationId });
@@ -84,28 +83,14 @@ async function processSingleEvent(
     eventType: (rawEvent as StatusTransitionEvent).type,
   });
 
-  // Validate event schema - this ensures rawEvent conforms to StatusTransitionEvent structure
   validateStatusTransitionEvent(rawEvent);
 
-  // After validation, we can safely treat rawEvent as StatusTransitionEvent
   const validatedEvent = rawEvent as StatusTransitionEvent;
 
   const eventType = validatedEvent.type;
-  if (!eventType) {
-    throw new ValidationError(
-      "Event type is required",
-      correlationId,
-      validatedEvent.id,
-    );
-  }
+  const { clientId } = validatedEvent.data;
 
-  const clientId = validatedEvent.data?.clientId;
-
-  // Emit metric for event received
-  await metricsService.emitEventReceived(
-    eventType ?? "unknown",
-    clientId ?? "unknown",
-  );
+  await metricsService.emitEventReceived(eventType, clientId);
 
   logLifecycleEvent("transformation-started", {
     correlationId,
@@ -113,7 +98,6 @@ async function processSingleEvent(
     clientId,
   });
 
-  // Transform based on event type
   const callbackPayload = transformEvent(
     validatedEvent,
     eventType,
@@ -126,14 +110,8 @@ async function processSingleEvent(
     clientId,
   });
 
-  // Emit metric for successful transformation
-  await metricsService.emitTransformationSuccess(
-    eventType,
-    clientId || "unknown",
-  );
+  await metricsService.emitTransformationSuccess(eventType, clientId);
 
-  // For US1, we pass all transformed events through
-  // US2 will add subscription filtering logic here
   const transformedEvent: TransformedEvent = {
     ...validatedEvent,
     transformedPayload: callbackPayload,
@@ -145,10 +123,8 @@ async function processSingleEvent(
     clientId,
   });
 
-  // Emit metric for callback delivery initiated
-  await metricsService.emitDeliveryInitiated(clientId || "unknown");
+  await metricsService.emitDeliveryInitiated(clientId);
 
-  // Clear context for next event
   logger.clearContext();
 
   return transformedEvent;
@@ -217,7 +193,6 @@ export const handler = async (
       try {
         const transformedEvent = await processSingleEvent(sqsRecord);
         transformedEvents.push(transformedEvent);
-        // Extract for metrics - these are set during processSingleEvent
         eventType = transformedEvent.type;
       } catch (error) {
         // Extract correlation ID and event type from error if available
