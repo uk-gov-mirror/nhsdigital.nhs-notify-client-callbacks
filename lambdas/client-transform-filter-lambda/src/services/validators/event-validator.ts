@@ -3,7 +3,10 @@ import {
   ValidationError as CloudEventsValidationError,
 } from "cloudevents";
 import { z } from "zod";
-import { EventTypes } from "models/status-transition-event";
+import {
+  EventTypes,
+  StatusTransitionEvent,
+} from "models/status-transition-event";
 import { ValidationError } from "services/error-handler";
 import { extractCorrelationId } from "services/logger";
 
@@ -75,7 +78,9 @@ function formatValidationError(error: unknown, event: unknown): never {
   throw new ValidationError(message, correlationId, eventId);
 }
 
-export function validateStatusTransitionEvent(event: unknown): void {
+export function validateStatusTransitionEvent(
+  event: unknown,
+): asserts event is StatusTransitionEvent {
   try {
     const ce = new CloudEvent(event as any, true);
 

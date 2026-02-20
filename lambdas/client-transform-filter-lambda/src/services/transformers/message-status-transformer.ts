@@ -8,16 +8,6 @@ import type {
   MessageStatusAttributes,
 } from "models/client-callback-payload";
 
-/**
- * Transforms a Message Status Event from the Shared Event Bus format
- * to the client-facing JSON:API callback payload format.
- *
- * Extracts fields from notify-data section and constructs a JSON:API
- * compliant payload, excluding operational fields (clientId, previousMessageStatus).
- *
- * @param event - Status transition event with MessageStatusData
- * @returns Client callback payload in JSON:API format
- */
 export function transformMessageStatus(
   event: StatusTransitionEvent<MessageStatusData>,
 ): ClientCallbackPayload {
@@ -33,7 +23,6 @@ export function transformMessageStatus(
     }),
   );
 
-  // Build attributes object with required fields
   const attributes: MessageStatusAttributes = {
     messageId: notifyData.messageId,
     messageReference: notifyData.messageReference,
@@ -43,7 +32,6 @@ export function transformMessageStatus(
     routingPlan: notifyData.routingPlan,
   };
 
-  // Include optional fields if present
   if (notifyData.messageStatusDescription) {
     attributes.messageStatusDescription = notifyData.messageStatusDescription;
   }
@@ -52,7 +40,6 @@ export function transformMessageStatus(
     attributes.messageFailureReasonCode = notifyData.messageFailureReasonCode;
   }
 
-  // Construct JSON:API payload
   const payload: ClientCallbackPayload = {
     data: [
       {

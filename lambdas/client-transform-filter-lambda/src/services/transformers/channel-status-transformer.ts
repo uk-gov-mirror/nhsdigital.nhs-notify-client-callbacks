@@ -8,16 +8,6 @@ import type {
   ClientSupplierStatus,
 } from "models/client-callback-payload";
 
-/**
- * Transforms a Channel Status Event from the Shared Event Bus format
- * to the client-facing JSON:API callback payload format.
- *
- * Extracts fields from notify-data section and constructs a JSON:API
- * compliant payload, excluding operational fields (clientId, previousChannelStatus, previousSupplierStatus).
- *
- * @param event - Status transition event with ChannelStatusData
- * @returns Client callback payload in JSON:API format
- */
 export function transformChannelStatus(
   event: StatusTransitionEvent<ChannelStatusData>,
 ): ClientCallbackPayload {
@@ -29,7 +19,6 @@ export function transformChannelStatus(
   const supplierStatus =
     notifyData.supplierStatus.toLowerCase() as ClientSupplierStatus;
 
-  // Build attributes object with required fields
   const attributes: ChannelStatusAttributes = {
     messageId: notifyData.messageId,
     messageReference: notifyData.messageReference,
@@ -42,7 +31,6 @@ export function transformChannelStatus(
     retryCount: notifyData.retryCount,
   };
 
-  // Include optional fields if present
   if (notifyData.channelStatusDescription) {
     attributes.channelStatusDescription = notifyData.channelStatusDescription;
   }
@@ -51,7 +39,6 @@ export function transformChannelStatus(
     attributes.channelFailureReasonCode = notifyData.channelFailureReasonCode;
   }
 
-  // Construct JSON:API payload
   const payload: ClientCallbackPayload = {
     data: [
       {

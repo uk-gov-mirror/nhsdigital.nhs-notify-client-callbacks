@@ -1,17 +1,13 @@
-/**
- * Transform & Filter Lambda Handler
- *
- * Receives events from SQS via EventBridge Pipe, validates, transforms,
- * and returns filtered events for delivery to client webhooks.
- *
- */
-
 import type { SQSRecord } from "aws-lambda";
 import type { StatusTransitionEvent } from "models/status-transition-event";
 import { EventTypes } from "models/status-transition-event";
 import type { MessageStatusData } from "models/message-status-data";
 import type { ChannelStatusData } from "models/channel-status-data";
-import type { ClientCallbackPayload } from "models/client-callback-payload";
+import type {
+  ChannelStatusAttributes,
+  ClientCallbackPayload,
+  MessageStatusAttributes,
+} from "models/client-callback-payload";
 import { validateStatusTransitionEvent } from "services/validators/event-validator";
 import { transformMessageStatus } from "services/transformers/message-status-transformer";
 import { transformChannelStatus } from "services/transformers/channel-status-transformer";
@@ -27,17 +23,10 @@ import {
 } from "services/error-handler";
 import { metricsService } from "services/metrics";
 
-/**
- * Transformed event returned by the enrichment lambda.
- * Contains the original event plus the transformed callback payload.
- */
 interface TransformedEvent extends StatusTransitionEvent {
   transformedPayload: ClientCallbackPayload;
 }
 
-/**
- * Transform event based on its type
- */
 function transformEvent(
   rawEvent: StatusTransitionEvent,
   eventType: string,
@@ -70,25 +59,62 @@ function parseSqsMessageBody(sqsRecord: SQSRecord): unknown {
   }
 }
 
+function logCallbackGenerated(
+  payload: ClientCallbackPayload,
+  eventType: string,
+  correlationId: string | undefined,
+  clientId: string,
+): void {
+  const { attributes } = payload.data[0];
+
+  const commonFields = {
+    correlationId,
+    callbackType: payload.data[0].type,
+    clientId,
+    messageId: attributes.messageId,
+    messageReference: attributes.messageReference,
+  };
+
+  if (eventType === EventTypes.MESSAGE_STATUS_TRANSITIONED) {
+    const messageAttrs = attributes as MessageStatusAttributes;
+    logger.info("Callback generated", {
+      ...commonFields,
+      messageStatus: messageAttrs.messageStatus,
+      messageStatusDescription: messageAttrs.messageStatusDescription,
+      messageFailureReasonCode: messageAttrs.messageFailureReasonCode,
+      channels: messageAttrs.channels,
+    });
+  } else if (eventType === EventTypes.CHANNEL_STATUS_TRANSITIONED) {
+    const channelAttrs = attributes as ChannelStatusAttributes;
+    logger.info("Callback generated", {
+      ...commonFields,
+      channel: channelAttrs.channel,
+      channelStatus: channelAttrs.channelStatus,
+      channelStatusDescription: channelAttrs.channelStatusDescription,
+      channelFailureReasonCode: channelAttrs.channelFailureReasonCode,
+      supplierStatus: channelAttrs.supplierStatus,
+    });
+  }
+}
+
 async function processSingleEvent(
   sqsRecord: SQSRecord,
 ): Promise<TransformedEvent> {
-  const rawEvent = parseSqsMessageBody(sqsRecord);
+  const event = parseSqsMessageBody(sqsRecord);
 
-  const correlationId = extractCorrelationId(rawEvent);
+  const correlationId = extractCorrelationId(event);
   logger.addContext({ correlationId });
+
+  validateStatusTransitionEvent(event);
+
+  const eventType = event.type;
+  const { clientId, messageId } = event.data;
 
   logLifecycleEvent("received", {
     correlationId,
-    eventType: (rawEvent as StatusTransitionEvent).type,
+    eventType,
+    messageId,
   });
-
-  validateStatusTransitionEvent(rawEvent);
-
-  const validatedEvent = rawEvent as StatusTransitionEvent;
-
-  const eventType = validatedEvent.type;
-  const { clientId } = validatedEvent.data;
 
   await metricsService.emitEventReceived(eventType, clientId);
 
@@ -96,24 +122,24 @@ async function processSingleEvent(
     correlationId,
     eventType,
     clientId,
+    messageId,
   });
 
-  const callbackPayload = transformEvent(
-    validatedEvent,
-    eventType,
-    correlationId,
-  );
+  const callbackPayload = transformEvent(event, eventType, correlationId);
+
+  logCallbackGenerated(callbackPayload, eventType, correlationId, clientId);
 
   logLifecycleEvent("transformation-completed", {
     correlationId,
     eventType,
     clientId,
+    messageId,
   });
 
   await metricsService.emitTransformationSuccess(eventType, clientId);
 
   const transformedEvent: TransformedEvent = {
-    ...validatedEvent,
+    ...event,
     transformedPayload: callbackPayload,
   };
 
@@ -121,6 +147,7 @@ async function processSingleEvent(
     correlationId,
     eventType,
     clientId,
+    messageId,
   });
 
   await metricsService.emitDeliveryInitiated(clientId);
@@ -130,9 +157,6 @@ async function processSingleEvent(
   return transformedEvent;
 }
 
-/**
- * Handle errors from event processing
- */
 async function handleEventError(
   error: unknown,
   correlationId = "unknown",
@@ -160,7 +184,6 @@ async function handleEventError(
     throw error;
   }
 
-  // Unknown errors
   const wrappedError = wrapUnknownError(error, correlationId);
   logger.error("Unexpected error processing event", {
     correlationId,
@@ -173,18 +196,18 @@ async function handleEventError(
   throw wrappedError;
 }
 
-/**
- * Lambda handler entry point
- *
- * Processes events from EventBridge Pipe (SQS source).
- * Returns transformed events for routing to Callbacks Event Bus.
- */
 export const handler = async (
   event: SQSRecord[],
 ): Promise<TransformedEvent[]> => {
   const startTime = Date.now();
   let correlationId: string | undefined;
   let eventType: string | undefined;
+
+  const stats = {
+    successful: 0,
+    failed: 0,
+    processed: 0,
+  };
 
   try {
     const transformedEvents: TransformedEvent[] = [];
@@ -194,8 +217,9 @@ export const handler = async (
         const transformedEvent = await processSingleEvent(sqsRecord);
         transformedEvents.push(transformedEvent);
         eventType = transformedEvent.type;
+        stats.successful += 1;
       } catch (error) {
-        // Extract correlation ID and event type from error if available
+        stats.failed += 1;
         if (
           error instanceof ValidationError ||
           error instanceof TransformationError
@@ -204,19 +228,20 @@ export const handler = async (
           // Event type may not be available if parsing/validation failed early
         }
         await handleEventError(error, correlationId, eventType);
+      } finally {
+        stats.processed += 1;
       }
     }
 
-    // Emit processing latency metric
+    logger.info("Batch processing completed", stats);
+
     const processingTime = Date.now() - startTime;
     if (eventType) {
       await metricsService.emitProcessingLatency(processingTime, eventType);
     }
 
-    // Return transformed events for EventBridge Pipe to route to Callbacks Event Bus
     return transformedEvents;
   } catch (error) {
-    // Top-level error handler
     logger.error("Lambda execution failed", {
       correlationId,
       error: error instanceof Error ? error : new Error(String(error)),

@@ -1,14 +1,3 @@
-/**
- * Error handler for Lambda function with structured error responses.
- *
- * Distinguishes between:
- * - Validation errors: Log and fail without retry
- * - Config loading errors: Retriable transient failures
- * - Transformation errors: Non-retriable business logic failures
- *
- * All errors include errorType, message, correlationId, and eventId fields.
- */
-
 /* eslint-disable max-classes-per-file */
 
 export enum ErrorType {
@@ -27,9 +16,6 @@ export interface StructuredError {
   originalError?: Error | string;
 }
 
-/**
- * Base class for custom Lambda errors
- */
 export class LambdaError extends Error {
   public readonly errorType: ErrorType;
 
@@ -71,20 +57,12 @@ export class LambdaError extends Error {
   }
 }
 
-/**
- * Validation error - event schema is invalid
- * Not retriable - event will never be valid
- */
 export class ValidationError extends LambdaError {
   constructor(message: string, correlationId?: string, eventId?: string) {
     super(ErrorType.VALIDATION_ERROR, message, correlationId, eventId, false);
   }
 }
 
-/**
- * Config loading error - S3 fetch or parse failure
- * Retriable - transient AWS service failure
- */
 export class ConfigLoadingError extends LambdaError {
   constructor(message: string, correlationId?: string, eventId?: string) {
     super(
@@ -97,10 +75,6 @@ export class ConfigLoadingError extends LambdaError {
   }
 }
 
-/**
- * Transformation error - unable to transform event to callback payload
- * Not retriable - transformation logic issue or missing required field
- */
 export class TransformationError extends LambdaError {
   constructor(message: string, correlationId?: string, eventId?: string) {
     super(
@@ -113,10 +87,6 @@ export class TransformationError extends LambdaError {
   }
 }
 
-/**
- * Converts an unknown error value to a string message
- * Handles primitives, objects, and unknown types safely
- */
 function errorToString(error: unknown): string {
   if (typeof error === "string") {
     return error;
@@ -137,9 +107,6 @@ function errorToString(error: unknown): string {
   return "Unknown error";
 }
 
-/**
- * Wraps an unknown error in structured format
- */
 export function wrapUnknownError(
   error: unknown,
   correlationId?: string,
@@ -159,7 +126,6 @@ export function wrapUnknownError(
     );
   }
 
-  // For non-Error objects, convert to string message
   const errorMessage = errorToString(error);
 
   return new LambdaError(
@@ -171,21 +137,14 @@ export function wrapUnknownError(
   );
 }
 
-/**
- * Determines if an error should trigger Lambda retry
- */
 export function isRetriable(error: unknown): boolean {
   if (error instanceof LambdaError) {
     return error.retryable;
   }
 
-  // Unknown errors are not retriable by default
   return false;
 }
 
-/**
- * Formats error for CloudWatch logging
- */
 export function formatErrorForLogging(error: unknown): {
   errorType: string;
   message: string;
@@ -210,7 +169,6 @@ export function formatErrorForLogging(error: unknown): {
     };
   }
 
-  // Handle non-Error objects
   const errorMessage = errorToString(error);
 
   return {

@@ -1,13 +1,3 @@
-/**
- * CloudWatch metrics emission for Lambda function.
- *
- * Emits custom metrics for:
- * - Event processing rates (per event type, per client)
- * - Transformation success/failure counts
- * - Filtering decisions (matched/rejected)
- * - Error rates by error type
- */
-
 import {
   CloudWatchClient,
   PutMetricDataCommand,
@@ -39,9 +29,6 @@ export class MetricsService {
     this.environment = process.env.ENVIRONMENT || "development";
   }
 
-  /**
-   * Emit metric for event received from Shared Event Bus
-   */
   async emitEventReceived(eventType: string, clientId: string): Promise<void> {
     await this.putMetric("EventsReceived", 1, {
       EventType: eventType,
@@ -50,9 +37,6 @@ export class MetricsService {
     });
   }
 
-  /**
-   * Emit metric for successful event transformation
-   */
   async emitTransformationSuccess(
     eventType: string,
     clientId: string,
@@ -64,9 +48,6 @@ export class MetricsService {
     });
   }
 
-  /**
-   * Emit metric for failed event transformation
-   */
   async emitTransformationFailure(
     eventType: string,
     errorType: string,
@@ -78,9 +59,6 @@ export class MetricsService {
     });
   }
 
-  /**
-   * Emit metric for event matched by subscription filter
-   */
   async emitFilterMatched(eventType: string, clientId: string): Promise<void> {
     await this.putMetric("EventsMatched", 1, {
       EventType: eventType,
@@ -89,9 +67,6 @@ export class MetricsService {
     });
   }
 
-  /**
-   * Emit metric for event rejected by subscription filter
-   */
   async emitFilterRejected(eventType: string, clientId: string): Promise<void> {
     await this.putMetric("EventsRejected", 1, {
       EventType: eventType,
@@ -100,9 +75,6 @@ export class MetricsService {
     });
   }
 
-  /**
-   * Emit metric for callback delivery initiated
-   */
   async emitDeliveryInitiated(clientId: string): Promise<void> {
     await this.putMetric("CallbacksInitiated", 1, {
       ClientId: clientId,
@@ -110,9 +82,6 @@ export class MetricsService {
     });
   }
 
-  /**
-   * Emit metric for validation error
-   */
   async emitValidationError(eventType: string): Promise<void> {
     await this.putMetric("ValidationErrors", 1, {
       EventType: eventType,
@@ -121,9 +90,6 @@ export class MetricsService {
     });
   }
 
-  /**
-   * Emit metric for processing latency (milliseconds)
-   */
   async emitProcessingLatency(
     latency: number,
     eventType: string,
@@ -139,9 +105,6 @@ export class MetricsService {
     );
   }
 
-  /**
-   * Internal method to put metric data to CloudWatch
-   */
   private async putMetric(
     metricName: string,
     value: number,
@@ -167,7 +130,6 @@ export class MetricsService {
 
       await this.cloudWatchClient.send(command);
     } catch (error) {
-      // Log error but don't fail Lambda execution due to metrics issue
       logger.error("Failed to emit CloudWatch metric", {
         errorDetails: formatErrorForLogging(error),
         metricName,
@@ -176,9 +138,6 @@ export class MetricsService {
     }
   }
 
-  /**
-   * Emit metric synchronously (fire-and-forget for non-critical metrics)
-   */
   emitMetricAsync(
     metricName: string,
     value: number,
@@ -194,5 +153,4 @@ export class MetricsService {
   }
 }
 
-// Export singleton instance
 export const metricsService = new MetricsService();

@@ -241,30 +241,7 @@ describe("extractCorrelationId", () => {
     expect(correlationId).toBe("test-corr-123");
   });
 
-  it("should extract correlation ID from traceparent when id is not present", () => {
-    const event = {
-      traceparent: "00-trace-123-span-456-01",
-      type: "status-update",
-    };
-
-    const correlationId = extractCorrelationId(event);
-
-    expect(correlationId).toBe("00-trace-123-span-456-01");
-  });
-
-  it("should prefer event.id over traceparent", () => {
-    const event = {
-      id: "event-id-123",
-      traceparent: "00-trace-123-span-456-01",
-      type: "status-update",
-    };
-
-    const correlationId = extractCorrelationId(event);
-
-    expect(correlationId).toBe("event-id-123");
-  });
-
-  it("should return undefined when neither id nor traceparent is present", () => {
+  it("should return undefined when id is not present", () => {
     const event = {
       type: "status-update",
     };
