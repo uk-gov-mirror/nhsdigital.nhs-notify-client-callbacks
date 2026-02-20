@@ -122,6 +122,46 @@ describe("Logger", () => {
     });
   });
 
+  describe("child", () => {
+    it("should create a child logger with new context", () => {
+      const testLogger = new Logger();
+      const childContext: LogContext = {
+        correlationId: "corr-123",
+        eventId: "evt-456",
+      };
+
+      const childLogger = testLogger.child(childContext);
+
+      expect(childLogger).toBeInstanceOf(Logger);
+      expect(mockLoggerMethods.child).toHaveBeenCalledWith(childContext);
+    });
+
+    it("should merge parent context with child context", () => {
+      const parentContext: LogContext = {
+        correlationId: "parent-corr",
+        clientId: "client-123",
+      };
+      const testLogger = new Logger(parentContext);
+
+      mockLoggerMethods.child.mockClear();
+
+      const childContext: LogContext = {
+        eventId: "evt-789",
+        messageId: "msg-101",
+      };
+
+      const childLogger = testLogger.child(childContext);
+
+      expect(childLogger).toBeInstanceOf(Logger);
+      expect(mockLoggerMethods.child).toHaveBeenCalledWith({
+        correlationId: "parent-corr",
+        clientId: "client-123",
+        eventId: "evt-789",
+        messageId: "msg-101",
+      });
+    });
+  });
+
   describe("info", () => {
     it("should log info message without additional context", () => {
       const testLogger = new Logger();
@@ -276,12 +316,13 @@ describe("logLifecycleEvent", () => {
   });
 
   it("should log received lifecycle event", () => {
+    const testLogger = new Logger();
     const context: LogContext = {
       correlationId: "corr-123",
       eventId: "evt-456",
     };
 
-    logLifecycleEvent("received", context);
+    logLifecycleEvent(testLogger, "received", context);
 
     expect(mockLoggerMethods.info).toHaveBeenCalledWith(
       context,
@@ -290,12 +331,13 @@ describe("logLifecycleEvent", () => {
   });
 
   it("should log transformation-started lifecycle event", () => {
+    const testLogger = new Logger();
     const context: LogContext = {
       correlationId: "corr-123",
       eventType: "message-status-update",
     };
 
-    logLifecycleEvent("transformation-started", context);
+    logLifecycleEvent(testLogger, "transformation-started", context);
 
     expect(mockLoggerMethods.info).toHaveBeenCalledWith(
       context,
@@ -304,12 +346,13 @@ describe("logLifecycleEvent", () => {
   });
 
   it("should log transformation-completed lifecycle event", () => {
+    const testLogger = new Logger();
     const context: LogContext = {
       correlationId: "corr-123",
       messageId: "msg-789",
     };
 
-    logLifecycleEvent("transformation-completed", context);
+    logLifecycleEvent(testLogger, "transformation-completed", context);
 
     expect(mockLoggerMethods.info).toHaveBeenCalledWith(
       context,
@@ -318,58 +361,17 @@ describe("logLifecycleEvent", () => {
   });
 
   it("should log delivery-initiated lifecycle event", () => {
+    const testLogger = new Logger();
     const context: LogContext = {
       correlationId: "corr-123",
       clientId: "client-456",
     };
 
-    logLifecycleEvent("delivery-initiated", context);
+    logLifecycleEvent(testLogger, "delivery-initiated", context);
 
     expect(mockLoggerMethods.info).toHaveBeenCalledWith(
       context,
       "Callback lifecycle: delivery-initiated",
-    );
-  });
-
-  it("should log delivery-completed lifecycle event", () => {
-    const context: LogContext = {
-      correlationId: "corr-123",
-      statusCode: 200,
-    };
-
-    logLifecycleEvent("delivery-completed", context);
-
-    expect(mockLoggerMethods.info).toHaveBeenCalledWith(
-      context,
-      "Callback lifecycle: delivery-completed",
-    );
-  });
-
-  it("should log dlq-placement lifecycle event", () => {
-    const context: LogContext = {
-      correlationId: "corr-123",
-      error: "Maximum retries exceeded",
-    };
-
-    logLifecycleEvent("dlq-placement", context);
-
-    expect(mockLoggerMethods.info).toHaveBeenCalledWith(
-      context,
-      "Callback lifecycle: dlq-placement",
-    );
-  });
-
-  it("should log filtered-out lifecycle event", () => {
-    const context: LogContext = {
-      correlationId: "corr-123",
-      eventType: "irrelevant-update",
-    };
-
-    logLifecycleEvent("filtered-out", context);
-
-    expect(mockLoggerMethods.info).toHaveBeenCalledWith(
-      context,
-      "Callback lifecycle: filtered-out",
     );
   });
 });

@@ -45,6 +45,11 @@ export class Logger {
     this.pinoLogger = basePinoLogger;
   }
 
+  child(context: LogContext): Logger {
+    const mergedContext = { ...this.context, ...context };
+    return new Logger(mergedContext);
+  }
+
   info(message: string, additionalContext?: LogContext): void {
     this.pinoLogger.info(additionalContext || {}, message);
   }
@@ -70,15 +75,13 @@ export function extractCorrelationId(event: unknown): string | undefined {
 }
 
 export function logLifecycleEvent(
+  eventLogger: Logger,
   stage:
     | "received"
     | "transformation-started"
     | "transformation-completed"
-    | "delivery-initiated"
-    | "delivery-completed"
-    | "dlq-placement"
-    | "filtered-out",
+    | "delivery-initiated",
   context: LogContext,
 ): void {
-  logger.info(`Callback lifecycle: ${stage}`, context);
+  eventLogger.info(`Callback lifecycle: ${stage}`, context);
 }

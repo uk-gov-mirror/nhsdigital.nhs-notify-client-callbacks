@@ -3,6 +3,7 @@
     "aws-embedded-metrics": "^4.2.1",
     "cloudevents": "^8.0.2",
     "esbuild": "^0.25.0",
+    "p-map": "^4.0.0",
     "pino": "^9.5.0",
     "zod": "^3.25.76"
   },

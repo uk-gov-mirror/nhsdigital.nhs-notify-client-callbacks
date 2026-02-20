@@ -1,4 +1,5 @@
 import type { SQSRecord } from "aws-lambda";
+import pMap from "p-map";
 import type { StatusTransitionEvent } from "models/status-transition-event";
 import { EventTypes } from "models/status-transition-event";
 import type { MessageStatusData } from "models/message-status-data";
@@ -12,9 +13,9 @@ import { validateStatusTransitionEvent } from "services/validators/event-validat
 import { transformMessageStatus } from "services/transformers/message-status-transformer";
 import { transformChannelStatus } from "services/transformers/channel-status-transformer";
 import {
+  Logger,
   extractCorrelationId,
   logLifecycleEvent,
-  logger,
 } from "services/logger";
 import {
   TransformationError,
@@ -60,6 +61,7 @@ function parseSqsMessageBody(sqsRecord: SQSRecord): unknown {
 }
 
 function logCallbackGenerated(
+  eventLogger: Logger,
   payload: ClientCallbackPayload,
   eventType: string,
   correlationId: string | undefined,
@@ -77,7 +79,7 @@ function logCallbackGenerated(
 
   if (eventType === EventTypes.MESSAGE_STATUS_TRANSITIONED) {
     const messageAttrs = attributes as MessageStatusAttributes;
-    logger.info("Callback generated", {
+    eventLogger.info("Callback generated", {
       ...commonFields,
       messageStatus: messageAttrs.messageStatus,
       messageStatusDescription: messageAttrs.messageStatusDescription,
@@ -86,7 +88,7 @@ function logCallbackGenerated(
     });
   } else if (eventType === EventTypes.CHANNEL_STATUS_TRANSITIONED) {
     const channelAttrs = attributes as ChannelStatusAttributes;
-    logger.info("Callback generated", {
+    eventLogger.info("Callback generated", {
       ...commonFields,
       channel: channelAttrs.channel,
       channelStatus: channelAttrs.channelStatus,
@@ -100,18 +102,18 @@ function logCallbackGenerated(
 async function processSingleEvent(
   sqsRecord: SQSRecord,
   metrics: CallbackMetrics,
+  eventLogger: Logger,
 ): Promise<TransformedEvent> {
   const event = parseSqsMessageBody(sqsRecord);
 
   const correlationId = extractCorrelationId(event);
-  logger.addContext({ correlationId });
 
   validateStatusTransitionEvent(event);
 
   const eventType = event.type;
   const { clientId, messageId } = event.data;
 
-  logLifecycleEvent("received", {
+  logLifecycleEvent(eventLogger, "received", {
     correlationId,
     eventType,
     messageId,
@@ -119,7 +121,7 @@ async function processSingleEvent(
 
   metrics.emitEventReceived(eventType, clientId);
 
-  logLifecycleEvent("transformation-started", {
+  logLifecycleEvent(eventLogger, "transformation-started", {
     correlationId,
     eventType,
     clientId,
@@ -128,9 +130,15 @@ async function processSingleEvent(
 
   const callbackPayload = transformEvent(event, eventType, correlationId);
 
-  logCallbackGenerated(callbackPayload, eventType, correlationId, clientId);
+  logCallbackGenerated(
+    eventLogger,
+    callbackPayload,
+    eventType,
+    correlationId,
+    clientId,
+  );
 
-  logLifecycleEvent("transformation-completed", {
+  logLifecycleEvent(eventLogger, "transformation-completed", {
     correlationId,
     eventType,
     clientId,
@@ -144,7 +152,7 @@ async function processSingleEvent(
     transformedPayload: callbackPayload,
   };
 
-  logLifecycleEvent("delivery-initiated", {
+  logLifecycleEvent(eventLogger, "delivery-initiated", {
     correlationId,
     eventType,
     clientId,
@@ -153,19 +161,18 @@ async function processSingleEvent(
 
   metrics.emitDeliveryInitiated(clientId);
 
-  logger.clearContext();
-
   return transformedEvent;
 }
 
 async function handleEventError(
   error: unknown,
   metrics: CallbackMetrics,
+  eventLogger: Logger,
   correlationId = "unknown",
   eventErrorType = "unknown",
 ): Promise<never> {
   if (error instanceof ValidationError) {
-    logger.error("Event validation failed", {
+    eventLogger.error("Event validation failed", {
       correlationId,
       error,
     });
@@ -174,7 +181,7 @@ async function handleEventError(
   }
 
   if (error instanceof TransformationError) {
-    logger.error("Event transformation failed", {
+    eventLogger.error("Event transformation failed", {
       correlationId,
       eventType: eventErrorType,
       error,
@@ -184,7 +191,7 @@ async function handleEventError(
   }
 
   const wrappedError = wrapUnknownError(error, correlationId);
-  logger.error("Unexpected error processing event", {
+  eventLogger.error("Unexpected error processing event", {
     correlationId,
     error: wrappedError,
   });
@@ -195,9 +202,9 @@ async function handleEventError(
 export const handler = async (
   event: SQSRecord[],
 ): Promise<TransformedEvent[]> => {
-  // Create metrics handler at handler entry point for dependency injection
   const metricsLogger = createMetricLogger();
   const metrics = new CallbackMetrics(metricsLogger);
+  const rootLogger = new Logger();
 
   const startTime = Date.now();
   let correlationId: string | undefined;
@@ -210,30 +217,46 @@ export const handler = async (
   };
 
   try {
-    const transformedEvents: TransformedEvent[] = [];
+    const transformedEvents = await pMap(
+      event,
+      async (sqsRecord: SQSRecord) => {
+        const eventLogger = rootLogger.child({
+          messageId: sqsRecord.messageId,
+        });
 
-    for (const sqsRecord of event) {
-      try {
-        const transformedEvent = await processSingleEvent(sqsRecord, metrics);
-        transformedEvents.push(transformedEvent);
-        eventType = transformedEvent.type;
-        stats.successful += 1;
-      } catch (error) {
-        stats.failed += 1;
-        if (
-          error instanceof ValidationError ||
-          error instanceof TransformationError
-        ) {
-          correlationId = error.correlationId;
-          // Event type may not be available if parsing/validation failed early
+        try {
+          const transformedEvent = await processSingleEvent(
+            sqsRecord,
+            metrics,
+            eventLogger,
+          );
+          eventType = transformedEvent.type;
+          stats.successful += 1;
+          return transformedEvent;
+        } catch (error) {
+          stats.failed += 1;
+          if (
+            error instanceof ValidationError ||
+            error instanceof TransformationError
+          ) {
+            correlationId = error.correlationId;
+          }
+          await handleEventError(
+            error,
+            metrics,
+            eventLogger,
+            correlationId,
+            eventType,
+          );
+          return null;
+        } finally {
+          stats.processed += 1;
         }
-        await handleEventError(error, metrics, correlationId, eventType);
-      } finally {
-        stats.processed += 1;
-      }
-    }
+      },
+      { concurrency: 10 },
+    );
 
-    logger.info("Batch processing completed", stats);
+    rootLogger.info("Batch processing completed", stats);
 
     const processingTime = Date.now() - startTime;
     if (eventType) {
@@ -241,9 +264,9 @@ export const handler = async (
     }
 
     await metricsLogger.flush();
-    return transformedEvents;
+    return transformedEvents.filter((e): e is TransformedEvent => e !== null);
   } catch (error) {
-    logger.error("Lambda execution failed", {
+    rootLogger.error("Lambda execution failed", {
       correlationId,
       error: error instanceof Error ? error : new Error(String(error)),
     });
