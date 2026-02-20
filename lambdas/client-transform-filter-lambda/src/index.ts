@@ -24,8 +24,36 @@ import {
 } from "services/error-handler";
 import { CallbackMetrics, createMetricLogger } from "services/metrics";
 
+const BATCH_CONCURRENCY = Number(process.env.BATCH_CONCURRENCY) || 10;
+
 interface TransformedEvent extends StatusTransitionEvent {
   transformedPayload: ClientCallbackPayload;
+}
+
+class BatchStats {
+  successful = 0;
+
+  failed = 0;
+
+  processed = 0;
+
+  recordSuccess(): void {
+    this.successful += 1;
+    this.processed += 1;
+  }
+
+  recordFailure(): void {
+    this.failed += 1;
+    this.processed += 1;
+  }
+
+  toObject() {
+    return {
+      successful: this.successful,
+      failed: this.failed,
+      processed: this.processed,
+    };
+  }
 }
 
 function transformEvent(
@@ -44,18 +72,21 @@ function transformEvent(
   throw new TransformationError(
     `Unsupported event type: ${eventType}`,
     correlationId,
-    rawEvent.id,
   );
 }
 
-function parseSqsMessageBody(sqsRecord: SQSRecord): unknown {
+function parseSqsMessageBody(sqsRecord: SQSRecord): StatusTransitionEvent {
   try {
-    return JSON.parse(sqsRecord.body);
+    const parsed = JSON.parse(sqsRecord.body);
+    validateStatusTransitionEvent(parsed);
+    return parsed;
   } catch (error) {
+    if (error instanceof ValidationError) {
+      throw error;
+    }
     throw new ValidationError(
       `Failed to parse SQS message body as JSON: ${error instanceof Error ? error.message : "Unknown error"}`,
       undefined,
-      sqsRecord.messageId,
     );
   }
 }
@@ -99,16 +130,12 @@ function logCallbackGenerated(
   }
 }
 
-async function processSingleEvent(
-  sqsRecord: SQSRecord,
+function processSingleEvent(
+  event: StatusTransitionEvent,
   metrics: CallbackMetrics,
   eventLogger: Logger,
-): Promise<TransformedEvent> {
-  const event = parseSqsMessageBody(sqsRecord);
-
+): TransformedEvent {
   const correlationId = extractCorrelationId(event);
-
-  validateStatusTransitionEvent(event);
 
   const eventType = event.type;
   const { clientId, messageId } = event.data;
@@ -147,30 +174,43 @@ async function processSingleEvent(
 
   metrics.emitTransformationSuccess(eventType, clientId);
 
-  const transformedEvent: TransformedEvent = {
+  return {
     ...event,
     transformedPayload: callbackPayload,
   };
-
-  logLifecycleEvent(eventLogger, "delivery-initiated", {
-    correlationId,
-    eventType,
-    clientId,
-    messageId,
-  });
-
-  metrics.emitDeliveryInitiated(clientId);
-
-  return transformedEvent;
 }
 
-async function handleEventError(
+function logDeliveryInitiated(
+  transformedEvents: TransformedEvent[],
+  metrics: CallbackMetrics,
+  logger: Logger,
+): void {
+  for (const transformedEvent of transformedEvents) {
+    const { clientId, messageId } = transformedEvent.data;
+    const correlationId = transformedEvent.traceparent;
+
+    logLifecycleEvent(logger, "delivery-initiated", {
+      correlationId,
+      eventType: transformedEvent.type,
+      clientId,
+      messageId,
+    });
+
+    metrics.emitDeliveryInitiated(clientId);
+  }
+}
+
+function handleEventError(
   error: unknown,
   metrics: CallbackMetrics,
   eventLogger: Logger,
-  correlationId = "unknown",
   eventErrorType = "unknown",
-): Promise<never> {
+): never {
+  const correlationId =
+    error instanceof ValidationError || error instanceof TransformationError
+      ? error.correlationId
+      : "unknown";
+
   if (error instanceof ValidationError) {
     eventLogger.error("Event validation failed", {
       correlationId,
@@ -199,6 +239,33 @@ async function handleEventError(
   throw wrappedError;
 }
 
+async function transformBatch(
+  sqsRecords: SQSRecord[],
+  metrics: CallbackMetrics,
+  rootLogger: Logger,
+  stats: BatchStats,
+): Promise<TransformedEvent[]> {
+  return pMap(
+    sqsRecords,
+    (sqsRecord: SQSRecord) => {
+      const event = parseSqsMessageBody(sqsRecord);
+      const correlationId = extractCorrelationId(event);
+
+      const eventLogger = rootLogger.child({
+        correlationId,
+        eventType: event.type,
+        clientId: event.data.clientId,
+        messageId: event.data.messageId,
+      });
+
+      const transformedEvent = processSingleEvent(event, metrics, eventLogger);
+      stats.recordSuccess();
+      return transformedEvent;
+    },
+    { concurrency: BATCH_CONCURRENCY, stopOnError: true },
+  );
+}
+
 export const handler = async (
   event: SQSRecord[],
 ): Promise<TransformedEvent[]> => {
@@ -207,72 +274,34 @@ export const handler = async (
   const rootLogger = new Logger();
 
   const startTime = Date.now();
-  let correlationId: string | undefined;
-  let eventType: string | undefined;
-
-  const stats = {
-    successful: 0,
-    failed: 0,
-    processed: 0,
-  };
+  const stats = new BatchStats();
 
   try {
-    const transformedEvents = await pMap(
+    const transformedEvents = await transformBatch(
       event,
-      async (sqsRecord: SQSRecord) => {
-        const eventLogger = rootLogger.child({
-          messageId: sqsRecord.messageId,
-        });
-
-        try {
-          const transformedEvent = await processSingleEvent(
-            sqsRecord,
-            metrics,
-            eventLogger,
-          );
-          eventType = transformedEvent.type;
-          stats.successful += 1;
-          return transformedEvent;
-        } catch (error) {
-          stats.failed += 1;
-          if (
-            error instanceof ValidationError ||
-            error instanceof TransformationError
-          ) {
-            correlationId = error.correlationId;
-          }
-          await handleEventError(
-            error,
-            metrics,
-            eventLogger,
-            correlationId,
-            eventType,
-          );
-          return null;
-        } finally {
-          stats.processed += 1;
-        }
-      },
-      { concurrency: 10 },
+      metrics,
+      rootLogger,
+      stats,
     );
 
-    rootLogger.info("Batch processing completed", stats);
-
     const processingTime = Date.now() - startTime;
-    if (eventType) {
-      metrics.emitProcessingLatency(processingTime, eventType);
-    }
-
-    await metricsLogger.flush();
-    return transformedEvents.filter((e): e is TransformedEvent => e !== null);
-  } catch (error) {
-    rootLogger.error("Lambda execution failed", {
-      correlationId,
-      error: error instanceof Error ? error : new Error(String(error)),
+    logLifecycleEvent(rootLogger, "batch-processing-completed", {
+      ...stats.toObject(),
+      batchSize: event.length,
+      processingTimeMs: processingTime,
     });
 
+    // Emit delivery-initiated metrics only after entire batch succeeds
+    logDeliveryInitiated(transformedEvents, metrics, rootLogger);
+
     await metricsLogger.flush();
-    // Rethrow to trigger Lambda retry or DLQ routing
+    return transformedEvents;
+  } catch (error) {
+    stats.recordFailure();
+
+    handleEventError(error, metrics, rootLogger);
+
+    await metricsLogger.flush();
     throw error;
   }
 };

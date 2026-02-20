@@ -11,7 +11,6 @@ export interface StructuredError {
   errorType: ErrorType;
   message: string;
   correlationId?: string;
-  eventId?: string;
   retryable: boolean;
   originalError?: Error | string;
 }
@@ -21,22 +20,18 @@ export class LambdaError extends Error {
 
   public readonly correlationId?: string;
 
-  public readonly eventId?: string;
-
   public readonly retryable: boolean;
 
   constructor(
     errorType: ErrorType,
     message: string,
     correlationId?: string,
-    eventId?: string,
     retryable = false,
   ) {
     super(message);
     this.name = this.constructor.name;
     this.errorType = errorType;
     this.correlationId = correlationId;
-    this.eventId = eventId;
     this.retryable = retryable;
 
     // Maintains proper stack trace for where our error was thrown (only available on V8)
@@ -50,7 +45,6 @@ export class LambdaError extends Error {
       errorType: this.errorType,
       message: this.message,
       correlationId: this.correlationId,
-      eventId: this.eventId,
       retryable: this.retryable,
       originalError: this.message,
     };
@@ -58,32 +52,20 @@ export class LambdaError extends Error {
 }
 
 export class ValidationError extends LambdaError {
-  constructor(message: string, correlationId?: string, eventId?: string) {
-    super(ErrorType.VALIDATION_ERROR, message, correlationId, eventId, false);
+  constructor(message: string, correlationId?: string) {
+    super(ErrorType.VALIDATION_ERROR, message, correlationId, false);
   }
 }
 
 export class ConfigLoadingError extends LambdaError {
-  constructor(message: string, correlationId?: string, eventId?: string) {
-    super(
-      ErrorType.CONFIG_LOADING_ERROR,
-      message,
-      correlationId,
-      eventId,
-      true,
-    );
+  constructor(message: string, correlationId?: string) {
+    super(ErrorType.CONFIG_LOADING_ERROR, message, correlationId, true);
   }
 }
 
 export class TransformationError extends LambdaError {
-  constructor(message: string, correlationId?: string, eventId?: string) {
-    super(
-      ErrorType.TRANSFORMATION_ERROR,
-      message,
-      correlationId,
-      eventId,
-      false,
-    );
+  constructor(message: string, correlationId?: string) {
+    super(ErrorType.TRANSFORMATION_ERROR, message, correlationId, false);
   }
 }
 
@@ -110,7 +92,6 @@ function errorToString(error: unknown): string {
 export function wrapUnknownError(
   error: unknown,
   correlationId?: string,
-  eventId?: string,
 ): LambdaError {
   if (error instanceof LambdaError) {
     return error;
@@ -121,7 +102,6 @@ export function wrapUnknownError(
       ErrorType.UNKNOWN_ERROR,
       error.message,
       correlationId,
-      eventId,
       false,
     );
   }
@@ -132,7 +112,6 @@ export function wrapUnknownError(
     ErrorType.UNKNOWN_ERROR,
     errorMessage,
     correlationId,
-    eventId,
     false,
   );
 }

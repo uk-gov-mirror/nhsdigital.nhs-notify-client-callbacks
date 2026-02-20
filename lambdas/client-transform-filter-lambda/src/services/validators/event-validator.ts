@@ -59,7 +59,6 @@ function isChannelStatusEvent(type: string): boolean {
 
 function formatValidationError(error: unknown, event: unknown): never {
   const correlationId = extractCorrelationId(event);
-  const eventId = (event as any)?.id;
 
   let message: string;
   if (error instanceof CloudEventsValidationError) {
@@ -75,7 +74,7 @@ function formatValidationError(error: unknown, event: unknown): never {
     message = `Validation failed: ${String(error)}`;
   }
 
-  throw new ValidationError(message, correlationId, eventId);
+  throw new ValidationError(message, correlationId);
 }
 
 export function validateStatusTransitionEvent(

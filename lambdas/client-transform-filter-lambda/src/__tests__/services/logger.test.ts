@@ -53,7 +53,6 @@ describe("Logger", () => {
       const testLogger = new Logger();
       const newContext: LogContext = {
         correlationId: "corr-789",
-        eventId: "evt-101",
       };
 
       testLogger.addContext(newContext);
@@ -71,7 +70,6 @@ describe("Logger", () => {
       mockLoggerMethods.child.mockClear();
 
       const additionalContext: LogContext = {
-        eventId: "evt-789",
         messageId: "msg-101",
       };
 
@@ -80,7 +78,7 @@ describe("Logger", () => {
       expect(mockLoggerMethods.child).toHaveBeenCalledWith({
         correlationId: "corr-123",
         clientId: "client-456",
-        eventId: "evt-789",
+
         messageId: "msg-101",
       });
     });
@@ -127,7 +125,6 @@ describe("Logger", () => {
       const testLogger = new Logger();
       const childContext: LogContext = {
         correlationId: "corr-123",
-        eventId: "evt-456",
       };
 
       const childLogger = testLogger.child(childContext);
@@ -146,7 +143,6 @@ describe("Logger", () => {
       mockLoggerMethods.child.mockClear();
 
       const childContext: LogContext = {
-        eventId: "evt-789",
         messageId: "msg-101",
       };
 
@@ -156,7 +152,7 @@ describe("Logger", () => {
       expect(mockLoggerMethods.child).toHaveBeenCalledWith({
         correlationId: "parent-corr",
         clientId: "client-123",
-        eventId: "evt-789",
+
         messageId: "msg-101",
       });
     });
@@ -250,7 +246,6 @@ describe("Logger", () => {
       const testLogger = new Logger();
       const context: LogContext = {
         correlationId: "corr-101",
-        eventId: "evt-202",
       };
 
       testLogger.debug("Debug info", context);
@@ -319,7 +314,6 @@ describe("logLifecycleEvent", () => {
     const testLogger = new Logger();
     const context: LogContext = {
       correlationId: "corr-123",
-      eventId: "evt-456",
     };
 
     logLifecycleEvent(testLogger, "received", context);

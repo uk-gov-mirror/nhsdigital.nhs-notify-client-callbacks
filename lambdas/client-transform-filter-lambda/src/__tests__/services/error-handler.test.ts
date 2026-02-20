@@ -24,14 +24,12 @@ describe("LambdaError", () => {
       ErrorType.UNKNOWN_ERROR,
       "Test error",
       "corr-123",
-      "event-456",
       true,
     );
 
     expect(error.message).toBe("Test error");
     expect(error.errorType).toBe(ErrorType.UNKNOWN_ERROR);
     expect(error.correlationId).toBe("corr-123");
-    expect(error.eventId).toBe("event-456");
     expect(error.retryable).toBe(true);
     expect(error.name).toBe("LambdaError");
     expect(error).toBeInstanceOf(Error);
@@ -43,7 +41,6 @@ describe("LambdaError", () => {
     expect(error.message).toBe("Test error");
     expect(error.errorType).toBe(ErrorType.UNKNOWN_ERROR);
     expect(error.correlationId).toBeUndefined();
-    expect(error.eventId).toBeUndefined();
     expect(error.retryable).toBe(false);
   });
 
@@ -58,7 +55,6 @@ describe("LambdaError", () => {
       ErrorType.VALIDATION_ERROR,
       "Invalid schema",
       "corr-789",
-      "event-101",
       false,
     );
 
@@ -68,7 +64,6 @@ describe("LambdaError", () => {
       errorType: ErrorType.VALIDATION_ERROR,
       message: "Invalid schema",
       correlationId: "corr-789",
-      eventId: "event-101",
       retryable: false,
       originalError: "Invalid schema",
     });
@@ -83,7 +78,7 @@ describe("LambdaError", () => {
       errorType: ErrorType.UNKNOWN_ERROR,
       message: "Test error",
       correlationId: undefined,
-      eventId: undefined,
+
       retryable: false,
       originalError: "Test error",
     });
@@ -92,12 +87,11 @@ describe("LambdaError", () => {
 
 describe("ValidationError", () => {
   it("should create non-retriable validation error", () => {
-    const error = new ValidationError("Schema mismatch", "corr-123", "evt-456");
+    const error = new ValidationError("Schema mismatch", "corr-123");
 
     expect(error.message).toBe("Schema mismatch");
     expect(error.errorType).toBe(ErrorType.VALIDATION_ERROR);
     expect(error.correlationId).toBe("corr-123");
-    expect(error.eventId).toBe("evt-456");
     expect(error.retryable).toBe(false);
     expect(error.name).toBe("ValidationError");
   });
@@ -108,7 +102,6 @@ describe("ValidationError", () => {
     expect(error.message).toBe("Schema mismatch");
     expect(error.errorType).toBe(ErrorType.VALIDATION_ERROR);
     expect(error.correlationId).toBeUndefined();
-    expect(error.eventId).toBeUndefined();
     expect(error.retryable).toBe(false);
   });
 
@@ -122,16 +115,11 @@ describe("ValidationError", () => {
 
 describe("ConfigLoadingError", () => {
   it("should create retriable config loading error", () => {
-    const error = new ConfigLoadingError(
-      "S3 unavailable",
-      "corr-123",
-      "evt-456",
-    );
+    const error = new ConfigLoadingError("S3 unavailable", "corr-123");
 
     expect(error.message).toBe("S3 unavailable");
     expect(error.errorType).toBe(ErrorType.CONFIG_LOADING_ERROR);
     expect(error.correlationId).toBe("corr-123");
-    expect(error.eventId).toBe("evt-456");
     expect(error.retryable).toBe(true);
     expect(error.name).toBe("ConfigLoadingError");
   });
@@ -142,7 +130,6 @@ describe("ConfigLoadingError", () => {
     expect(error.message).toBe("S3 unavailable");
     expect(error.errorType).toBe(ErrorType.CONFIG_LOADING_ERROR);
     expect(error.correlationId).toBeUndefined();
-    expect(error.eventId).toBeUndefined();
     expect(error.retryable).toBe(true);
   });
 
@@ -156,16 +143,11 @@ describe("ConfigLoadingError", () => {
 
 describe("TransformationError", () => {
   it("should create non-retriable transformation error", () => {
-    const error = new TransformationError(
-      "Missing field",
-      "corr-123",
-      "evt-456",
-    );
+    const error = new TransformationError("Missing field", "corr-123");
 
     expect(error.message).toBe("Missing field");
     expect(error.errorType).toBe(ErrorType.TRANSFORMATION_ERROR);
     expect(error.correlationId).toBe("corr-123");
-    expect(error.eventId).toBe("evt-456");
     expect(error.retryable).toBe(false);
     expect(error.name).toBe("TransformationError");
   });
@@ -176,7 +158,6 @@ describe("TransformationError", () => {
     expect(error.message).toBe("Missing field");
     expect(error.errorType).toBe(ErrorType.TRANSFORMATION_ERROR);
     expect(error.correlationId).toBeUndefined();
-    expect(error.eventId).toBeUndefined();
     expect(error.retryable).toBe(false);
   });
 
@@ -190,27 +171,21 @@ describe("TransformationError", () => {
 
 describe("wrapUnknownError", () => {
   it("should return LambdaError as-is", () => {
-    const originalError = new ValidationError(
-      "Original",
-      "corr-123",
-      "evt-456",
-    );
-    const wrapped = wrapUnknownError(originalError, "corr-789", "evt-999");
+    const originalError = new ValidationError("Original", "corr-123");
+    const wrapped = wrapUnknownError(originalError, "corr-789");
 
     expect(wrapped).toBe(originalError);
     expect(wrapped.correlationId).toBe("corr-123");
-    expect(wrapped.eventId).toBe("evt-456");
   });
 
   it("should wrap standard Error", () => {
     const originalError = new Error("Standard error");
-    const wrapped = wrapUnknownError(originalError, "corr-123", "evt-456");
+    const wrapped = wrapUnknownError(originalError, "corr-123");
 
     expect(wrapped).toBeInstanceOf(LambdaError);
     expect(wrapped.message).toBe("Standard error");
     expect(wrapped.errorType).toBe(ErrorType.UNKNOWN_ERROR);
     expect(wrapped.correlationId).toBe("corr-123");
-    expect(wrapped.eventId).toBe("evt-456");
     expect(wrapped.retryable).toBe(false);
   });
 
@@ -221,22 +196,20 @@ describe("wrapUnknownError", () => {
     expect(wrapped).toBeInstanceOf(LambdaError);
     expect(wrapped.message).toBe("Standard error");
     expect(wrapped.correlationId).toBeUndefined();
-    expect(wrapped.eventId).toBeUndefined();
   });
 
   it("should wrap string error", () => {
-    const wrapped = wrapUnknownError("String error", "corr-123", "evt-456");
+    const wrapped = wrapUnknownError("String error", "corr-123");
 
     expect(wrapped).toBeInstanceOf(LambdaError);
     expect(wrapped.message).toBe("String error");
     expect(wrapped.errorType).toBe(ErrorType.UNKNOWN_ERROR);
     expect(wrapped.correlationId).toBe("corr-123");
-    expect(wrapped.eventId).toBe("evt-456");
     expect(wrapped.retryable).toBe(false);
   });
 
   it("should wrap number error", () => {
-    const wrapped = wrapUnknownError(404, "corr-123", "evt-456");
+    const wrapped = wrapUnknownError(404, "corr-123");
 
     expect(wrapped).toBeInstanceOf(LambdaError);
     expect(wrapped.message).toBe("404");
@@ -244,7 +217,7 @@ describe("wrapUnknownError", () => {
   });
 
   it("should wrap boolean error", () => {
-    const wrapped = wrapUnknownError(false, "corr-123", "evt-456");
+    const wrapped = wrapUnknownError(false, "corr-123");
 
     expect(wrapped).toBeInstanceOf(LambdaError);
     expect(wrapped.message).toBe("false");
@@ -253,7 +226,7 @@ describe("wrapUnknownError", () => {
 
   it("should wrap object error", () => {
     const errorObj = { code: 500, details: "Internal error" };
-    const wrapped = wrapUnknownError(errorObj, "corr-123", "evt-456");
+    const wrapped = wrapUnknownError(errorObj, "corr-123");
 
     expect(wrapped).toBeInstanceOf(LambdaError);
     expect(wrapped.message).toBe(JSON.stringify(errorObj));
@@ -264,7 +237,7 @@ describe("wrapUnknownError", () => {
     const circularObj: any = { name: "test" };
     circularObj.self = circularObj;
 
-    const wrapped = wrapUnknownError(circularObj, "corr-123", "evt-456");
+    const wrapped = wrapUnknownError(circularObj, "corr-123");
 
     expect(wrapped).toBeInstanceOf(LambdaError);
     expect(wrapped.message).toBe("Unknown error (unable to serialize)");
@@ -272,7 +245,7 @@ describe("wrapUnknownError", () => {
   });
 
   it("should wrap null error", () => {
-    const wrapped = wrapUnknownError(null, "corr-123", "evt-456");
+    const wrapped = wrapUnknownError(null, "corr-123");
 
     expect(wrapped).toBeInstanceOf(LambdaError);
     expect(wrapped.message).toBe("Unknown error");
@@ -280,11 +253,7 @@ describe("wrapUnknownError", () => {
   });
 
   it("should wrap undefined error", () => {
-    const wrapped = wrapUnknownError(
-      undefined as unknown,
-      "corr-123",
-      "evt-456",
-    );
+    const wrapped = wrapUnknownError(undefined as unknown, "corr-123");
 
     expect(wrapped).toBeInstanceOf(LambdaError);
     expect(wrapped.message).toBe("Unknown error");
@@ -292,7 +261,7 @@ describe("wrapUnknownError", () => {
   });
 
   it("should wrap array error", () => {
-    const wrapped = wrapUnknownError([1, 2, 3], "corr-123", "evt-456");
+    const wrapped = wrapUnknownError([1, 2, 3], "corr-123");
 
     expect(wrapped).toBeInstanceOf(LambdaError);
     expect(wrapped.message).toBe("[1,2,3]");
@@ -321,7 +290,6 @@ describe("isRetriable", () => {
       ErrorType.UNKNOWN_ERROR,
       "Test",
       undefined,
-      undefined,
       false,
     );
     expect(isRetriable(error)).toBe(false);
@@ -331,7 +299,6 @@ describe("isRetriable", () => {
     const error = new LambdaError(
       ErrorType.UNKNOWN_ERROR,
       "Test",
-      undefined,
       undefined,
       true,
     );
@@ -366,7 +333,7 @@ describe("isRetriable", () => {
 
 describe("formatErrorForLogging", () => {
   it("should format LambdaError with all fields", () => {
-    const error = new ValidationError("Invalid schema", "corr-123", "evt-456");
+    const error = new ValidationError("Invalid schema", "corr-123");
     const formatted = formatErrorForLogging(error);
 
     expect(formatted.errorType).toBe(ErrorType.VALIDATION_ERROR);

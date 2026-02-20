@@ -3,7 +3,6 @@ import pino from "pino";
 export interface LogContext {
   correlationId?: string;
   clientId?: string;
-  eventId?: string;
   eventType?: string;
   messageId?: string;
   statusCode?: number;
@@ -80,7 +79,8 @@ export function logLifecycleEvent(
     | "received"
     | "transformation-started"
     | "transformation-completed"
-    | "delivery-initiated",
+    | "delivery-initiated"
+    | "batch-processing-completed",
   context: LogContext,
 ): void {
   eventLogger.info(`Callback lifecycle: ${stage}`, context);
