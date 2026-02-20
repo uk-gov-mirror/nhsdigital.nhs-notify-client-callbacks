@@ -1,156 +1,95 @@
-import {
-  CloudWatchClient,
-  PutMetricDataCommand,
-  StandardUnit,
-} from "@aws-sdk/client-cloudwatch";
-import { logger } from "services/logger";
-import { formatErrorForLogging } from "services/error-handler";
+import { MetricHandler } from "services/metric-handler";
 
-export interface MetricDimensions {
-  EventType?: string;
-  ClientId?: string;
-  ErrorType?: string;
-  Environment?: string;
-}
+export const createMetricHandler = (): MetricHandler => {
+  const namespace =
+    process.env.METRICS_NAMESPACE || "nhs-notify-client-callbacks-metrics";
+  const environment = process.env.ENVIRONMENT || "development";
 
-export class MetricsService {
-  private readonly cloudWatchClient: CloudWatchClient;
+  return new MetricHandler(namespace, [
+    {
+      Name: "Environment",
+      Value: environment,
+    },
+  ]);
+};
 
-  private readonly namespace: string;
+/**
+ * Uses EMF instead of direct CloudWatch API calls for:
+ * - Better performance (no network latency)
+ * - Lower cost (no PutMetricData API charges)
+ * - Easier testing (simple console.log mocking)
+ */
+export class CallbackMetrics {
+  constructor(private readonly metricHandler: MetricHandler) {}
 
-  private readonly environment: string;
-
-  constructor() {
-    this.cloudWatchClient = new CloudWatchClient({
-      region: process.env.AWS_REGION || "eu-west-2",
-    });
-    this.namespace =
-      process.env.METRICS_NAMESPACE || "NHS-Notify/ClientCallbacks"; // TODO - CCM-14200 - what should the namespace be for these metrics?
-    this.environment = process.env.ENVIRONMENT || "development";
-  }
-
-  async emitEventReceived(eventType: string, clientId: string): Promise<void> {
-    await this.putMetric("EventsReceived", 1, {
-      EventType: eventType,
-      ClientId: clientId,
-      Environment: this.environment,
+  emitEventReceived(eventType: string, clientId: string): void {
+    this.metricHandler.addMetrics(["EventsReceived", "Count", 1], {
+      extraDimensions: [
+        { Name: "EventType", Value: eventType },
+        { Name: "ClientId", Value: clientId },
+      ],
     });
   }
 
-  async emitTransformationSuccess(
-    eventType: string,
-    clientId: string,
-  ): Promise<void> {
-    await this.putMetric("TransformationsSuccessful", 1, {
-      EventType: eventType,
-      ClientId: clientId,
-      Environment: this.environment,
+  emitTransformationSuccess(eventType: string, clientId: string): void {
+    this.metricHandler.addMetrics(["TransformationsSuccessful", "Count", 1], {
+      extraDimensions: [
+        { Name: "EventType", Value: eventType },
+        { Name: "ClientId", Value: clientId },
+      ],
     });
   }
 
-  async emitTransformationFailure(
-    eventType: string,
-    errorType: string,
-  ): Promise<void> {
-    await this.putMetric("TransformationsFailed", 1, {
-      EventType: eventType,
-      ErrorType: errorType,
-      Environment: this.environment,
+  emitTransformationFailure(eventType: string, errorType: string): void {
+    this.metricHandler.addMetrics(["TransformationsFailed", "Count", 1], {
+      extraDimensions: [
+        { Name: "EventType", Value: eventType },
+        { Name: "ErrorType", Value: errorType },
+      ],
     });
   }
 
-  async emitFilterMatched(eventType: string, clientId: string): Promise<void> {
-    await this.putMetric("EventsMatched", 1, {
-      EventType: eventType,
-      ClientId: clientId,
-      Environment: this.environment,
+  emitFilterMatched(eventType: string, clientId: string): void {
+    this.metricHandler.addMetrics(["EventsMatched", "Count", 1], {
+      extraDimensions: [
+        { Name: "EventType", Value: eventType },
+        { Name: "ClientId", Value: clientId },
+      ],
     });
   }
 
-  async emitFilterRejected(eventType: string, clientId: string): Promise<void> {
-    await this.putMetric("EventsRejected", 1, {
-      EventType: eventType,
-      ClientId: clientId,
-      Environment: this.environment,
+  emitFilterRejected(eventType: string, clientId: string): void {
+    this.metricHandler.addMetrics(["EventsRejected", "Count", 1], {
+      extraDimensions: [
+        { Name: "EventType", Value: eventType },
+        { Name: "ClientId", Value: clientId },
+      ],
     });
   }
 
-  async emitDeliveryInitiated(clientId: string): Promise<void> {
-    await this.putMetric("CallbacksInitiated", 1, {
-      ClientId: clientId,
-      Environment: this.environment,
+  emitDeliveryInitiated(clientId: string): void {
+    this.metricHandler.addMetrics(["CallbacksInitiated", "Count", 1], {
+      extraDimensions: [{ Name: "ClientId", Value: clientId }],
     });
   }
 
-  async emitValidationError(eventType: string): Promise<void> {
-    await this.putMetric("ValidationErrors", 1, {
-      EventType: eventType,
-      ErrorType: "ValidationError",
-      Environment: this.environment,
+  emitValidationError(eventType: string): void {
+    this.metricHandler.addMetrics(["ValidationErrors", "Count", 1], {
+      extraDimensions: [
+        { Name: "EventType", Value: eventType },
+        { Name: "ErrorType", Value: "ValidationError" },
+      ],
     });
   }
 
-  async emitProcessingLatency(
-    latency: number,
-    eventType: string,
-  ): Promise<void> {
-    await this.putMetric(
-      "ProcessingLatency",
-      latency,
+  emitProcessingLatency(latency: number, eventType: string): void {
+    this.metricHandler.addMetrics(
+      ["ProcessingLatency", "Milliseconds", latency],
       {
-        EventType: eventType,
-        Environment: this.environment,
+        extraDimensions: [{ Name: "EventType", Value: eventType }],
       },
-      StandardUnit.Milliseconds,
     );
   }
-
-  private async putMetric(
-    metricName: string,
-    value: number,
-    dimensions: MetricDimensions,
-    unit: StandardUnit = StandardUnit.Count,
-  ): Promise<void> {
-    try {
-      const command = new PutMetricDataCommand({
-        Namespace: this.namespace,
-        MetricData: [
-          {
-            MetricName: metricName,
-            Value: value,
-            Unit: unit,
-            Timestamp: new Date(),
-            Dimensions: Object.entries(dimensions).map(([Name, Value]) => ({
-              Name,
-              Value,
-            })),
-          },
-        ],
-      });
-
-      await this.cloudWatchClient.send(command);
-    } catch (error) {
-      logger.error("Failed to emit CloudWatch metric", {
-        errorDetails: formatErrorForLogging(error),
-        metricName,
-        dimensions,
-      });
-    }
-  }
-
-  emitMetricAsync(
-    metricName: string,
-    value: number,
-    dimensions: MetricDimensions,
-  ): void {
-    this.putMetric(metricName, value, dimensions).catch((error) => {
-      logger.error("Failed to emit async metric", {
-        errorDetails: formatErrorForLogging(error),
-        metricName,
-        dimensions,
-      });
-    });
-  }
 }
 
-export const metricsService = new MetricsService();
+export { type MetricDimension, MetricHandler } from "services/metric-handler";

@@ -4,19 +4,14 @@ import type { MessageStatusData } from "models/message-status-data";
 import type { MessageStatusAttributes } from "models/client-callback-payload";
 import { handler } from "..";
 
-// Mock the metrics service to avoid actual CloudWatch calls
-jest.mock("services/metrics", () => ({
-  metricsService: {
-    emitEventReceived: jest.fn().mockImplementation(async () => {}),
-    emitTransformationSuccess: jest.fn().mockImplementation(async () => {}),
-    emitDeliveryInitiated: jest.fn().mockImplementation(async () => {}),
-    emitValidationError: jest.fn().mockImplementation(async () => {}),
-    emitTransformationFailure: jest.fn().mockImplementation(async () => {}),
-    emitProcessingLatency: jest.fn().mockImplementation(async () => {}),
-  },
-}));
+// Mock console.log to avoid EMF output during tests
+const consoleLogSpy = jest.spyOn(console, "log").mockImplementation();
 
 describe("Lambda handler", () => {
+  beforeEach(() => {
+    consoleLogSpy.mockClear();
+  });
+
   const validMessageStatusEvent: StatusTransitionEvent<MessageStatusData> = {
     specversion: "1.0",
     id: "661f9510-f39c-52e5-b827-557766551111",

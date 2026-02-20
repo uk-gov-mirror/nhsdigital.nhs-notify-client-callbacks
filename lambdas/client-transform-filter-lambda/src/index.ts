@@ -21,7 +21,7 @@ import {
   ValidationError,
   wrapUnknownError,
 } from "services/error-handler";
-import { metricsService } from "services/metrics";
+import { CallbackMetrics, createMetricHandler } from "services/metrics";
 
 interface TransformedEvent extends StatusTransitionEvent {
   transformedPayload: ClientCallbackPayload;
@@ -99,6 +99,7 @@ function logCallbackGenerated(
 
 async function processSingleEvent(
   sqsRecord: SQSRecord,
+  metrics: CallbackMetrics,
 ): Promise<TransformedEvent> {
   const event = parseSqsMessageBody(sqsRecord);
 
@@ -116,7 +117,7 @@ async function processSingleEvent(
     messageId,
   });
 
-  await metricsService.emitEventReceived(eventType, clientId);
+  metrics.emitEventReceived(eventType, clientId);
 
   logLifecycleEvent("transformation-started", {
     correlationId,
@@ -136,7 +137,7 @@ async function processSingleEvent(
     messageId,
   });
 
-  await metricsService.emitTransformationSuccess(eventType, clientId);
+  metrics.emitTransformationSuccess(eventType, clientId);
 
   const transformedEvent: TransformedEvent = {
     ...event,
@@ -150,7 +151,7 @@ async function processSingleEvent(
     messageId,
   });
 
-  await metricsService.emitDeliveryInitiated(clientId);
+  metrics.emitDeliveryInitiated(clientId);
 
   logger.clearContext();
 
@@ -159,6 +160,7 @@ async function processSingleEvent(
 
 async function handleEventError(
   error: unknown,
+  metrics: CallbackMetrics,
   correlationId = "unknown",
   eventErrorType = "unknown",
 ): Promise<never> {
@@ -167,7 +169,7 @@ async function handleEventError(
       correlationId,
       error,
     });
-    await metricsService.emitValidationError(eventErrorType);
+    metrics.emitValidationError(eventErrorType);
     throw error;
   }
 
@@ -177,10 +179,7 @@ async function handleEventError(
       eventType: eventErrorType,
       error,
     });
-    await metricsService.emitTransformationFailure(
-      eventErrorType,
-      "TransformationError",
-    );
+    metrics.emitTransformationFailure(eventErrorType, "TransformationError");
     throw error;
   }
 
@@ -189,16 +188,17 @@ async function handleEventError(
     correlationId,
     error: wrappedError,
   });
-  await metricsService.emitTransformationFailure(
-    eventErrorType,
-    "UnknownError",
-  );
+  metrics.emitTransformationFailure(eventErrorType, "UnknownError");
   throw wrappedError;
 }
 
 export const handler = async (
   event: SQSRecord[],
 ): Promise<TransformedEvent[]> => {
+  // Create metrics handler at handler entry point for dependency injection
+  const metricHandler = createMetricHandler();
+  const metrics = new CallbackMetrics(metricHandler);
+
   const startTime = Date.now();
   let correlationId: string | undefined;
   let eventType: string | undefined;
@@ -214,7 +214,7 @@ export const handler = async (
 
     for (const sqsRecord of event) {
       try {
-        const transformedEvent = await processSingleEvent(sqsRecord);
+        const transformedEvent = await processSingleEvent(sqsRecord, metrics);
         transformedEvents.push(transformedEvent);
         eventType = transformedEvent.type;
         stats.successful += 1;
@@ -227,7 +227,7 @@ export const handler = async (
           correlationId = error.correlationId;
           // Event type may not be available if parsing/validation failed early
         }
-        await handleEventError(error, correlationId, eventType);
+        await handleEventError(error, metrics, correlationId, eventType);
       } finally {
         stats.processed += 1;
       }
@@ -237,7 +237,7 @@ export const handler = async (
 
     const processingTime = Date.now() - startTime;
     if (eventType) {
-      await metricsService.emitProcessingLatency(processingTime, eventType);
+      metrics.emitProcessingLatency(processingTime, eventType);
     }
 
     return transformedEvents;

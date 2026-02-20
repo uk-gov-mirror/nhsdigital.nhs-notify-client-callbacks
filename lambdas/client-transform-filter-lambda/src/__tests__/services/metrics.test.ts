@@ -1,488 +1,402 @@
-import {
-  CloudWatchClient,
-  PutMetricDataCommand,
-  StandardUnit,
-} from "@aws-sdk/client-cloudwatch";
-import { MetricsService, metricsService } from "services/metrics";
-import { logger } from "services/logger";
+import { MetricHandler } from "services/metric-handler";
+import { CallbackMetrics, createMetricHandler } from "services/metrics";
 
-// Mock AWS SDK CloudWatch client
-jest.mock("@aws-sdk/client-cloudwatch");
-
-// Mock logger to avoid actual logging during tests
-jest.mock("services/logger", () => ({
-  logger: {
-    error: jest.fn(),
-  },
-}));
-
-describe("MetricsService", () => {
-  let mockCloudWatchClient: jest.Mocked<CloudWatchClient>;
-  let mockSend: jest.Mock;
-  let capturedCommandInputs: any[] = [];
+describe("MetricHandler", () => {
+  let consoleLogSpy: jest.SpyInstance;
 
   beforeEach(() => {
-    jest.clearAllMocks();
-    capturedCommandInputs = [];
-
-    // Setup mock CloudWatch client
-    mockSend = jest.fn().mockResolvedValue({});
-    mockCloudWatchClient = {
-      send: mockSend,
-    } as any;
-
-    (CloudWatchClient as jest.Mock).mockImplementation(
-      () => mockCloudWatchClient,
-    );
-
-    // Mock PutMetricDataCommand to capture inputs
-    (PutMetricDataCommand as unknown as jest.Mock).mockImplementation(
-      (input) => {
-        capturedCommandInputs.push(input);
-        return { input };
-      },
-    );
+    consoleLogSpy = jest.spyOn(console, "log").mockImplementation();
   });
 
   afterEach(() => {
-    // Clean up environment variables
-    delete process.env.AWS_REGION;
+    consoleLogSpy.mockRestore();
     delete process.env.METRICS_NAMESPACE;
     delete process.env.ENVIRONMENT;
   });
 
-  describe("constructor", () => {
-    it("should initialize with default values when environment variables are not set", () => {
-      const service = new MetricsService();
+  describe("addMetrics", () => {
+    it("should emit EMF-formatted metric to console", () => {
+      const handler = new MetricHandler("TestNamespace", [
+        { Name: "Environment", Value: "test" },
+      ]);
 
-      expect(service).toBeInstanceOf(MetricsService);
-      expect(CloudWatchClient).toHaveBeenCalledWith({
-        region: "eu-west-2",
+      handler.addMetrics(["TestMetric", "Count", 1], {
+        extraDimensions: [{ Name: "ClientId", Value: "client-123" }],
       });
-    });
 
-    it("should use AWS_REGION environment variable when set", () => {
-      process.env.AWS_REGION = "us-east-1";
+      expect(consoleLogSpy).toHaveBeenCalledTimes(1);
 
-      const service = new MetricsService();
+      const emittedLog = JSON.parse(consoleLogSpy.mock.calls[0][0]);
 
-      expect(service).toBeInstanceOf(MetricsService);
-      expect(CloudWatchClient).toHaveBeenCalledWith({
-        region: "us-east-1",
+      expect(emittedLog).toMatchObject({
+        _aws: {
+          CloudWatchMetrics: [
+            {
+              Namespace: "TestNamespace",
+              Dimensions: [["Environment", "ClientId"]],
+              Metrics: [
+                {
+                  Name: "TestMetric",
+                  Unit: "Count",
+                  StorageResolution: 60,
+                },
+              ],
+            },
+          ],
+        },
+        Environment: "test",
+        ClientId: "client-123",
+        TestMetric: 1,
       });
+      expect(emittedLog._aws.Timestamp).toEqual(expect.any(Number));
     });
 
-    it("should use default namespace when METRICS_NAMESPACE is not set", async () => {
-      const service = new MetricsService();
+    it("should support multiple metrics in one call", () => {
+      const handler = new MetricHandler("TestNamespace", []);
 
-      // Test namespace by checking a metric emission
-      await service.emitEventReceived("test-event", "test-client");
+      handler.addMetrics([
+        ["Metric1", "Count", 1],
+        ["Metric2", "Count", 5],
+        ["Metric3", "Milliseconds", 250],
+      ]);
 
-      expect(capturedCommandInputs).toHaveLength(1);
-      expect(capturedCommandInputs[0].Namespace).toBe(
-        "NHS-Notify/ClientCallbacks",
-      );
+      expect(consoleLogSpy).toHaveBeenCalledTimes(1);
+
+      const emittedLog = JSON.parse(consoleLogSpy.mock.calls[0][0]);
+
+      expect(emittedLog.Metric1).toBe(1);
+      expect(emittedLog.Metric2).toBe(5);
+      expect(emittedLog.Metric3).toBe(250);
+      expect(emittedLog._aws.CloudWatchMetrics[0].Metrics).toHaveLength(3);
     });
 
-    it("should use custom namespace when METRICS_NAMESPACE is set", async () => {
-      process.env.METRICS_NAMESPACE = "CustomNamespace";
+    it("should use custom timestamp when provided", () => {
+      const handler = new MetricHandler("TestNamespace", []);
+      const customTime = new Date("2026-02-20T10:00:00Z");
 
-      const service = new MetricsService();
-      await service.emitEventReceived("test-event", "test-client");
-
-      expect(capturedCommandInputs).toHaveLength(1);
-      expect(capturedCommandInputs[0].Namespace).toBe("CustomNamespace");
-    });
-
-    it("should use default environment when ENVIRONMENT is not set", async () => {
-      const service = new MetricsService();
-
-      await service.emitEventReceived("test-event", "test-client");
-
-      const dimensions = capturedCommandInputs[0].MetricData[0].Dimensions;
-
-      expect(dimensions).toContainEqual({
-        Name: "Environment",
-        Value: "development",
+      handler.addMetrics(["TestMetric", "Count", 1], {
+        timestamp: customTime,
       });
+
+      const emittedLog = JSON.parse(consoleLogSpy.mock.calls[0][0]);
+
+      expect(emittedLog._aws.Timestamp).toBe(customTime.valueOf());
     });
 
-    it("should use custom environment when ENVIRONMENT is set", async () => {
-      process.env.ENVIRONMENT = "production";
+    it("should support custom storage resolution", () => {
+      const handler = new MetricHandler("TestNamespace", []);
 
-      const service = new MetricsService();
-      await service.emitEventReceived("test-event", "test-client");
-
-      const dimensions = capturedCommandInputs[0].MetricData[0].Dimensions;
-
-      expect(dimensions).toContainEqual({
-        Name: "Environment",
-        Value: "production",
+      handler.addMetrics(["TestMetric", "Count", 1], {
+        storageResolution: 1,
       });
+
+      const emittedLog = JSON.parse(consoleLogSpy.mock.calls[0][0]);
+
+      expect(
+        emittedLog._aws.CloudWatchMetrics[0].Metrics[0].StorageResolution,
+      ).toBe(1);
+    });
+
+    it("should merge base dimensions with extra dimensions", () => {
+      const handler = new MetricHandler("TestNamespace", [
+        { Name: "Environment", Value: "production" },
+        { Name: "Service", Value: "callbacks" },
+      ]);
+
+      handler.addMetrics(["TestMetric", "Count", 1], {
+        extraDimensions: [
+          { Name: "ClientId", Value: "client-abc" },
+          { Name: "EventType", Value: "test-event" },
+        ],
+      });
+
+      const emittedLog = JSON.parse(consoleLogSpy.mock.calls[0][0]);
+
+      expect(emittedLog.Environment).toBe("production");
+      expect(emittedLog.Service).toBe("callbacks");
+      expect(emittedLog.ClientId).toBe("client-abc");
+      expect(emittedLog.EventType).toBe("test-event");
+      expect(emittedLog._aws.CloudWatchMetrics[0].Dimensions[0]).toEqual([
+        "Environment",
+        "Service",
+        "ClientId",
+        "EventType",
+      ]);
     });
   });
 
-  describe("emitEventReceived", () => {
-    it("should emit EventsReceived metric with correct parameters", async () => {
-      const service = new MetricsService();
+  describe("getChildMetricHandler", () => {
+    it("should create child handler with combined dimensions", () => {
+      const parentHandler = new MetricHandler("TestNamespace", [
+        { Name: "Environment", Value: "test" },
+      ]);
 
-      await service.emitEventReceived(
+      const childHandler = parentHandler.getChildMetricHandler([
+        { Name: "RequestId", Value: "req-123" },
+      ]);
+
+      childHandler.addMetrics(["ChildMetric", "Count", 1]);
+
+      expect(consoleLogSpy).toHaveBeenCalledTimes(1);
+
+      const emittedLog = JSON.parse(consoleLogSpy.mock.calls[0][0]);
+
+      expect(emittedLog.Environment).toBe("test");
+      expect(emittedLog.RequestId).toBe("req-123");
+    });
+
+    it("should not affect parent handler dimensions", () => {
+      const parentHandler = new MetricHandler("TestNamespace", [
+        { Name: "Environment", Value: "test" },
+      ]);
+
+      parentHandler.getChildMetricHandler([
+        { Name: "RequestId", Value: "req-123" },
+      ]);
+
+      parentHandler.addMetrics(["ParentMetric", "Count", 1]);
+
+      const emittedLog = JSON.parse(consoleLogSpy.mock.calls[0][0]);
+
+      expect(emittedLog.Environment).toBe("test");
+      expect(emittedLog.RequestId).toBeUndefined();
+    });
+  });
+
+  describe("DIMENSION_NOT_APPLICABLE constant", () => {
+    it("should expose NOT_APPLICABLE constant", () => {
+      expect(MetricHandler.DIMENSION_NOT_APPLICABLE).toBe("not_applicable");
+    });
+
+    it("should work with NOT_APPLICABLE in dimensions", () => {
+      const handler = new MetricHandler("TestNamespace", []);
+
+      handler.addMetrics(["TestMetric", "Count", 1], {
+        extraDimensions: [
+          { Name: "CampaignId", Value: MetricHandler.DIMENSION_NOT_APPLICABLE },
+        ],
+      });
+
+      const emittedLog = JSON.parse(consoleLogSpy.mock.calls[0][0]);
+
+      expect(emittedLog.CampaignId).toBe("not_applicable");
+    });
+  });
+});
+
+describe("createMetricHandler", () => {
+  let consoleLogSpy: jest.SpyInstance;
+
+  beforeEach(() => {
+    consoleLogSpy = jest.spyOn(console, "log").mockImplementation();
+  });
+
+  afterEach(() => {
+    consoleLogSpy.mockRestore();
+    delete process.env.METRICS_NAMESPACE;
+    delete process.env.ENVIRONMENT;
+  });
+
+  it("should create MetricHandler with default namespace and environment", () => {
+    const handler = createMetricHandler();
+
+    handler.addMetrics(["TestMetric", "Count", 1]);
+
+    const emittedLog = JSON.parse(consoleLogSpy.mock.calls[0][0]);
+
+    expect(emittedLog._aws.CloudWatchMetrics[0].Namespace).toBe(
+      "NHS-Notify/ClientCallbacks",
+    );
+    expect(emittedLog.Environment).toBe("development");
+  });
+
+  it("should use METRICS_NAMESPACE environment variable", () => {
+    process.env.METRICS_NAMESPACE = "CustomNamespace";
+
+    const handler = createMetricHandler();
+
+    handler.addMetrics(["TestMetric", "Count", 1]);
+
+    const emittedLog = JSON.parse(consoleLogSpy.mock.calls[0][0]);
+
+    expect(emittedLog._aws.CloudWatchMetrics[0].Namespace).toBe(
+      "CustomNamespace",
+    );
+  });
+
+  it("should use ENVIRONMENT environment variable", () => {
+    process.env.ENVIRONMENT = "production";
+
+    const handler = createMetricHandler();
+
+    handler.addMetrics(["TestMetric", "Count", 1]);
+
+    const emittedLog = JSON.parse(consoleLogSpy.mock.calls[0][0]);
+
+    expect(emittedLog.Environment).toBe("production");
+  });
+});
+
+describe("CallbackMetrics", () => {
+  let mockMetricHandler: jest.Mocked<MetricHandler>;
+  let callbackMetrics: CallbackMetrics;
+
+  beforeEach(() => {
+    mockMetricHandler = {
+      addMetrics: jest.fn(),
+      getChildMetricHandler: jest.fn(),
+    } as any;
+
+    callbackMetrics = new CallbackMetrics(mockMetricHandler);
+  });
+
+  describe("emitEventReceived", () => {
+    it("should call addMetrics with correct parameters", () => {
+      callbackMetrics.emitEventReceived(
         "message.status.transitioned",
         "client-123",
       );
 
-      expect(mockSend).toHaveBeenCalledTimes(1);
-      expect(capturedCommandInputs).toHaveLength(1);
-
-      const commandInput = capturedCommandInputs[0];
-      expect(commandInput.Namespace).toBe("NHS-Notify/ClientCallbacks");
-      expect(commandInput.MetricData).toHaveLength(1);
-
-      const metric = commandInput.MetricData[0];
-      expect(metric.MetricName).toBe("EventsReceived");
-      expect(metric.Value).toBe(1);
-      expect(metric.Unit).toBe(StandardUnit.Count);
-      expect(metric.Timestamp).toBeInstanceOf(Date);
-      expect(metric.Dimensions).toEqual(
-        expect.arrayContaining([
-          { Name: "EventType", Value: "message.status.transitioned" },
-          { Name: "ClientId", Value: "client-123" },
-          { Name: "Environment", Value: "development" },
-        ]),
+      expect(mockMetricHandler.addMetrics).toHaveBeenCalledWith(
+        ["EventsReceived", "Count", 1],
+        {
+          extraDimensions: [
+            { Name: "EventType", Value: "message.status.transitioned" },
+            { Name: "ClientId", Value: "client-123" },
+          ],
+        },
       );
     });
   });
 
   describe("emitTransformationSuccess", () => {
-    it("should emit TransformationsSuccessful metric with correct parameters", async () => {
-      const service = new MetricsService();
-
-      await service.emitTransformationSuccess(
-        "message.status.transitioned",
+    it("should call addMetrics with correct parameters", () => {
+      callbackMetrics.emitTransformationSuccess(
+        "channel.status.transitioned",
         "client-456",
       );
 
-      expect(mockSend).toHaveBeenCalledTimes(1);
-
-      const metric = capturedCommandInputs[0].MetricData[0];
-
-      expect(metric.MetricName).toBe("TransformationsSuccessful");
-      expect(metric.Value).toBe(1);
-      expect(metric.Dimensions).toEqual(
-        expect.arrayContaining([
-          { Name: "EventType", Value: "message.status.transitioned" },
-          { Name: "ClientId", Value: "client-456" },
-          { Name: "Environment", Value: "development" },
-        ]),
+      expect(mockMetricHandler.addMetrics).toHaveBeenCalledWith(
+        ["TransformationsSuccessful", "Count", 1],
+        {
+          extraDimensions: [
+            { Name: "EventType", Value: "channel.status.transitioned" },
+            { Name: "ClientId", Value: "client-456" },
+          ],
+        },
       );
     });
   });
 
   describe("emitTransformationFailure", () => {
-    it("should emit TransformationsFailed metric with correct parameters", async () => {
-      const service = new MetricsService();
-
-      await service.emitTransformationFailure(
+    it("should call addMetrics with correct parameters", () => {
+      callbackMetrics.emitTransformationFailure(
         "message.status.transitioned",
         "ValidationError",
       );
 
-      expect(mockSend).toHaveBeenCalledTimes(1);
-
-      const metric = capturedCommandInputs[0].MetricData[0];
-
-      expect(metric.MetricName).toBe("TransformationsFailed");
-      expect(metric.Value).toBe(1);
-      expect(metric.Dimensions).toEqual(
-        expect.arrayContaining([
-          { Name: "EventType", Value: "message.status.transitioned" },
-          { Name: "ErrorType", Value: "ValidationError" },
-          { Name: "Environment", Value: "development" },
-        ]),
+      expect(mockMetricHandler.addMetrics).toHaveBeenCalledWith(
+        ["TransformationsFailed", "Count", 1],
+        {
+          extraDimensions: [
+            { Name: "EventType", Value: "message.status.transitioned" },
+            { Name: "ErrorType", Value: "ValidationError" },
+          ],
+        },
       );
     });
   });
 
   describe("emitFilterMatched", () => {
-    it("should emit EventsMatched metric with correct parameters", async () => {
-      const service = new MetricsService();
-
-      await service.emitFilterMatched(
-        "channel.status.transitioned",
+    it("should call addMetrics with correct parameters", () => {
+      callbackMetrics.emitFilterMatched(
+        "message.status.transitioned",
         "client-789",
       );
 
-      expect(mockSend).toHaveBeenCalledTimes(1);
-
-      const metric = capturedCommandInputs[0].MetricData[0];
-
-      expect(metric.MetricName).toBe("EventsMatched");
-      expect(metric.Value).toBe(1);
-      expect(metric.Dimensions).toEqual(
-        expect.arrayContaining([
-          { Name: "EventType", Value: "channel.status.transitioned" },
-          { Name: "ClientId", Value: "client-789" },
-          { Name: "Environment", Value: "development" },
-        ]),
+      expect(mockMetricHandler.addMetrics).toHaveBeenCalledWith(
+        ["EventsMatched", "Count", 1],
+        {
+          extraDimensions: [
+            { Name: "EventType", Value: "message.status.transitioned" },
+            { Name: "ClientId", Value: "client-789" },
+          ],
+        },
       );
     });
   });
 
   describe("emitFilterRejected", () => {
-    it("should emit EventsRejected metric with correct parameters", async () => {
-      const service = new MetricsService();
-
-      await service.emitFilterRejected(
-        "message.status.transitioned",
+    it("should call addMetrics with correct parameters", () => {
+      callbackMetrics.emitFilterRejected(
+        "channel.status.transitioned",
         "client-abc",
       );
 
-      expect(mockSend).toHaveBeenCalledTimes(1);
-
-      const metric = capturedCommandInputs[0].MetricData[0];
-
-      expect(metric.MetricName).toBe("EventsRejected");
-      expect(metric.Value).toBe(1);
-      expect(metric.Dimensions).toEqual(
-        expect.arrayContaining([
-          { Name: "EventType", Value: "message.status.transitioned" },
-          { Name: "ClientId", Value: "client-abc" },
-          { Name: "Environment", Value: "development" },
-        ]),
+      expect(mockMetricHandler.addMetrics).toHaveBeenCalledWith(
+        ["EventsRejected", "Count", 1],
+        {
+          extraDimensions: [
+            { Name: "EventType", Value: "channel.status.transitioned" },
+            { Name: "ClientId", Value: "client-abc" },
+          ],
+        },
       );
     });
   });
 
   describe("emitDeliveryInitiated", () => {
-    it("should emit CallbacksInitiated metric with correct parameters", async () => {
-      const service = new MetricsService();
+    it("should call addMetrics with correct parameters", () => {
+      callbackMetrics.emitDeliveryInitiated("client-xyz");
 
-      await service.emitDeliveryInitiated("client-xyz");
-
-      expect(mockSend).toHaveBeenCalledTimes(1);
-
-      const metric = capturedCommandInputs[0].MetricData[0];
-
-      expect(metric.MetricName).toBe("CallbacksInitiated");
-      expect(metric.Value).toBe(1);
-      expect(metric.Dimensions).toEqual(
-        expect.arrayContaining([
-          { Name: "ClientId", Value: "client-xyz" },
-          { Name: "Environment", Value: "development" },
-        ]),
+      expect(mockMetricHandler.addMetrics).toHaveBeenCalledWith(
+        ["CallbacksInitiated", "Count", 1],
+        {
+          extraDimensions: [{ Name: "ClientId", Value: "client-xyz" }],
+        },
       );
     });
   });
 
   describe("emitValidationError", () => {
-    it("should emit ValidationErrors metric with correct parameters", async () => {
-      const service = new MetricsService();
+    it("should call addMetrics with correct parameters", () => {
+      callbackMetrics.emitValidationError("invalid.event.type");
 
-      await service.emitValidationError("invalid.event.type");
-
-      expect(mockSend).toHaveBeenCalledTimes(1);
-
-      const metric = capturedCommandInputs[0].MetricData[0];
-
-      expect(metric.MetricName).toBe("ValidationErrors");
-      expect(metric.Value).toBe(1);
-      expect(metric.Dimensions).toEqual(
-        expect.arrayContaining([
-          { Name: "EventType", Value: "invalid.event.type" },
-          { Name: "ErrorType", Value: "ValidationError" },
-          { Name: "Environment", Value: "development" },
-        ]),
+      expect(mockMetricHandler.addMetrics).toHaveBeenCalledWith(
+        ["ValidationErrors", "Count", 1],
+        {
+          extraDimensions: [
+            { Name: "EventType", Value: "invalid.event.type" },
+            { Name: "ErrorType", Value: "ValidationError" },
+          ],
+        },
       );
     });
   });
 
   describe("emitProcessingLatency", () => {
-    it("should emit ProcessingLatency metric with milliseconds unit", async () => {
-      const service = new MetricsService();
+    it("should call addMetrics with Milliseconds unit", () => {
+      callbackMetrics.emitProcessingLatency(250, "message.status.transitioned");
 
-      await service.emitProcessingLatency(250, "message.status.transitioned");
-
-      expect(mockSend).toHaveBeenCalledTimes(1);
-
-      const metric = capturedCommandInputs[0].MetricData[0];
-
-      expect(metric.MetricName).toBe("ProcessingLatency");
-      expect(metric.Value).toBe(250);
-      expect(metric.Unit).toBe(StandardUnit.Milliseconds);
-      expect(metric.Dimensions).toEqual(
-        expect.arrayContaining([
-          { Name: "EventType", Value: "message.status.transitioned" },
-          { Name: "Environment", Value: "development" },
-        ]),
+      expect(mockMetricHandler.addMetrics).toHaveBeenCalledWith(
+        ["ProcessingLatency", "Milliseconds", 250],
+        {
+          extraDimensions: [
+            { Name: "EventType", Value: "message.status.transitioned" },
+          ],
+        },
       );
     });
 
-    it("should handle high latency values", async () => {
-      const service = new MetricsService();
+    it("should handle high latency values", () => {
+      callbackMetrics.emitProcessingLatency(5000, "slow.event");
 
-      await service.emitProcessingLatency(5000, "slow.event");
-
-      const metric = capturedCommandInputs[0].MetricData[0];
-
-      expect(metric.Value).toBe(5000);
-    });
-  });
-
-  describe("error handling in putMetric", () => {
-    it("should log error and not throw when CloudWatch send fails", async () => {
-      const error = new Error("CloudWatch API error");
-      mockSend.mockRejectedValueOnce(error);
-
-      const service = new MetricsService();
-
-      // Should not throw
-      await expect(
-        service.emitEventReceived("test-event", "test-client"),
-      ).resolves.not.toThrow();
-
-      expect(logger.error).toHaveBeenCalledWith(
-        "Failed to emit CloudWatch metric",
-        expect.objectContaining({
-          metricName: "EventsReceived",
-          dimensions: expect.objectContaining({
-            EventType: "test-event",
-            ClientId: "test-client",
-          }),
-        }),
+      expect(mockMetricHandler.addMetrics).toHaveBeenCalledWith(
+        ["ProcessingLatency", "Milliseconds", 5000],
+        {
+          extraDimensions: [{ Name: "EventType", Value: "slow.event" }],
+        },
       );
-    });
-
-    it("should continue processing subsequent metrics after an error", async () => {
-      mockSend.mockRejectedValueOnce(new Error("First metric fails"));
-      mockSend.mockResolvedValueOnce({});
-
-      const service = new MetricsService();
-
-      await service.emitEventReceived("event-1", "client-1");
-      await service.emitEventReceived("event-2", "client-2");
-
-      expect(mockSend).toHaveBeenCalledTimes(2);
-      expect(logger.error).toHaveBeenCalledTimes(1);
-    });
-  });
-
-  describe("emitMetricAsync", () => {
-    it("should call putMetric without waiting for result", async () => {
-      const service = new MetricsService();
-
-      // emitMetricAsync is fire-and-forget, returns void immediately
-      const result = service.emitMetricAsync("TestMetric", 1, {
-        EventType: "test",
-      });
-
-      expect(result).toBeUndefined();
-
-      // Give async operation time to execute
-      await new Promise<void>((resolve) => {
-        setTimeout(resolve, 100);
-      });
-
-      expect(mockSend).toHaveBeenCalledTimes(1);
-      expect(capturedCommandInputs).toHaveLength(1);
-
-      const metric = capturedCommandInputs[0].MetricData[0];
-
-      expect(metric.MetricName).toBe("TestMetric");
-      expect(metric.Value).toBe(1);
-    });
-
-    it("should log error when async metric emission fails", async () => {
-      const error = new Error("Async metric failed");
-      mockSend.mockRejectedValueOnce(error);
-
-      const service = new MetricsService();
-
-      service.emitMetricAsync("TestMetric", 1, { EventType: "test" });
-
-      // Give async operation time to fail and log
-      await new Promise<void>((resolve) => {
-        setTimeout(resolve, 100);
-      });
-
-      // The error is logged by putMetric, not emitMetricAsync
-      expect(logger.error).toHaveBeenCalledWith(
-        "Failed to emit CloudWatch metric",
-        expect.objectContaining({
-          metricName: "TestMetric",
-          dimensions: expect.objectContaining({
-            EventType: "test",
-          }),
-        }),
-      );
-    });
-  });
-
-  describe("metricsService singleton", () => {
-    it("should export a singleton instance", () => {
-      expect(metricsService).toBeInstanceOf(MetricsService);
-    });
-
-    it("should be usable directly", async () => {
-      // Create a new instance instead of using isolated modules
-      const service = new MetricsService();
-
-      await service.emitEventReceived("test-event", "test-client");
-
-      expect(mockSend).toHaveBeenCalled();
-      expect(capturedCommandInputs.length).toBeGreaterThan(0);
-    });
-  });
-
-  describe("dimension handling", () => {
-    it("should handle empty optional dimensions", async () => {
-      const service = new MetricsService();
-
-      await service.emitDeliveryInitiated("client-123");
-
-      const dimensions = capturedCommandInputs[0].MetricData[0].Dimensions;
-
-      // Should only have ClientId and Environment, no EventType
-      expect(dimensions).toHaveLength(2);
-      expect(dimensions).toEqual(
-        expect.arrayContaining([
-          { Name: "ClientId", Value: "client-123" },
-          { Name: "Environment", Value: "development" },
-        ]),
-      );
-    });
-
-    it("should include all provided dimensions", async () => {
-      const service = new MetricsService();
-
-      await service.emitTransformationFailure("event-type", "error-type");
-
-      const dimensions = capturedCommandInputs[0].MetricData[0].Dimensions;
-
-      expect(dimensions).toHaveLength(3);
-      expect(dimensions).toEqual(
-        expect.arrayContaining([
-          { Name: "EventType", Value: "event-type" },
-          { Name: "ErrorType", Value: "error-type" },
-          { Name: "Environment", Value: "development" },
-        ]),
-      );
-    });
-  });
-
-  describe("timestamp handling", () => {
-    it("should include timestamp in metric data", async () => {
-      const beforeTime = new Date();
-
-      const service = new MetricsService();
-      await service.emitEventReceived("test-event", "test-client");
-
-      const afterTime = new Date();
-
-      const timestamp = capturedCommandInputs[0].MetricData[0].Timestamp;
-
-      expect(timestamp).toBeInstanceOf(Date);
-      expect(timestamp.getTime()).toBeGreaterThanOrEqual(beforeTime.getTime());
-      expect(timestamp.getTime()).toBeLessThanOrEqual(afterTime.getTime());
     });
   });
 });
