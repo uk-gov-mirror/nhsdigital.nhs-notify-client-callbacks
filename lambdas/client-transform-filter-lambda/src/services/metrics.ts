@@ -1,95 +1,61 @@
-import { MetricHandler } from "services/metric-handler";
+import { Unit, createMetricsLogger } from "aws-embedded-metrics";
+import type { MetricsLogger } from "aws-embedded-metrics";
 
-export const createMetricHandler = (): MetricHandler => {
+export const createMetricLogger = (): MetricsLogger => {
   const namespace =
     process.env.METRICS_NAMESPACE || "nhs-notify-client-callbacks-metrics";
   const environment = process.env.ENVIRONMENT || "development";
 
-  return new MetricHandler(namespace, [
-    {
-      Name: "Environment",
-      Value: environment,
-    },
-  ]);
+  const metrics = createMetricsLogger();
+  metrics.setNamespace(namespace);
+  metrics.setDimensions({ Environment: environment });
+
+  return metrics;
 };
 
-/**
- * Uses EMF instead of direct CloudWatch API calls for:
- * - Better performance (no network latency)
- * - Lower cost (no PutMetricData API charges)
- * - Easier testing (simple console.log mocking)
- */
 export class CallbackMetrics {
-  constructor(private readonly metricHandler: MetricHandler) {}
+  constructor(private readonly metrics: MetricsLogger) {}
 
   emitEventReceived(eventType: string, clientId: string): void {
-    this.metricHandler.addMetrics(["EventsReceived", "Count", 1], {
-      extraDimensions: [
-        { Name: "EventType", Value: eventType },
-        { Name: "ClientId", Value: clientId },
-      ],
-    });
+    this.metrics.setDimensions({ EventType: eventType, ClientId: clientId });
+    this.metrics.putMetric("EventsReceived", 1, Unit.Count);
   }
 
   emitTransformationSuccess(eventType: string, clientId: string): void {
-    this.metricHandler.addMetrics(["TransformationsSuccessful", "Count", 1], {
-      extraDimensions: [
-        { Name: "EventType", Value: eventType },
-        { Name: "ClientId", Value: clientId },
-      ],
-    });
+    this.metrics.setDimensions({ EventType: eventType, ClientId: clientId });
+    this.metrics.putMetric("TransformationsSuccessful", 1, Unit.Count);
   }
 
   emitTransformationFailure(eventType: string, errorType: string): void {
-    this.metricHandler.addMetrics(["TransformationsFailed", "Count", 1], {
-      extraDimensions: [
-        { Name: "EventType", Value: eventType },
-        { Name: "ErrorType", Value: errorType },
-      ],
-    });
+    this.metrics.setDimensions({ EventType: eventType, ErrorType: errorType });
+    this.metrics.putMetric("TransformationsFailed", 1, Unit.Count);
   }
 
   emitFilterMatched(eventType: string, clientId: string): void {
-    this.metricHandler.addMetrics(["EventsMatched", "Count", 1], {
-      extraDimensions: [
-        { Name: "EventType", Value: eventType },
-        { Name: "ClientId", Value: clientId },
-      ],
-    });
+    this.metrics.setDimensions({ EventType: eventType, ClientId: clientId });
+    this.metrics.putMetric("EventsMatched", 1, Unit.Count);
   }
 
   emitFilterRejected(eventType: string, clientId: string): void {
-    this.metricHandler.addMetrics(["EventsRejected", "Count", 1], {
-      extraDimensions: [
-        { Name: "EventType", Value: eventType },
-        { Name: "ClientId", Value: clientId },
-      ],
-    });
+    this.metrics.setDimensions({ EventType: eventType, ClientId: clientId });
+    this.metrics.putMetric("EventsRejected", 1, Unit.Count);
   }
 
   emitDeliveryInitiated(clientId: string): void {
-    this.metricHandler.addMetrics(["CallbacksInitiated", "Count", 1], {
-      extraDimensions: [{ Name: "ClientId", Value: clientId }],
-    });
+    this.metrics.setDimensions({ ClientId: clientId });
+    this.metrics.putMetric("CallbacksInitiated", 1, Unit.Count);
   }
 
   emitValidationError(eventType: string): void {
-    this.metricHandler.addMetrics(["ValidationErrors", "Count", 1], {
-      extraDimensions: [
-        { Name: "EventType", Value: eventType },
-        { Name: "ErrorType", Value: "ValidationError" },
-      ],
+    this.metrics.setDimensions({
+      EventType: eventType,
+      ErrorType: "ValidationError",
     });
+    this.metrics.putMetric("ValidationErrors", 1, Unit.Count);
   }
 
   emitProcessingLatency(latency: number, eventType: string): void {
-    this.metricHandler.addMetrics(
-      ["ProcessingLatency", "Milliseconds", latency],
-      {
-        extraDimensions: [{ Name: "EventType", Value: eventType }],
-      },
-    );
+    this.metrics.setDimensions({ EventType: eventType });
+    this.metrics.putMetric("ProcessingLatency", latency, Unit.Milliseconds);
   }
 }
-
-export { type MetricDimension, MetricHandler } from "services/metric-handler";

@@ -4,14 +4,20 @@ import type { MessageStatusData } from "models/message-status-data";
 import type { MessageStatusAttributes } from "models/client-callback-payload";
 import { handler } from "..";
 
-// Mock console.log to avoid EMF output during tests
-const consoleLogSpy = jest.spyOn(console, "log").mockImplementation();
+jest.mock("aws-embedded-metrics", () => ({
+  createMetricsLogger: jest.fn(() => ({
+    setNamespace: jest.fn(),
+    setDimensions: jest.fn(),
+    putMetric: jest.fn(),
+    flush: jest.fn().mockResolvedValue(undefined as unknown),
+  })),
+  Unit: {
+    Count: "Count",
+    Milliseconds: "Milliseconds",
+  },
+}));
 
 describe("Lambda handler", () => {
-  beforeEach(() => {
-    consoleLogSpy.mockClear();
-  });
-
   const validMessageStatusEvent: StatusTransitionEvent<MessageStatusData> = {
     specversion: "1.0",
     id: "661f9510-f39c-52e5-b827-557766551111",

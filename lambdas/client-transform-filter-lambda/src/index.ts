@@ -21,7 +21,7 @@ import {
   ValidationError,
   wrapUnknownError,
 } from "services/error-handler";
-import { CallbackMetrics, createMetricHandler } from "services/metrics";
+import { CallbackMetrics, createMetricLogger } from "services/metrics";
 
 interface TransformedEvent extends StatusTransitionEvent {
   transformedPayload: ClientCallbackPayload;
@@ -196,8 +196,8 @@ export const handler = async (
   event: SQSRecord[],
 ): Promise<TransformedEvent[]> => {
   // Create metrics handler at handler entry point for dependency injection
-  const metricHandler = createMetricHandler();
-  const metrics = new CallbackMetrics(metricHandler);
+  const metricsLogger = createMetricLogger();
+  const metrics = new CallbackMetrics(metricsLogger);
 
   const startTime = Date.now();
   let correlationId: string | undefined;
@@ -240,6 +240,7 @@ export const handler = async (
       metrics.emitProcessingLatency(processingTime, eventType);
     }
 
+    await metricsLogger.flush();
     return transformedEvents;
   } catch (error) {
     logger.error("Lambda execution failed", {
@@ -247,6 +248,7 @@ export const handler = async (
       error: error instanceof Error ? error : new Error(String(error)),
     });
 
+    await metricsLogger.flush();
     // Rethrow to trigger Lambda retry or DLQ routing
     throw error;
   }
