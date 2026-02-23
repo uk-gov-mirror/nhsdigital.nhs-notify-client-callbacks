@@ -4,11 +4,7 @@ import type { StatusTransitionEvent } from "models/status-transition-event";
 import { EventTypes } from "models/status-transition-event";
 import type { MessageStatusData } from "models/message-status-data";
 import type { ChannelStatusData } from "models/channel-status-data";
-import type {
-  ChannelStatusAttributes,
-  ClientCallbackPayload,
-  MessageStatusAttributes,
-} from "models/client-callback-payload";
+import type { ClientCallbackPayload } from "models/client-callback-payload";
 import { validateStatusTransitionEvent } from "services/validators/event-validator";
 import { transformMessageStatus } from "services/transformers/message-status-transformer";
 import { transformChannelStatus } from "services/transformers/channel-status-transformer";
@@ -17,10 +13,11 @@ import {
   extractCorrelationId,
   logLifecycleEvent,
 } from "services/logger";
+import { logCallbackGenerated } from "services/callback-logger";
 import {
   TransformationError,
   ValidationError,
-  wrapUnknownError,
+  getEventError,
 } from "services/error-handler";
 import { CallbackMetrics, createMetricLogger } from "services/metrics";
 
@@ -88,45 +85,6 @@ function parseSqsMessageBody(sqsRecord: SQSRecord): StatusTransitionEvent {
       `Failed to parse SQS message body as JSON: ${error instanceof Error ? error.message : "Unknown error"}`,
       undefined,
     );
-  }
-}
-
-function logCallbackGenerated(
-  eventLogger: Logger,
-  payload: ClientCallbackPayload,
-  eventType: string,
-  correlationId: string | undefined,
-  clientId: string,
-): void {
-  const { attributes } = payload.data[0];
-
-  const commonFields = {
-    correlationId,
-    callbackType: payload.data[0].type,
-    clientId,
-    messageId: attributes.messageId,
-    messageReference: attributes.messageReference,
-  };
-
-  if (eventType === EventTypes.MESSAGE_STATUS_TRANSITIONED) {
-    const messageAttrs = attributes as MessageStatusAttributes;
-    eventLogger.info("Callback generated", {
-      ...commonFields,
-      messageStatus: messageAttrs.messageStatus,
-      messageStatusDescription: messageAttrs.messageStatusDescription,
-      messageFailureReasonCode: messageAttrs.messageFailureReasonCode,
-      channels: messageAttrs.channels,
-    });
-  } else if (eventType === EventTypes.CHANNEL_STATUS_TRANSITIONED) {
-    const channelAttrs = attributes as ChannelStatusAttributes;
-    eventLogger.info("Callback generated", {
-      ...commonFields,
-      channel: channelAttrs.channel,
-      channelStatus: channelAttrs.channelStatus,
-      channelStatusDescription: channelAttrs.channelStatusDescription,
-      channelFailureReasonCode: channelAttrs.channelFailureReasonCode,
-      supplierStatus: channelAttrs.supplierStatus,
-    });
   }
 }
 
@@ -200,45 +158,6 @@ function logDeliveryInitiated(
   }
 }
 
-function handleEventError(
-  error: unknown,
-  metrics: CallbackMetrics,
-  eventLogger: Logger,
-  eventErrorType = "unknown",
-): never {
-  const correlationId =
-    error instanceof ValidationError || error instanceof TransformationError
-      ? error.correlationId
-      : "unknown";
-
-  if (error instanceof ValidationError) {
-    eventLogger.error("Event validation failed", {
-      correlationId,
-      error,
-    });
-    metrics.emitValidationError(eventErrorType);
-    throw error;
-  }
-
-  if (error instanceof TransformationError) {
-    eventLogger.error("Event transformation failed", {
-      correlationId,
-      eventType: eventErrorType,
-      error,
-    });
-    metrics.emitTransformationFailure(eventErrorType, "TransformationError");
-    throw error;
-  }
-
-  const wrappedError = wrapUnknownError(error, correlationId);
-  eventLogger.error("Unexpected error processing event", {
-    correlationId,
-    error: wrappedError,
-  });
-  metrics.emitTransformationFailure(eventErrorType, "UnknownError");
-  throw wrappedError;
-}
-
 async function transformBatch(
   sqsRecords: SQSRecord[],
   metrics: CallbackMetrics,
@@ -299,9 +218,9 @@ export const handler = async (
   } catch (error) {
     stats.recordFailure();
 
-    handleEventError(error, metrics, rootLogger);
+    const wrappedError = getEventError(error, metrics, rootLogger);
 
     await metricsLogger.flush();
-    throw error;
+    throw wrappedError;
   }
 };

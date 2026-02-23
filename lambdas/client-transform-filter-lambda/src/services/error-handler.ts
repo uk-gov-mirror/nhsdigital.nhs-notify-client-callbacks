@@ -7,14 +7,6 @@ export enum ErrorType {
   UNKNOWN_ERROR = "UnknownError",
 }
 
-export interface StructuredError {
-  errorType: ErrorType;
-  message: string;
-  correlationId?: string;
-  retryable: boolean;
-  originalError?: Error | string;
-}
-
 export class LambdaError extends Error {
   public readonly errorType: ErrorType;
 
@@ -39,16 +31,6 @@ export class LambdaError extends Error {
       Error.captureStackTrace(this, this.constructor);
     }
   }
-
-  toJSON(): StructuredError {
-    return {
-      errorType: this.errorType,
-      message: this.message,
-      correlationId: this.correlationId,
-      retryable: this.retryable,
-      originalError: this.message,
-    };
-  }
 }
 
 export class ValidationError extends LambdaError {
@@ -69,7 +51,7 @@ export class TransformationError extends LambdaError {
   }
 }
 
-function errorToString(error: unknown): string {
+function serializeUnknownError(error: unknown): string {
   if (typeof error === "string") {
     return error;
   }
@@ -98,15 +80,18 @@ export function wrapUnknownError(
   }
 
   if (error instanceof Error) {
-    return new LambdaError(
+    const wrappedError = new LambdaError(
       ErrorType.UNKNOWN_ERROR,
       error.message,
       correlationId,
       false,
     );
+    wrappedError.cause = error;
+    wrappedError.stack = error.stack;
+    return wrappedError;
   }
 
-  const errorMessage = errorToString(error);
+  const errorMessage = serializeUnknownError(error);
 
   return new LambdaError(
     ErrorType.UNKNOWN_ERROR,
@@ -117,11 +102,7 @@ export function wrapUnknownError(
 }
 
 export function isRetriable(error: unknown): boolean {
-  if (error instanceof LambdaError) {
-    return error.retryable;
-  }
-
-  return false;
+  return error instanceof LambdaError && error.retryable;
 }
 
 export function formatErrorForLogging(error: unknown): {
@@ -148,11 +129,53 @@ export function formatErrorForLogging(error: unknown): {
     };
   }
 
-  const errorMessage = errorToString(error);
+  const errorMessage = serializeUnknownError(error);
 
   return {
     errorType: ErrorType.UNKNOWN_ERROR,
     message: errorMessage,
     retryable: false,
   };
+}
+
+export function getEventError(
+  error: unknown,
+  metrics: {
+    emitValidationError: (type: string) => void;
+    emitTransformationFailure: (type: string, reason: string) => void;
+  },
+  eventLogger: { error: (message: string, context: object) => void },
+  eventErrorType = "unknown",
+): Error {
+  const correlationId =
+    error instanceof ValidationError || error instanceof TransformationError
+      ? error.correlationId
+      : "unknown";
+
+  if (error instanceof ValidationError) {
+    eventLogger.error("Event validation failed", {
+      correlationId,
+      error,
+    });
+    metrics.emitValidationError(eventErrorType);
+    return error;
+  }
+
+  if (error instanceof TransformationError) {
+    eventLogger.error("Event transformation failed", {
+      correlationId,
+      eventType: eventErrorType,
+      error,
+    });
+    metrics.emitTransformationFailure(eventErrorType, "TransformationError");
+    return error;
+  }
+
+  const wrappedError = wrapUnknownError(error, correlationId);
+  eventLogger.error("Unexpected error processing event", {
+    correlationId,
+    error: wrappedError,
+  });
+  metrics.emitTransformationFailure(eventErrorType, "UnknownError");
+  return wrappedError;
 }

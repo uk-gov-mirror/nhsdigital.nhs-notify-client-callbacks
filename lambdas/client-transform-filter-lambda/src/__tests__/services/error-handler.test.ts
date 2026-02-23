@@ -50,7 +50,7 @@ describe("LambdaError", () => {
     expect(error.stack).toContain("LambdaError");
   });
 
-  it("should serialize to JSON correctly", () => {
+  it("should have correct properties", () => {
     const error = new LambdaError(
       ErrorType.VALIDATION_ERROR,
       "Invalid schema",
@@ -58,30 +58,19 @@ describe("LambdaError", () => {
       false,
     );
 
-    const json = error.toJSON();
-
-    expect(json).toEqual({
-      errorType: ErrorType.VALIDATION_ERROR,
-      message: "Invalid schema",
-      correlationId: "corr-789",
-      retryable: false,
-      originalError: "Invalid schema",
-    });
+    expect(error.errorType).toBe(ErrorType.VALIDATION_ERROR);
+    expect(error.message).toBe("Invalid schema");
+    expect(error.correlationId).toBe("corr-789");
+    expect(error.retryable).toBe(false);
   });
 
-  it("should serialize to JSON without optional fields", () => {
+  it("should have correct properties without optional fields", () => {
     const error = new LambdaError(ErrorType.UNKNOWN_ERROR, "Test error");
 
-    const json = error.toJSON();
-
-    expect(json).toEqual({
-      errorType: ErrorType.UNKNOWN_ERROR,
-      message: "Test error",
-      correlationId: undefined,
-
-      retryable: false,
-      originalError: "Test error",
-    });
+    expect(error.errorType).toBe(ErrorType.UNKNOWN_ERROR);
+    expect(error.message).toBe("Test error");
+    expect(error.correlationId).toBeUndefined();
+    expect(error.retryable).toBe(false);
   });
 });
 
