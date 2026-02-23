@@ -1,5 +1,4 @@
 {
-  "autoOpenWorkspace.enableAutoOpenIfSingleWorkspace": true,
   "files.exclude": {
     "**/.DS_Store": true,
     "**/.git": true,
@@ -11,5 +10,10 @@
     ".devcontainer": true,
     ".github": false,
     ".vscode": false
+  },
+  "jest.jestCommandLine": "npm run test:unit --workspaces --",
+  "sonarlint.connectedMode.project": {
+    "connectionId": "nhsdigital",
+    "projectKey": "NHSDigital_nhs-notify-client-callbacks"
   }
 }
