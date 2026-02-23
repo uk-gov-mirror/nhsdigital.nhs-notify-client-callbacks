@@ -29,6 +29,7 @@
     "jest-mock-extended": "^3.0.7",
     "lcov-result-merger": "^5.0.1",
     "ts-jest": "^29.4.6",
+    "p-wait-for": "^5.0.2",
     "ts-node": "^10.9.2",
     "tsx": "^4.19.3",
     "typescript-eslint": "^8.56.1"

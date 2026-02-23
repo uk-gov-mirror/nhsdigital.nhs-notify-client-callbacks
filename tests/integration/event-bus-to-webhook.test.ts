@@ -1,15 +1,105 @@
 import {
   EventBridgeClient,
   PutEventsCommand,
-  type PutEventsRequestEntry,
 } from "@aws-sdk/client-eventbridge";
+import type { PutEventsRequestEntry } from "@aws-sdk/client-eventbridge";
 import {
   GetQueueAttributesCommand,
   PurgeQueueCommand,
   SQSClient,
 } from "@aws-sdk/client-sqs";
+import pWaitFor from "p-wait-for";
 import type { StatusTransitionEvent } from "nhs-notify-client-transform-filter-lambda/src/models/status-transition-event";
 import type { MessageStatusData } from "nhs-notify-client-transform-filter-lambda/src/models/message-status-data";
+
+const publishEvent = async (
+  client: EventBridgeClient,
+  eventBusName: string,
+  event: StatusTransitionEvent,
+) => {
+  const putEventsCommand = new PutEventsCommand({
+    Entries: [
+      {
+        EventBusName: eventBusName,
+        Source: event.source,
+        DetailType: event.type,
+        Detail: JSON.stringify(event),
+        Time: new Date(event.time),
+      } as PutEventsRequestEntry,
+    ],
+  });
+
+  return client.send(putEventsCommand);
+};
+
+const getQueueMessageCount = async (
+  client: SQSClient,
+  queueUrl?: string,
+  attributeNames: (
+    | "ApproximateNumberOfMessages"
+    | "ApproximateNumberOfMessagesNotVisible"
+  )[] = ["ApproximateNumberOfMessages"],
+) => {
+  if (!queueUrl) {
+    return 0;
+  }
+
+  const queueAttributesCommand = new GetQueueAttributesCommand({
+    QueueUrl: queueUrl,
+    AttributeNames: attributeNames,
+  });
+
+  const queueAttributes = await client.send(queueAttributesCommand);
+
+  return Number(queueAttributes.Attributes?.ApproximateNumberOfMessages || 0);
+};
+
+const awaitQueueEmpty = async (
+  client: SQSClient,
+  queueUrl?: string,
+  attributeNames: (
+    | "ApproximateNumberOfMessages"
+    | "ApproximateNumberOfMessagesNotVisible"
+  )[] = ["ApproximateNumberOfMessages"],
+) => {
+  if (!queueUrl) {
+    return;
+  }
+
+  await pWaitFor(
+    async () =>
+      (await getQueueMessageCount(client, queueUrl, attributeNames)) === 0,
+    {
+      interval: 250,
+      timeout: 10_000,
+    },
+  );
+};
+
+const awaitMessageStatusCallbacks = async (
+  logGroup: string,
+  messageId: string,
+) => {
+  const { getMessageStatusCallbacks } = await import("./helpers/index.js");
+  let callbacks: Awaited<ReturnType<typeof getMessageStatusCallbacks>> = [];
+
+  await pWaitFor(
+    async () => {
+      callbacks = await getMessageStatusCallbacks(logGroup, messageId);
+      return callbacks.length > 0;
+    },
+    {
+      interval: 500,
+      timeout: 10_000,
+    },
+  );
+
+  if (callbacks.length === 0) {
+    throw new Error("Timed out waiting for message status callbacks");
+  }
+
+  return callbacks;
+};
 
 // eslint-disable-next-line jest/no-disabled-tests
 describe.skip("Event Bus to Webhook Integration", () => {
@@ -54,6 +144,10 @@ describe.skip("Event Bus to Webhook Integration", () => {
         return;
       }
 
+      if (!TEST_WEBHOOK_LOG_GROUP) {
+        throw new Error("TEST_WEBHOOK_LOG_GROUP must be set for this test");
+      }
+
       const messageStatusEvent: StatusTransitionEvent<MessageStatusData> = {
         specversion: "1.0",
         id: crypto.randomUUID(),
@@ -87,66 +181,36 @@ describe.skip("Event Bus to Webhook Integration", () => {
         },
       };
 
-      const putEventsCommand = new PutEventsCommand({
-        Entries: [
-          {
-            EventBusName: TEST_EVENT_BUS_NAME,
-            Source: messageStatusEvent.source,
-            DetailType: messageStatusEvent.type,
-            Detail: JSON.stringify(messageStatusEvent),
-            Time: new Date(messageStatusEvent.time),
-          } as PutEventsRequestEntry,
-        ],
-      });
-
-      const putEventsResponse = await eventBridgeClient.send(putEventsCommand);
+      const putEventsResponse = await publishEvent(
+        eventBridgeClient,
+        TEST_EVENT_BUS_NAME,
+        messageStatusEvent,
+      );
 
       expect(putEventsResponse.FailedEntryCount).toBe(0);
       expect(putEventsResponse.Entries).toHaveLength(1);
       expect(putEventsResponse.Entries![0].EventId).toBeDefined();
 
-      await new Promise<void>((resolve) => {
-        setTimeout(resolve, 5000);
+      await awaitQueueEmpty(sqsClient, TEST_QUEUE_URL, [
+        "ApproximateNumberOfMessages",
+        "ApproximateNumberOfMessagesNotVisible",
+      ]);
+
+      const callbacks = await awaitMessageStatusCallbacks(
+        TEST_WEBHOOK_LOG_GROUP,
+        messageStatusEvent.data.messageId,
+      );
+
+      expect(callbacks).toHaveLength(1);
+
+      expect(callbacks[0]).toMatchObject({
+        type: "MessageStatus",
+
+        attributes: expect.objectContaining({
+          messageStatus: "delivered",
+        }),
       });
-
-      let queueMessageCount = 0;
-      if (TEST_QUEUE_URL) {
-        const queueAttributesCommand = new GetQueueAttributesCommand({
-          QueueUrl: TEST_QUEUE_URL,
-          AttributeNames: [
-            "ApproximateNumberOfMessages",
-            "ApproximateNumberOfMessagesNotVisible",
-          ],
-        });
-
-        const queueAttributes = await sqsClient.send(queueAttributesCommand);
-        queueMessageCount = Number(
-          queueAttributes.Attributes?.ApproximateNumberOfMessages || 0,
-        );
-      }
-
-      expect(TEST_QUEUE_URL ? queueMessageCount : 0).toBe(0);
-
-      if (TEST_WEBHOOK_LOG_GROUP) {
-        const { getMessageStatusCallbacks } = await import(
-          "./helpers/index.js"
-        );
-        const callbacks = await getMessageStatusCallbacks(
-          TEST_WEBHOOK_LOG_GROUP,
-          messageStatusEvent.data.messageId,
-        );
-        // eslint-disable-next-line jest/no-conditional-expect
-        expect(callbacks).toHaveLength(1);
-        // eslint-disable-next-line jest/no-conditional-expect
-        expect(callbacks[0]).toMatchObject({
-          type: "MessageStatus",
-          // eslint-disable-next-line jest/no-conditional-expect
-          attributes: expect.objectContaining({
-            messageStatus: "delivered",
-          }),
-        });
-      }
-    }, 30_000); // 30 second timeout for integration test
+    }, 30_000);
 
     it("should filter out events not matching client subscription", async () => {
       if (!TEST_WEBHOOK_URL) {
@@ -185,25 +249,18 @@ describe.skip("Event Bus to Webhook Integration", () => {
         },
       };
 
-      const putEventsCommand = new PutEventsCommand({
-        Entries: [
-          {
-            EventBusName: TEST_EVENT_BUS_NAME,
-            Source: messageStatusEvent.source,
-            DetailType: messageStatusEvent.type,
-            Detail: JSON.stringify(messageStatusEvent),
-            Time: new Date(messageStatusEvent.time),
-          } as PutEventsRequestEntry,
-        ],
-      });
-
-      const putEventsResponse = await eventBridgeClient.send(putEventsCommand);
+      const putEventsResponse = await publishEvent(
+        eventBridgeClient,
+        TEST_EVENT_BUS_NAME,
+        messageStatusEvent,
+      );
 
       expect(putEventsResponse.FailedEntryCount).toBe(0);
 
-      await new Promise<void>((resolve) => {
-        setTimeout(resolve, 5000);
-      });
+      await awaitQueueEmpty(sqsClient, TEST_QUEUE_URL, [
+        "ApproximateNumberOfMessages",
+        "ApproximateNumberOfMessagesNotVisible",
+      ]);
     }, 30_000);
   });
 
@@ -245,42 +302,17 @@ describe.skip("Event Bus to Webhook Integration", () => {
         },
       };
 
-      const putEventsCommand = new PutEventsCommand({
-        Entries: [
-          {
-            EventBusName: TEST_EVENT_BUS_NAME,
-            Source: channelStatusEvent.source,
-            DetailType: channelStatusEvent.type,
-            Detail: JSON.stringify(channelStatusEvent),
-            Time: new Date(channelStatusEvent.time),
-          } as PutEventsRequestEntry,
-        ],
-      });
-
-      const putEventsResponse = await eventBridgeClient.send(putEventsCommand);
+      const putEventsResponse = await publishEvent(
+        eventBridgeClient,
+        TEST_EVENT_BUS_NAME,
+        channelStatusEvent,
+      );
 
       expect(putEventsResponse.FailedEntryCount).toBe(0);
       expect(putEventsResponse.Entries).toHaveLength(1);
       expect(putEventsResponse.Entries![0].EventId).toBeDefined();
 
-      await new Promise<void>((resolve) => {
-        setTimeout(resolve, 5000);
-      });
-
-      let queueMessageCount = 0;
-      if (TEST_QUEUE_URL) {
-        const queueAttributesCommand = new GetQueueAttributesCommand({
-          QueueUrl: TEST_QUEUE_URL,
-          AttributeNames: ["ApproximateNumberOfMessages"],
-        });
-
-        const queueAttributes = await sqsClient.send(queueAttributesCommand);
-        queueMessageCount = Number(
-          queueAttributes.Attributes?.ApproximateNumberOfMessages || 0,
-        );
-      }
-
-      expect(TEST_QUEUE_URL ? queueMessageCount : 0).toBe(0);
+      await awaitQueueEmpty(sqsClient, TEST_QUEUE_URL);
     }, 30_000);
   });
 });
