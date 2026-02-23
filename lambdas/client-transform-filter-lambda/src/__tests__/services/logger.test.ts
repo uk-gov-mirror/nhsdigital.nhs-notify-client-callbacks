@@ -7,7 +7,6 @@ import {
   logger,
 } from "services/logger";
 
-// Mock pino
 jest.mock("pino", () => {
   const mockLoggerMethods = {
     info: jest.fn(),
@@ -19,13 +18,11 @@ jest.mock("pino", () => {
   return jest.fn(() => mockLoggerMethods);
 });
 
-// Get reference to pino mock (cast to any to avoid TypeScript seeing real pino types)
 const mockLoggerMethods = pino() as any;
 
 describe("Logger", () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    // Reset child mock to return the same mock logger
     mockLoggerMethods.child.mockReturnValue(mockLoggerMethods);
   });
 
@@ -115,7 +112,6 @@ describe("Logger", () => {
 
       testLogger.clearContext();
 
-      // After clearing, the logger should be reset (no child logger with context)
       expect(testLogger).toBeInstanceOf(Logger);
     });
   });

@@ -4,7 +4,6 @@ import type { StatusTransitionEvent } from "models/status-transition-event";
 import type { MessageStatusData } from "models/message-status-data";
 import type { ChannelStatusData } from "models/channel-status-data";
 
-// Make traceparent optional for tests that need to delete it
 type TestEvent<T> = Omit<StatusTransitionEvent<T>, "traceparent"> & {
   traceparent?: string;
 };

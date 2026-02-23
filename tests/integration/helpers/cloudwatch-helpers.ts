@@ -6,14 +6,6 @@ import type { CallbackPayload } from "nhs-notify-mock-webhook-lambda/src/types";
 
 const client = new CloudWatchLogsClient({ region: "eu-west-2" });
 
-/**
- * Query CloudWatch Logs for mock webhook callbacks
- *
- * @param logGroupName - CloudWatch log group name for the mock webhook lambda
- * @param pattern - Filter pattern (e.g., messageId)
- * @param startTime - Optional start time for log search (defaults to 5 minutes ago)
- * @returns Array of log entries containing callback payloads
- */
 export async function getCallbackLogsFromCloudWatch(
   logGroupName: string,
   pattern: string,
@@ -35,15 +27,6 @@ export async function getCallbackLogsFromCloudWatch(
   );
 }
 
-/**
- * Parse callback payloads from CloudWatch log messages
- *
- * Extracts the JSON payload from log messages with format:
- * "CALLBACK {messageId} {messageType} : {JSON payload}"
- *
- * @param logs - Array of log entries from CloudWatch
- * @returns Array of parsed callback payloads
- */
 export function parseCallbacksFromLogs(logs: unknown[]): CallbackPayload[] {
   return logs
     .map((log: unknown) => {
@@ -53,7 +36,6 @@ export function parseCallbacksFromLogs(logs: unknown[]): CallbackPayload[] {
         "msg" in log &&
         typeof log.msg === "string"
       ) {
-        // Extract JSON from "CALLBACK {id} {type} : {json}" format
         const match = /CALLBACK .+ : (.+)$/.exec(log.msg);
         if (match?.[1]) {
           try {
@@ -68,14 +50,6 @@ export function parseCallbacksFromLogs(logs: unknown[]): CallbackPayload[] {
     .filter((payload): payload is CallbackPayload => payload !== null);
 }
 
-/**
- * Get message status callbacks for a specific message ID
- *
- * @param logGroupName - CloudWatch log group name
- * @param requestItemId - Message ID to filter by
- * @param startTime - Optional start time for search
- * @returns Array of MessageStatus callback payloads
- */
 export async function getMessageStatusCallbacks(
   logGroupName: string,
   requestItemId: string,
@@ -89,14 +63,6 @@ export async function getMessageStatusCallbacks(
   return parseCallbacksFromLogs(logs);
 }
 
-/**
- * Get channel status callbacks for a specific message ID
- *
- * @param logGroupName - CloudWatch log group name
- * @param requestItemId - Message ID to filter by
- * @param startTime - Optional start time for search
- * @returns Array of ChannelStatus callback payloads
- */
 export async function getChannelStatusCallbacks(
   logGroupName: string,
   requestItemId: string,

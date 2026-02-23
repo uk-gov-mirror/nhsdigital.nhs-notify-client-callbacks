@@ -1,45 +1,3 @@
-/**
- * Integration test for Event Bus to Webhook flow
- *
- * Tests the end-to-end flow:
- * 1. Event published to Shared Event Bus
- * 2. Consumed by SQS Queue
- * 3. Processed by EventBridge Pipe
- * 4. Transformed by Lambda
- * 5. Routed to API Destination
- * 6. Delivered to client webhook
- *
- * This test requires AWS infrastructure to be deployed.
- * Run with: npm run test:integration
- *
- * ## Webhook Verification
- *
- * To verify webhook delivery, deploy the mock-webhook-lambda and configure:
- * - TEST_WEBHOOK_URL: URL of the deployed mock webhook Lambda
- * - TEST_WEBHOOK_LOG_GROUP: CloudWatch log group name (e.g., /aws/lambda/nhs-notify-callbacks-dev-mock-webhook)
- *
- * Then use helpers from ./helpers/cloudwatch-helpers to query received callbacks:
- *
- * ```typescript
- * import { getMessageStatusCallbacks } from './helpers';
- *
- * const callbacks = await getMessageStatusCallbacks(
- *   process.env.TEST_WEBHOOK_LOG_GROUP!,
- *   messageId
- * );
- *
- * expect(callbacks).toContainEqual(
- *   expect.objectContaining({
- *     type: 'MessageStatus',
- *     attributes: expect.objectContaining({
- *       messageId,
- *       messageStatus: 'delivered'
- *     })
- *   })
- * );
- * ```
- */
-
 import {
   EventBridgeClient,
   PutEventsCommand,
@@ -53,7 +11,6 @@ import {
 import type { StatusTransitionEvent } from "nhs-notify-client-transform-filter-lambda/src/models/status-transition-event";
 import type { MessageStatusData } from "nhs-notify-client-transform-filter-lambda/src/models/message-status-data";
 
-// Skipped - unfinished
 // eslint-disable-next-line jest/no-disabled-tests
 describe.skip("Event Bus to Webhook Integration", () => {
   let eventBridgeClient: EventBridgeClient;
@@ -76,7 +33,6 @@ describe.skip("Event Bus to Webhook Integration", () => {
   });
 
   beforeEach(async () => {
-    // Purge test queue before each test
     if (TEST_QUEUE_URL) {
       try {
         await sqsClient.send(
@@ -95,7 +51,6 @@ describe.skip("Event Bus to Webhook Integration", () => {
   describe("Message Status Event Flow", () => {
     it("should process message status event from Event Bus to webhook", async () => {
       if (!TEST_WEBHOOK_URL) {
-        // Skip test if webhook URL not configured
         return;
       }
 
@@ -111,7 +66,7 @@ describe.skip("Event Bus to Webhook Integration", () => {
         dataschema: "https://nhs.uk/schemas/notify/message-status-data.v1.json",
         traceparent: "00-4d678967f96e353c07a0a31c1849b500-07f83ba58dd8df70-01",
         data: {
-          clientId: "test-client-integration",
+          clientId: "test-client",
           messageId: `test-msg-${Date.now()}`,
           messageReference: `test-ref-${Date.now()}`,
           messageStatus: "DELIVERED",
@@ -132,7 +87,6 @@ describe.skip("Event Bus to Webhook Integration", () => {
         },
       };
 
-      // Publish event to Event Bus
       const putEventsCommand = new PutEventsCommand({
         Entries: [
           {
@@ -147,17 +101,14 @@ describe.skip("Event Bus to Webhook Integration", () => {
 
       const putEventsResponse = await eventBridgeClient.send(putEventsCommand);
 
-      // Verify event was accepted
       expect(putEventsResponse.FailedEntryCount).toBe(0);
       expect(putEventsResponse.Entries).toHaveLength(1);
       expect(putEventsResponse.Entries![0].EventId).toBeDefined();
 
-      // Wait for event processing (Lambda execution, API Destination delivery)
       await new Promise<void>((resolve) => {
         setTimeout(resolve, 5000);
       });
 
-      // Verify queue metrics (optional - requires TEST_QUEUE_URL)
       let queueMessageCount = 0;
       if (TEST_QUEUE_URL) {
         const queueAttributesCommand = new GetQueueAttributesCommand({
@@ -174,10 +125,8 @@ describe.skip("Event Bus to Webhook Integration", () => {
         );
       }
 
-      // Messages should have been processed (not visible anymore)
       expect(TEST_QUEUE_URL ? queueMessageCount : 0).toBe(0);
 
-      // Verify webhook delivery (optional - requires TEST_WEBHOOK_LOG_GROUP)
       if (TEST_WEBHOOK_LOG_GROUP) {
         const { getMessageStatusCallbacks } = await import(
           "./helpers/index.js"
@@ -201,7 +150,6 @@ describe.skip("Event Bus to Webhook Integration", () => {
 
     it("should filter out events not matching client subscription", async () => {
       if (!TEST_WEBHOOK_URL) {
-        // Skip test if webhook URL not configured
         return;
       }
 
@@ -237,7 +185,6 @@ describe.skip("Event Bus to Webhook Integration", () => {
         },
       };
 
-      // Publish event to Event Bus
       const putEventsCommand = new PutEventsCommand({
         Entries: [
           {
@@ -252,23 +199,17 @@ describe.skip("Event Bus to Webhook Integration", () => {
 
       const putEventsResponse = await eventBridgeClient.send(putEventsCommand);
 
-      // Verify event was accepted
       expect(putEventsResponse.FailedEntryCount).toBe(0);
 
-      // Wait for event processing
       await new Promise<void>((resolve) => {
         setTimeout(resolve, 5000);
       });
-
-      // Event should be filtered out by Lambda and not delivered to webhook
-      // Manual verification: check CloudWatch logs show event was discarded with appropriate logging
     }, 30_000);
   });
 
   describe("Channel Status Event Flow", () => {
     it("should process channel status event from Event Bus to webhook", async () => {
       if (!TEST_WEBHOOK_URL) {
-        // Skip test if webhook URL not configured
         return;
       }
 
@@ -284,7 +225,7 @@ describe.skip("Event Bus to Webhook Integration", () => {
         dataschema: "https://nhs.uk/schemas/notify/channel-status-data.v1.json",
         traceparent: "00-4d678967f96e353c07a0a31c1849b500-07f83ba58dd8df70-02",
         data: {
-          clientId: "test-client-integration",
+          clientId: "test-client",
           messageId: `test-msg-${Date.now()}`,
           messageReference: `test-ref-${Date.now()}`,
           channel: "NHSAPP",
@@ -304,7 +245,6 @@ describe.skip("Event Bus to Webhook Integration", () => {
         },
       };
 
-      // Publish event to Event Bus
       const putEventsCommand = new PutEventsCommand({
         Entries: [
           {
@@ -319,17 +259,14 @@ describe.skip("Event Bus to Webhook Integration", () => {
 
       const putEventsResponse = await eventBridgeClient.send(putEventsCommand);
 
-      // Verify event was accepted
       expect(putEventsResponse.FailedEntryCount).toBe(0);
       expect(putEventsResponse.Entries).toHaveLength(1);
       expect(putEventsResponse.Entries![0].EventId).toBeDefined();
 
-      // Wait for event processing
       await new Promise<void>((resolve) => {
         setTimeout(resolve, 5000);
       });
 
-      // Verify queue metrics (optional)
       let queueMessageCount = 0;
       if (TEST_QUEUE_URL) {
         const queueAttributesCommand = new GetQueueAttributesCommand({
@@ -343,7 +280,6 @@ describe.skip("Event Bus to Webhook Integration", () => {
         );
       }
 
-      // Messages should have been processed
       expect(TEST_QUEUE_URL ? queueMessageCount : 0).toBe(0);
     }, 30_000);
   });
