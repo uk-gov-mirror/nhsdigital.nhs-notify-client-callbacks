@@ -1,8 +1,5 @@
 {
   "devDependencies": {
-    "@aws-sdk/client-cloudwatch-logs": "^3.991.0",
-    "@aws-sdk/client-eventbridge": "^3.990.0",
-    "@aws-sdk/client-sqs": "^3.990.0",
     "@stylistic/eslint-plugin": "^3.1.0",
     "@tsconfig/node22": "^22.0.2",
     "@types/jest": "^29.5.14",
@@ -54,8 +51,5 @@
     "src/models",
     "lambdas/mock-webhook-lambda",
     "tests/integration"
-  ],
-  "dependencies": {
-    "@aws-sdk/client-cloudwatch": "^3.990.0"
-  }
+  ]
 }
