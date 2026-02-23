@@ -1,7 +1,11 @@
 import type { SQSRecord } from "aws-lambda";
 import type { StatusTransitionEvent } from "models/status-transition-event";
 import type { MessageStatusData } from "models/message-status-data";
-import type { MessageStatusAttributes } from "models/client-callback-payload";
+import type { ChannelStatusData } from "models/channel-status-data";
+import type {
+  ChannelStatusAttributes,
+  MessageStatusAttributes,
+} from "models/client-callback-payload";
 import { handler } from "..";
 
 jest.mock("aws-embedded-metrics", () => ({
@@ -150,5 +154,193 @@ describe("Lambda handler", () => {
     await expect(handler([sqsMessage])).rejects.toThrow(
       "Validation failed: type: Invalid enum value",
     );
+  });
+
+  it("should transform a valid channel status event from SQS", async () => {
+    const validChannelStatusEvent: StatusTransitionEvent<ChannelStatusData> = {
+      specversion: "1.0",
+      id: "channel-event-123",
+      source:
+        "/nhs/england/notify/development/primary/data-plane/client-callbacks",
+      subject:
+        "customer/920fca11-596a-4eca-9c47-99f624614658/message/msg-456-abc/channel/nhsapp",
+      type: "uk.nhs.notify.client-callbacks.channel.status.transitioned.v1",
+      time: "2026-02-05T14:30:00.000Z",
+      datacontenttype: "application/json",
+      dataschema: "https://nhs.uk/schemas/notify/channel-status-data.v1.json",
+      traceparent: "00-4d678967f96e353c07a0a31c1849b500-07f83ba58dd8df70-02",
+      data: {
+        clientId: "client-abc-123",
+        messageId: "msg-789-xyz",
+        messageReference: "client-ref-12345",
+        channel: "NHSAPP",
+        channelStatus: "DELIVERED",
+        channelStatusDescription: "Successfully delivered to NHS App",
+        supplierStatus: "DELIVERED",
+        cascadeType: "primary",
+        cascadeOrder: 1,
+        timestamp: "2026-02-05T14:29:55Z",
+        retryCount: 0,
+      },
+    };
+
+    const sqsMessage: SQSRecord = {
+      messageId: "sqs-channel-msg-id",
+      receiptHandle: "receipt-handle-channel",
+      body: JSON.stringify(validChannelStatusEvent),
+      attributes: {
+        ApproximateReceiveCount: "1",
+        SentTimestamp: "1519211230",
+        SenderId: "ABCDEFGHIJ",
+        ApproximateFirstReceiveTimestamp: "1519211230",
+      },
+      messageAttributes: {},
+      md5OfBody: "mock-md5",
+      eventSource: "aws:sqs",
+      eventSourceARN: "arn:aws:sqs:eu-west-2:123456789:mock-queue",
+      awsRegion: "eu-west-2",
+    };
+
+    const result = await handler([sqsMessage]);
+
+    expect(result).toHaveLength(1);
+    expect(result[0]).toHaveProperty("transformedPayload");
+    const dataItem = result[0].transformedPayload.data[0];
+    expect(dataItem.type).toBe("ChannelStatus");
+    expect((dataItem.attributes as ChannelStatusAttributes).channelStatus).toBe(
+      "delivered",
+    );
+    expect((dataItem.attributes as ChannelStatusAttributes).channel).toBe(
+      "nhsapp",
+    );
+  });
+
+  it("should throw error for invalid JSON in SQS message body", async () => {
+    const sqsMessage: SQSRecord = {
+      messageId: "sqs-msg-id-invalid",
+      receiptHandle: "receipt-handle-invalid",
+      body: "{ invalid json",
+      attributes: {
+        ApproximateReceiveCount: "1",
+        SentTimestamp: "1519211230",
+        SenderId: "ABCDEFGHIJ",
+        ApproximateFirstReceiveTimestamp: "1519211230",
+      },
+      messageAttributes: {},
+      md5OfBody: "mock-md5",
+      eventSource: "aws:sqs",
+      eventSourceARN: "arn:aws:sqs:eu-west-2:123456789:mock-queue",
+      awsRegion: "eu-west-2",
+    };
+
+    await expect(handler([sqsMessage])).rejects.toThrow(
+      "Failed to parse SQS message body as JSON",
+    );
+  });
+
+  it("should handle validation errors and emit metrics", async () => {
+    const invalidEvent = {
+      ...validMessageStatusEvent,
+      data: {
+        ...validMessageStatusEvent.data,
+        clientId: "",
+      },
+    };
+
+    const sqsMessage: SQSRecord = {
+      messageId: "sqs-msg-validation-error",
+      receiptHandle: "receipt-handle-validation",
+      body: JSON.stringify(invalidEvent),
+      attributes: {
+        ApproximateReceiveCount: "1",
+        SentTimestamp: "1519211230",
+        SenderId: "ABCDEFGHIJ",
+        ApproximateFirstReceiveTimestamp: "1519211230",
+      },
+      messageAttributes: {},
+      md5OfBody: "mock-md5",
+      eventSource: "aws:sqs",
+      eventSourceARN: "arn:aws:sqs:eu-west-2:123456789:mock-queue",
+      awsRegion: "eu-west-2",
+    };
+
+    await expect(handler([sqsMessage])).rejects.toThrow("Validation failed");
+  });
+
+  it("should process empty batch successfully", async () => {
+    const result = await handler([]);
+
+    expect(result).toEqual([]);
+  });
+
+  it("should handle mixed message and channel status events in batch", async () => {
+    const channelStatusEvent: StatusTransitionEvent<ChannelStatusData> = {
+      specversion: "1.0",
+      id: "channel-event-456",
+      source:
+        "/nhs/england/notify/development/primary/data-plane/client-callbacks",
+      subject:
+        "customer/920fca11-596a-4eca-9c47-99f624614658/message/msg-456-abc/channel/sms",
+      type: "uk.nhs.notify.client-callbacks.channel.status.transitioned.v1",
+      time: "2026-02-05T14:30:00.000Z",
+      datacontenttype: "application/json",
+      dataschema: "https://nhs.uk/schemas/notify/channel-status-data.v1.json",
+      traceparent: "00-5e789078g07f464d08b1b42d2950c611-08g94cb69ee9eg81-02",
+      data: {
+        clientId: "client-xyz-789",
+        messageId: "msg-456-abc",
+        messageReference: "client-ref-67890",
+        channel: "SMS",
+        channelStatus: "FAILED",
+        channelStatusDescription: "SMS delivery failed",
+        channelFailureReasonCode: "SMS_001",
+        supplierStatus: "PERMANENT_FAILURE",
+        cascadeType: "secondary",
+        cascadeOrder: 2,
+        timestamp: "2026-02-05T14:30:00Z",
+        retryCount: 1,
+      },
+    };
+
+    const sqsMessages: SQSRecord[] = [
+      {
+        messageId: "sqs-msg-1",
+        receiptHandle: "receipt-1",
+        body: JSON.stringify(validMessageStatusEvent),
+        attributes: {
+          ApproximateReceiveCount: "1",
+          SentTimestamp: "1519211230",
+          SenderId: "ABCDEFGHIJ",
+          ApproximateFirstReceiveTimestamp: "1519211230",
+        },
+        messageAttributes: {},
+        md5OfBody: "mock-md5-1",
+        eventSource: "aws:sqs",
+        eventSourceARN: "arn:aws:sqs:eu-west-2:123456789:mock-queue",
+        awsRegion: "eu-west-2",
+      },
+      {
+        messageId: "sqs-msg-2",
+        receiptHandle: "receipt-2",
+        body: JSON.stringify(channelStatusEvent),
+        attributes: {
+          ApproximateReceiveCount: "1",
+          SentTimestamp: "1519211231",
+          SenderId: "ABCDEFGHIJ",
+          ApproximateFirstReceiveTimestamp: "1519211231",
+        },
+        messageAttributes: {},
+        md5OfBody: "mock-md5-2",
+        eventSource: "aws:sqs",
+        eventSourceARN: "arn:aws:sqs:eu-west-2:123456789:mock-queue",
+        awsRegion: "eu-west-2",
+      },
+    ];
+
+    const result = await handler(sqsMessages);
+
+    expect(result).toHaveLength(2);
+    expect(result[0].transformedPayload.data[0].type).toBe("MessageStatus");
+    expect(result[1].transformedPayload.data[0].type).toBe("ChannelStatus");
   });
 });
