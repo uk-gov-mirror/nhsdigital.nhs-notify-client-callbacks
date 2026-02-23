@@ -8,7 +8,7 @@ import {
   PurgeQueueCommand,
   SQSClient,
 } from "@aws-sdk/client-sqs";
-import pWaitFor from "p-wait-for";
+import { waitUntil } from "async-wait-until";
 import type { StatusTransitionEvent } from "nhs-notify-client-transform-filter-lambda/src/models/status-transition-event";
 import type { MessageStatusData } from "nhs-notify-client-transform-filter-lambda/src/models/message-status-data";
 
@@ -66,11 +66,11 @@ const awaitQueueEmpty = async (
     return;
   }
 
-  await pWaitFor(
+  await waitUntil(
     async () =>
       (await getQueueMessageCount(client, queueUrl, attributeNames)) === 0,
     {
-      interval: 250,
+      intervalBetweenAttempts: 250,
       timeout: 10_000,
     },
   );
@@ -83,13 +83,13 @@ const awaitMessageStatusCallbacks = async (
   const { getMessageStatusCallbacks } = await import("./helpers/index.js");
   let callbacks: Awaited<ReturnType<typeof getMessageStatusCallbacks>> = [];
 
-  await pWaitFor(
+  await waitUntil(
     async () => {
       callbacks = await getMessageStatusCallbacks(logGroup, messageId);
       return callbacks.length > 0;
     },
     {
-      interval: 500,
+      intervalBetweenAttempts: 500,
       timeout: 10_000,
     },
   );
