@@ -76,7 +76,7 @@ export function extractCorrelationId(event: unknown): string | undefined {
 export function logLifecycleEvent(
   eventLogger: Logger,
   stage:
-    | "received"
+    | "processing-started"
     | "transformation-started"
     | "transformation-completed"
     | "delivery-initiated"

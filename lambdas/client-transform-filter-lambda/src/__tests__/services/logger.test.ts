@@ -306,32 +306,17 @@ describe("logLifecycleEvent", () => {
     jest.clearAllMocks();
   });
 
-  it("should log received lifecycle event", () => {
+  it("should log processing-started lifecycle event", () => {
     const testLogger = new Logger();
     const context: LogContext = {
       correlationId: "corr-123",
     };
 
-    logLifecycleEvent(testLogger, "received", context);
+    logLifecycleEvent(testLogger, "processing-started", context);
 
     expect(mockLoggerMethods.info).toHaveBeenCalledWith(
       context,
-      "Callback lifecycle: received",
-    );
-  });
-
-  it("should log transformation-started lifecycle event", () => {
-    const testLogger = new Logger();
-    const context: LogContext = {
-      correlationId: "corr-123",
-      eventType: "message-status-update",
-    };
-
-    logLifecycleEvent(testLogger, "transformation-started", context);
-
-    expect(mockLoggerMethods.info).toHaveBeenCalledWith(
-      context,
-      "Callback lifecycle: transformation-started",
+      "Callback lifecycle: processing-started",
     );
   });
 
@@ -347,6 +332,23 @@ describe("logLifecycleEvent", () => {
     expect(mockLoggerMethods.info).toHaveBeenCalledWith(
       context,
       "Callback lifecycle: transformation-completed",
+    );
+  });
+
+  it("should log transformation-started lifecycle event", () => {
+    const testLogger = new Logger();
+    const context: LogContext = {
+      correlationId: "corr-123",
+      eventType: "message.status.transitioned",
+      clientId: "client-456",
+      messageId: "msg-789",
+    };
+
+    logLifecycleEvent(testLogger, "transformation-started", context);
+
+    expect(mockLoggerMethods.info).toHaveBeenCalledWith(
+      context,
+      "Callback lifecycle: transformation-started",
     );
   });
 

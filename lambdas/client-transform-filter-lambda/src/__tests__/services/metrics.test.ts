@@ -122,44 +122,6 @@ describe("CallbackMetrics", () => {
     });
   });
 
-  describe("emitFilterMatched", () => {
-    it("should emit EventsMatched metric with correct dimensions", () => {
-      callbackMetrics.emitFilterMatched(
-        "message.status.transitioned",
-        "client-789",
-      );
-
-      expect(mockSetDimensions).toHaveBeenCalledWith({
-        EventType: "message.status.transitioned",
-        ClientId: "client-789",
-      });
-      expect(mockPutMetric).toHaveBeenCalledWith(
-        "EventsMatched",
-        1,
-        Unit.Count,
-      );
-    });
-  });
-
-  describe("emitFilterRejected", () => {
-    it("should emit EventsRejected metric with correct dimensions", () => {
-      callbackMetrics.emitFilterRejected(
-        "channel.status.transitioned",
-        "client-abc",
-      );
-
-      expect(mockSetDimensions).toHaveBeenCalledWith({
-        EventType: "channel.status.transitioned",
-        ClientId: "client-abc",
-      });
-      expect(mockPutMetric).toHaveBeenCalledWith(
-        "EventsRejected",
-        1,
-        Unit.Count,
-      );
-    });
-  });
-
   describe("emitDeliveryInitiated", () => {
     it("should emit CallbacksInitiated metric with correct dimensions", () => {
       callbackMetrics.emitDeliveryInitiated("client-xyz");
@@ -187,34 +149,6 @@ describe("CallbackMetrics", () => {
         "ValidationErrors",
         1,
         Unit.Count,
-      );
-    });
-  });
-
-  describe("emitProcessingLatency", () => {
-    it("should emit ProcessingLatency metric with Milliseconds unit", () => {
-      callbackMetrics.emitProcessingLatency(250, "message.status.transitioned");
-
-      expect(mockSetDimensions).toHaveBeenCalledWith({
-        EventType: "message.status.transitioned",
-      });
-      expect(mockPutMetric).toHaveBeenCalledWith(
-        "ProcessingLatency",
-        250,
-        Unit.Milliseconds,
-      );
-    });
-
-    it("should handle high latency values", () => {
-      callbackMetrics.emitProcessingLatency(5000, "slow.event");
-
-      expect(mockSetDimensions).toHaveBeenCalledWith({
-        EventType: "slow.event",
-      });
-      expect(mockPutMetric).toHaveBeenCalledWith(
-        "ProcessingLatency",
-        5000,
-        Unit.Milliseconds,
       );
     });
   });

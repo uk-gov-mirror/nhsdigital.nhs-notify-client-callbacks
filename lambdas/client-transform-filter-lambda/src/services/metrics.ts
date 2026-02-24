@@ -31,16 +31,6 @@ export class CallbackMetrics {
     this.metrics.putMetric("TransformationsFailed", 1, Unit.Count);
   }
 
-  emitFilterMatched(eventType: string, clientId: string): void {
-    this.metrics.setDimensions({ EventType: eventType, ClientId: clientId });
-    this.metrics.putMetric("EventsMatched", 1, Unit.Count);
-  }
-
-  emitFilterRejected(eventType: string, clientId: string): void {
-    this.metrics.setDimensions({ EventType: eventType, ClientId: clientId });
-    this.metrics.putMetric("EventsRejected", 1, Unit.Count);
-  }
-
   emitDeliveryInitiated(clientId: string): void {
     this.metrics.setDimensions({ ClientId: clientId });
     this.metrics.putMetric("CallbacksInitiated", 1, Unit.Count);
@@ -52,10 +42,5 @@ export class CallbackMetrics {
       ErrorType: "ValidationError",
     });
     this.metrics.putMetric("ValidationErrors", 1, Unit.Count);
-  }
-
-  emitProcessingLatency(latency: number, eventType: string): void {
-    this.metrics.setDimensions({ EventType: eventType });
-    this.metrics.putMetric("ProcessingLatency", latency, Unit.Milliseconds);
   }
 }
