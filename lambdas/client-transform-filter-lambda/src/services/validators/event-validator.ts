@@ -71,7 +71,7 @@ function formatValidationError(error: unknown, event: unknown): never {
   } else if (error instanceof Error) {
     message = error.message;
   } else {
-    message = `Validation failed: ${String(error)}`;
+    message = `Validation failed: ${JSON.stringify(error)}`;
   }
 
   throw new ValidationError(message, correlationId);
