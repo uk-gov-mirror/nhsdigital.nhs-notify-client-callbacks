@@ -4,16 +4,6 @@
  * Receives events from SQS via EventBridge Pipe, validates, transforms,
  * and returns filtered events for delivery to client webhooks.
  *
- * User Story 1: Event-Driven Callback Delivery
- * - Validates CloudEvents schema
- * - Transforms to JSON:API callback payload format
- * - Filters based on client subscriptions (US2)
- * - Emits CloudWatch metrics for observability
- *
- * Handler Evolution:
- * - US1: Basic validation & transformation (this version)
- * - US2: Add config loading and subscription filtering
- * - US3: Add backward compatibility formatters
  */
 
 import type { StatusTransitionEvent } from "models/status-transition-event";
