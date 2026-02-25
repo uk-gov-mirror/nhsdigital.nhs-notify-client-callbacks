@@ -6,6 +6,31 @@ const logger = pino({
   level: process.env.LOG_LEVEL || "info",
 });
 
+function isValidCallbackPayload(payload: unknown): payload is CallbackPayload {
+  if (
+    typeof payload !== "object" ||
+    payload === null ||
+    Array.isArray(payload)
+  ) {
+    return false;
+  }
+
+  const candidate = payload as {
+    type?: unknown;
+    id?: unknown;
+    attributes?: unknown;
+  };
+
+  return (
+    (candidate.type === "MessageStatus" ||
+      candidate.type === "ChannelStatus") &&
+    typeof candidate.id === "string" &&
+    typeof candidate.attributes === "object" &&
+    candidate.attributes !== null &&
+    !Array.isArray(candidate.attributes)
+  );
+}
+
 export async function handler(
   event: APIGatewayProxyEvent,
 ): Promise<APIGatewayProxyResult> {
@@ -49,6 +74,18 @@ export async function handler(
       };
     }
 
+    if (!messages.data.every((payload) => isValidCallbackPayload(payload))) {
+      logger.error({
+        correlationId,
+        msg: "Invalid message structure - invalid callback payload",
+      });
+
+      return {
+        statusCode: 400,
+        body: JSON.stringify({ message: "Invalid message structure" }),
+      };
+    }
+
     // Log each callback in a format that can be queried from CloudWatch
     for (const message of messages.data) {
       const messageId = message.attributes.messageId as string | undefined;
@@ -78,6 +115,19 @@ export async function handler(
       body: JSON.stringify(response),
     };
   } catch (error) {
+    if (error instanceof SyntaxError) {
+      logger.error({
+        correlationId,
+        error: error.message,
+        msg: "Invalid JSON body",
+      });
+
+      return {
+        statusCode: 400,
+        body: JSON.stringify({ message: "Invalid JSON body" }),
+      };
+    }
+
     logger.error({
       correlationId,
       error: error instanceof Error ? error.message : String(error),

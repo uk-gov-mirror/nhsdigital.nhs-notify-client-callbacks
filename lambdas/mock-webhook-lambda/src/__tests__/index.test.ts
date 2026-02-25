@@ -2,6 +2,22 @@ import type { APIGatewayProxyEvent } from "aws-lambda";
 import { handler } from "index";
 import type { CallbackMessage, CallbackPayload } from "types";
 
+jest.mock("pino", () => {
+  const info = jest.fn();
+  const error = jest.fn();
+  const mockPino = jest.fn(() => ({
+    info,
+    error,
+  }));
+
+  return {
+    __esModule: true,
+    default: mockPino,
+    info,
+    error,
+  };
+});
+
 const createMockEvent = (body: string | null): APIGatewayProxyEvent => ({
   body,
   headers: {},
@@ -154,13 +170,13 @@ describe("Mock Webhook Lambda", () => {
       expect(body.message).toBe("No body");
     });
 
-    it("should return 500 when body is invalid JSON", async () => {
+    it("should return 400 when body is invalid JSON", async () => {
       const event = createMockEvent("invalid json {");
       const result = await handler(event);
 
-      expect(result.statusCode).toBe(500);
+      expect(result.statusCode).toBe(400);
       const body = JSON.parse(result.body);
-      expect(body.message).toBe("Internal server error");
+      expect(body.message).toBe("Invalid JSON body");
     });
 
     it("should return 400 when data field is missing", async () => {
@@ -179,6 +195,56 @@ describe("Mock Webhook Lambda", () => {
       expect(result.statusCode).toBe(400);
       const body = JSON.parse(result.body);
       expect(body.message).toBe("Invalid message structure");
+    });
+
+    it("should return 400 when callback payload is missing attributes", async () => {
+      const event = createMockEvent(
+        JSON.stringify({ data: [{ type: "MessageStatus", id: "msg-123" }] }),
+      );
+      const result = await handler(event);
+
+      expect(result.statusCode).toBe(400);
+      const body = JSON.parse(result.body);
+      expect(body.message).toBe("Invalid message structure");
+    });
+
+    it("should return 400 when callback payload type is invalid", async () => {
+      const event = createMockEvent(
+        JSON.stringify({
+          data: [{ type: "OtherStatus", id: "msg-123", attributes: {} }],
+        }),
+      );
+      const result = await handler(event);
+
+      expect(result.statusCode).toBe(400);
+      const body = JSON.parse(result.body);
+      expect(body.message).toBe("Invalid message structure");
+    });
+
+    it("should return 400 when callback payload item is an array", async () => {
+      const event = createMockEvent(
+        JSON.stringify({ data: [["invalid-payload"]] }),
+      );
+      const result = await handler(event);
+
+      expect(result.statusCode).toBe(400);
+      const body = JSON.parse(result.body);
+      expect(body.message).toBe("Invalid message structure");
+    });
+
+    it("should return 500 when parsing throws non-syntax error", async () => {
+      const parseSpy = jest.spyOn(JSON, "parse").mockImplementationOnce(() => {
+        throw new Error("forced-parse-error");
+      });
+
+      const event = createMockEvent('{"data":[]}');
+      const result = await handler(event);
+
+      expect(result.statusCode).toBe(500);
+      const body = JSON.parse(result.body);
+      expect(body.message).toBe("Internal server error");
+
+      parseSpy.mockRestore();
     });
   });
 
@@ -199,25 +265,30 @@ describe("Mock Webhook Lambda", () => {
 
       const event = createMockEvent(JSON.stringify(callback));
 
-      // Capture console output (pino writes to stdout)
-      const logSpy = jest.spyOn(process.stdout, "write").mockImplementation();
-
       await handler(event);
 
-      expect(logSpy).toHaveBeenCalled();
+      const logger = jest.requireMock("pino");
+      const infoCalls = logger.info.mock.calls as unknown[][];
 
-      // Find the log entry containing our callback
-      const logCalls = logSpy.mock.calls.map(
-        (call) => call[0]?.toString() || "",
-      );
-      const callbackLog = logCalls.find((log) =>
-        log.includes("CALLBACK test-msg-789"),
-      );
+      expect(logger).toBeDefined();
+
+      const callbackLog = infoCalls
+        .map(([payload]: unknown[]) => payload)
+        .find(
+          (payload: unknown) =>
+            typeof payload === "object" &&
+            payload !== null &&
+            "msg" in payload &&
+            payload.msg ===
+              'CALLBACK test-msg-789 MessageStatus : {"type":"MessageStatus","id":"test-msg-789","attributes":{"messageId":"test-msg-789","messageStatus":"delivered"}}',
+        );
 
       expect(callbackLog).toBeDefined();
-      expect(callbackLog).toContain("MessageStatus");
-
-      logSpy.mockRestore();
+      expect(callbackLog).toMatchObject({
+        messageId: "test-msg-789",
+        messageType: "MessageStatus",
+        correlationId: "test-request-id",
+      });
     });
   });
 });
