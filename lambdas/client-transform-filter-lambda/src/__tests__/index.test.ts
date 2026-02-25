@@ -152,7 +152,7 @@ describe("Lambda handler", () => {
     };
 
     await expect(handler([sqsMessage])).rejects.toThrow(
-      "Validation failed: type: Invalid enum value",
+      'Validation failed: type: Invalid option: expected one of "uk.nhs.notify.client-callbacks.message.status.transitioned.v1"|"uk.nhs.notify.client-callbacks.channel.status.transitioned.v1"',
     );
   });
 

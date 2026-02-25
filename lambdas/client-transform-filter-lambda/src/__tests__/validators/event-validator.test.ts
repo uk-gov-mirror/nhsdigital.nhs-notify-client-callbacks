@@ -56,7 +56,7 @@ describe("event-validator", () => {
         delete invalidEvent.traceparent;
 
         expect(() => validateStatusTransitionEvent(invalidEvent)).toThrow(
-          "Validation failed: traceparent: Required",
+          "Validation failed: traceparent: Invalid input: expected string, received undefined",
         );
       });
     });
@@ -69,7 +69,7 @@ describe("event-validator", () => {
         };
 
         expect(() => validateStatusTransitionEvent(invalidEvent)).toThrow(
-          "Validation failed: type: Invalid enum value",
+          'Validation failed: type: Invalid option: expected one of "uk.nhs.notify.client-callbacks.message.status.transitioned.v1"|"uk.nhs.notify.client-callbacks.channel.status.transitioned.v1"',
         );
       });
     });
@@ -82,7 +82,7 @@ describe("event-validator", () => {
         };
 
         expect(() => validateStatusTransitionEvent(invalidEvent)).toThrow(
-          'Validation failed: datacontenttype: Invalid literal value, expected "application/json"',
+          'Validation failed: datacontenttype: Invalid input: expected "application/json"',
         );
       });
     });
@@ -98,7 +98,7 @@ describe("event-validator", () => {
         };
 
         expect(() => validateStatusTransitionEvent(invalidEvent)).toThrow(
-          "Validation failed: clientId: Required",
+          "Validation failed: clientId: Invalid input: expected string, received undefined",
         );
       });
 
@@ -112,7 +112,7 @@ describe("event-validator", () => {
         };
 
         expect(() => validateStatusTransitionEvent(invalidEvent)).toThrow(
-          "Validation failed: messageId: Required",
+          "Validation failed: messageId: Invalid input: expected string, received undefined",
         );
       });
 
@@ -126,7 +126,7 @@ describe("event-validator", () => {
         };
 
         expect(() => validateStatusTransitionEvent(invalidEvent)).toThrow(
-          "Validation failed: timestamp: Required",
+          "Validation failed: timestamp: Invalid input: expected string, received undefined",
         );
       });
 
@@ -156,7 +156,7 @@ describe("event-validator", () => {
         };
 
         expect(() => validateStatusTransitionEvent(invalidEvent)).toThrow(
-          "Validation failed: messageStatus: Required",
+          "Validation failed: messageStatus: Invalid input: expected string, received undefined",
         );
       });
 
@@ -170,7 +170,7 @@ describe("event-validator", () => {
         };
 
         expect(() => validateStatusTransitionEvent(invalidEvent)).toThrow(
-          "Validation failed: channels: Required",
+          "Validation failed: channels: Invalid input: expected array, received undefined",
         );
       });
 
@@ -198,7 +198,7 @@ describe("event-validator", () => {
         };
 
         expect(() => validateStatusTransitionEvent(invalidEvent)).toThrow(
-          "Validation failed: channels.0.type: Required",
+          "Validation failed: channels.0.type: Invalid input: expected string, received undefined",
         );
       });
 
@@ -212,7 +212,7 @@ describe("event-validator", () => {
         };
 
         expect(() => validateStatusTransitionEvent(invalidEvent)).toThrow(
-          "Validation failed: channels.0.channelStatus: Required",
+          "Validation failed: channels.0.channelStatus: Invalid input: expected string, received undefined",
         );
       });
     });
@@ -251,7 +251,7 @@ describe("event-validator", () => {
         };
 
         expect(() => validateStatusTransitionEvent(invalidEvent)).toThrow(
-          "Validation failed: channel: Required",
+          "Validation failed: channel: Invalid input: expected string, received undefined",
         );
       });
 
@@ -265,7 +265,7 @@ describe("event-validator", () => {
         };
 
         expect(() => validateStatusTransitionEvent(invalidEvent)).toThrow(
-          "Validation failed: channelStatus: Required",
+          "Validation failed: channelStatus: Invalid input: expected string, received undefined",
         );
       });
 
@@ -279,7 +279,7 @@ describe("event-validator", () => {
         };
 
         expect(() => validateStatusTransitionEvent(invalidEvent)).toThrow(
-          "Validation failed: supplierStatus: Required",
+          "Validation failed: supplierStatus: Invalid input: expected string, received undefined",
         );
       });
     });
