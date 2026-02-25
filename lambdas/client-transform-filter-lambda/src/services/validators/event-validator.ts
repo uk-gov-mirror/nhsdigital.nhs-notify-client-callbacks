@@ -28,7 +28,8 @@ const BaseDataSchema = z.object({
   messageId: z.string().min(1),
   timestamp: z
     .string()
-    .datetime("data.timestamp must be a valid RFC 3339 timestamp"),
+    .min(1)
+    .pipe(z.iso.datetime("data.timestamp must be a valid RFC 3339 timestamp")),
 });
 
 const MessageStatusDataSchema = BaseDataSchema.extend({

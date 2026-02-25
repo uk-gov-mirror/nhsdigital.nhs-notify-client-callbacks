@@ -1,4 +1,5 @@
 import type { SQSRecord } from "aws-lambda";
+import type { MetricsLogger } from "aws-embedded-metrics";
 import type { StatusTransitionEvent } from "models/status-transition-event";
 import type { MessageStatusData } from "models/message-status-data";
 import type { ChannelStatusData } from "models/channel-status-data";
@@ -6,22 +7,43 @@ import type {
   ChannelStatusAttributes,
   MessageStatusAttributes,
 } from "models/client-callback-payload";
-import { handler } from "..";
-
-jest.mock("aws-embedded-metrics", () => ({
-  createMetricsLogger: jest.fn(() => ({
-    setNamespace: jest.fn(),
-    setDimensions: jest.fn(),
-    putMetric: jest.fn(),
-    flush: jest.fn().mockResolvedValue(undefined as unknown),
-  })),
-  Unit: {
-    Count: "Count",
-    Milliseconds: "Milliseconds",
-  },
-}));
+import type { Logger } from "services/logger";
+import type { CallbackMetrics } from "services/metrics";
+import { ObservabilityService } from "services/observability";
+import { createHandler } from "..";
 
 describe("Lambda handler", () => {
+  const mockLogger = {
+    info: jest.fn(),
+    warn: jest.fn(),
+    error: jest.fn(),
+    debug: jest.fn(),
+    child: jest.fn(),
+  } as unknown as Logger;
+
+  (mockLogger.child as jest.Mock).mockImplementation(() => mockLogger);
+
+  const mockMetrics = {
+    emitEventReceived: jest.fn(),
+    emitTransformationSuccess: jest.fn(),
+    emitTransformationFailure: jest.fn(),
+    emitDeliveryInitiated: jest.fn(),
+    emitValidationError: jest.fn(),
+  } as unknown as CallbackMetrics;
+
+  const mockMetricsLogger = {
+    flush: jest.fn().mockImplementation(async () => {}),
+  } as unknown as MetricsLogger;
+
+  const handler = createHandler({
+    createObservabilityService: () =>
+      new ObservabilityService(mockLogger, mockMetrics, mockMetricsLogger),
+  });
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
   const validMessageStatusEvent: StatusTransitionEvent<MessageStatusData> = {
     specversion: "1.0",
     id: "661f9510-f39c-52e5-b827-557766551111",
@@ -342,5 +364,82 @@ describe("Lambda handler", () => {
     expect(result).toHaveLength(2);
     expect(result[0].transformedPayload.data[0].type).toBe("MessageStatus");
     expect(result[1].transformedPayload.data[0].type).toBe("ChannelStatus");
+  });
+});
+
+describe("createHandler default wiring", () => {
+  it("should construct default observability dependencies and delegate to processEvents", async () => {
+    jest.resetModules();
+
+    const state = {
+      createMetricLogger: jest.fn(),
+      CallbackMetrics: jest.fn(),
+      LoggerCtor: jest.fn(),
+      ObservabilityServiceCtor: jest.fn(),
+      processEvents: jest.fn(),
+      mockMetricsLogger: {
+        flush: jest.fn().mockImplementation(async () => {}),
+      },
+      mockMetricsInstance: { emitEventReceived: jest.fn() },
+      mockLoggerInstance: { info: jest.fn(), child: jest.fn() },
+      mockObservabilityInstance: {
+        flush: jest.fn().mockImplementation(async () => {}),
+      },
+      testHandler: undefined as
+        | ((event: SQSRecord[]) => Promise<unknown>)
+        | undefined,
+    };
+
+    jest.isolateModules(() => {
+      state.createMetricLogger.mockReturnValue(state.mockMetricsLogger);
+      state.CallbackMetrics.mockReturnValue(state.mockMetricsInstance);
+      state.LoggerCtor.mockReturnValue(state.mockLoggerInstance);
+      state.ObservabilityServiceCtor.mockReturnValue(
+        state.mockObservabilityInstance,
+      );
+      state.processEvents.mockResolvedValue(["ok"]);
+
+      jest.doMock("services/metrics", () => ({
+        createMetricLogger: state.createMetricLogger,
+        CallbackMetrics: state.CallbackMetrics,
+      }));
+
+      jest.doMock("services/logger", () => ({
+        Logger: state.LoggerCtor,
+      }));
+
+      jest.doMock("services/observability", () => ({
+        ObservabilityService: state.ObservabilityServiceCtor,
+      }));
+
+      jest.doMock("handler", () => ({
+        processEvents: state.processEvents,
+      }));
+
+      const moduleUnderTest = jest.requireActual("..");
+      state.testHandler = moduleUnderTest.createHandler();
+    });
+
+    expect(state.testHandler).toBeDefined();
+    const result = await state.testHandler!([]);
+
+    expect(state.createMetricLogger).toHaveBeenCalledTimes(1);
+    expect(state.CallbackMetrics).toHaveBeenCalledWith(state.mockMetricsLogger);
+    expect(state.LoggerCtor).toHaveBeenCalledTimes(1);
+    expect(state.ObservabilityServiceCtor).toHaveBeenCalledWith(
+      state.mockLoggerInstance,
+      state.mockMetricsInstance,
+      state.mockMetricsLogger,
+    );
+    expect(state.processEvents).toHaveBeenCalledWith(
+      [],
+      state.mockObservabilityInstance,
+    );
+    expect(result).toEqual(["ok"]);
+
+    jest.unmock("services/metrics");
+    jest.unmock("services/logger");
+    jest.unmock("services/observability");
+    jest.unmock("handler");
   });
 });

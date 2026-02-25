@@ -5,6 +5,7 @@ import {
   TransformationError,
   ValidationError,
   formatErrorForLogging,
+  getEventError,
   isRetriable,
   wrapUnknownError,
 } from "services/error-handler";
@@ -439,5 +440,102 @@ describe("formatErrorForLogging", () => {
     expect(formatted.message).toBe("Unknown error (unable to serialize)");
     expect(formatted.retryable).toBe(false);
     expect(formatted.stack).toBeUndefined();
+  });
+});
+
+describe("getEventError", () => {
+  const mockMetrics = {
+    emitValidationError: jest.fn(),
+    emitTransformationFailure: jest.fn(),
+  };
+
+  const mockEventLogger = {
+    error: jest.fn(),
+  };
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it("should return ValidationError and emit validation metric", () => {
+    const error = new ValidationError("Invalid event", "corr-validation");
+
+    const result = getEventError(
+      error,
+      mockMetrics,
+      mockEventLogger,
+      "message.status.transitioned",
+    );
+
+    expect(result).toBe(error);
+    expect(mockEventLogger.error).toHaveBeenCalledWith(
+      "Event validation failed",
+      {
+        correlationId: "corr-validation",
+        error,
+      },
+    );
+    expect(mockMetrics.emitValidationError).toHaveBeenCalledWith(
+      "message.status.transitioned",
+    );
+    expect(mockMetrics.emitTransformationFailure).not.toHaveBeenCalled();
+  });
+
+  it("should return TransformationError and emit transformation metric", () => {
+    const error = new TransformationError(
+      "Transformation failed",
+      "corr-transform",
+    );
+
+    const result = getEventError(
+      error,
+      mockMetrics,
+      mockEventLogger,
+      "channel.status.transitioned",
+    );
+
+    expect(result).toBe(error);
+    expect(mockEventLogger.error).toHaveBeenCalledWith(
+      "Event transformation failed",
+      {
+        correlationId: "corr-transform",
+        eventType: "channel.status.transitioned",
+        error,
+      },
+    );
+    expect(mockMetrics.emitTransformationFailure).toHaveBeenCalledWith(
+      "channel.status.transitioned",
+      "TransformationError",
+    );
+    expect(mockMetrics.emitValidationError).not.toHaveBeenCalled();
+  });
+
+  it("should wrap unknown error and emit unknown transformation metric", () => {
+    const error = new Error("Unexpected runtime error");
+
+    const result = getEventError(
+      error,
+      mockMetrics,
+      mockEventLogger,
+      "message.status.transitioned",
+    );
+
+    expect(result).toBeInstanceOf(LambdaError);
+    expect(result.message).toBe("Unexpected runtime error");
+    expect((result as LambdaError).errorType).toBe(ErrorType.UNKNOWN_ERROR);
+    expect((result as LambdaError).correlationId).toBe("unknown");
+
+    expect(mockEventLogger.error).toHaveBeenCalledWith(
+      "Unexpected error processing event",
+      {
+        correlationId: "unknown",
+        error: result,
+      },
+    );
+    expect(mockMetrics.emitTransformationFailure).toHaveBeenCalledWith(
+      "message.status.transitioned",
+      "UnknownError",
+    );
+    expect(mockMetrics.emitValidationError).not.toHaveBeenCalled();
   });
 });

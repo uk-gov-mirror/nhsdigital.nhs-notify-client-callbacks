@@ -283,5 +283,75 @@ describe("event-validator", () => {
         );
       });
     });
+
+    describe("error handling edge paths", () => {
+      it("should wrap CloudEvent constructor validation errors", () => {
+        jest.resetModules();
+
+        jest.isolateModules(() => {
+          const MockCloudEventsValidationError =
+            function MockCloudEventsValidationError(
+              this: Error,
+              message: string,
+            ) {
+              this.name = "ValidationError";
+              this.message = message;
+            } as unknown as new (message: string) => Error;
+
+          Object.setPrototypeOf(
+            MockCloudEventsValidationError.prototype,
+            Error.prototype,
+          );
+
+          jest.doMock("cloudevents", () => {
+            return {
+              CloudEvent: jest.fn(() => {
+                throw new MockCloudEventsValidationError("invalid CloudEvent");
+              }),
+              ValidationError: MockCloudEventsValidationError,
+            };
+          });
+
+          const moduleUnderTest = jest.requireActual(
+            "services/validators/event-validator",
+          );
+
+          expect(() =>
+            moduleUnderTest.validateStatusTransitionEvent({
+              specversion: "1.0",
+            }),
+          ).toThrow("CloudEvents validation failed: invalid CloudEvent");
+        });
+
+        jest.unmock("cloudevents");
+      });
+
+      it("should format unknown non-Error exceptions during validation", () => {
+        jest.resetModules();
+
+        jest.isolateModules(() => {
+          const nonErrorThrown = { foo: "bar" } as unknown as Error;
+
+          jest.doMock("cloudevents", () => ({
+            CloudEvent: jest.fn(() => {
+              throw nonErrorThrown;
+            }),
+            ValidationError: Error,
+          }));
+
+          const moduleUnderTest = jest.requireActual(
+            "services/validators/event-validator",
+          );
+
+          expect(() =>
+            moduleUnderTest.validateStatusTransitionEvent({
+              specversion: "1.0",
+            }),
+          ).toThrow('Validation failed: {"foo":"bar"}');
+        });
+
+        jest.unmock("cloudevents");
+      });
+    });
   });
 });
