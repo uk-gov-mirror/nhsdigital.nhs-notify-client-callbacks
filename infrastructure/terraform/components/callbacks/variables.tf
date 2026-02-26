@@ -103,6 +103,17 @@ variable "clients" {
 
 }
 
+variable "pipe_log_level" {
+  type        = string
+  description = "Log level for the EventBridge Pipe."
+  default     = "ERROR"
+
+  validation {
+    condition     = contains(["OFF", "ERROR", "INFO", "TRACE"], var.pipe_log_level)
+    error_message = "pipe_log_level must be one of: OFF, ERROR, INFO, TRACE."
+  }
+}
+
 variable "pipe_sqs_input_batch_size" {
   type    = number
   default = 1

@@ -6,7 +6,7 @@ resource "aws_pipes_pipe" "main" {
   enrichment         = module.client_transform_filter_lambda.function_arn
   kms_key_identifier = module.kms.key_arn
   log_configuration {
-    level = "ERROR"
+    level = var.pipe_log_level
     cloudwatch_logs_log_destination {
       log_group_arn = aws_cloudwatch_log_group.main_pipe.arn
     }
