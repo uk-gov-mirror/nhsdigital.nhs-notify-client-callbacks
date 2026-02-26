@@ -4,12 +4,14 @@ import { CallbackMetrics, createMetricLogger } from "services/metrics";
 jest.mock("aws-embedded-metrics");
 
 const mockPutMetric = jest.fn();
+const mockSetProperty = jest.fn();
 const mockSetDimensions = jest.fn();
 const mockSetNamespace = jest.fn();
 const mockFlush = jest.fn();
 
 const mockMetricsLogger = {
   putMetric: mockPutMetric,
+  setProperty: mockSetProperty,
   setDimensions: mockSetDimensions,
   setNamespace: mockSetNamespace,
   flush: mockFlush,
@@ -27,19 +29,25 @@ describe("createMetricsLogger", () => {
     delete process.env.ENVIRONMENT;
   });
 
-  it("should create metrics logger with default namespace and environment", () => {
-    createMetricLogger();
+  it("should throw if METRICS_NAMESPACE is not set", () => {
+    process.env.ENVIRONMENT = "production";
 
-    expect(mockSetNamespace).toHaveBeenCalledWith(
-      "nhs-notify-client-callbacks-metrics",
+    expect(() => createMetricLogger()).toThrow(
+      "METRICS_NAMESPACE environment variable is not set",
     );
-    expect(mockSetDimensions).toHaveBeenCalledWith({
-      Environment: "development",
-    });
+  });
+
+  it("should throw if ENVIRONMENT is not set", () => {
+    process.env.METRICS_NAMESPACE = "nhs-notify-client-callbacks-metrics";
+
+    expect(() => createMetricLogger()).toThrow(
+      "ENVIRONMENT environment variable is not set",
+    );
   });
 
   it("should use METRICS_NAMESPACE environment variable", () => {
     process.env.METRICS_NAMESPACE = "CustomNamespace";
+    process.env.ENVIRONMENT = "production";
 
     createMetricLogger();
 
@@ -47,6 +55,7 @@ describe("createMetricsLogger", () => {
   });
 
   it("should use ENVIRONMENT environment variable", () => {
+    process.env.METRICS_NAMESPACE = "nhs-notify-client-callbacks-metrics";
     process.env.ENVIRONMENT = "production";
 
     createMetricLogger();
@@ -66,16 +75,17 @@ describe("CallbackMetrics", () => {
   });
 
   describe("emitEventReceived", () => {
-    it("should emit EventsReceived metric with correct dimensions", () => {
+    it("should emit EventsReceived metric with correct properties", () => {
       callbackMetrics.emitEventReceived(
         "message.status.transitioned",
         "client-123",
       );
 
-      expect(mockSetDimensions).toHaveBeenCalledWith({
-        EventType: "message.status.transitioned",
-        ClientId: "client-123",
-      });
+      expect(mockSetProperty).toHaveBeenCalledWith(
+        "EventType",
+        "message.status.transitioned",
+      );
+      expect(mockSetProperty).toHaveBeenCalledWith("ClientId", "client-123");
       expect(mockPutMetric).toHaveBeenCalledWith(
         "EventsReceived",
         1,
@@ -85,16 +95,17 @@ describe("CallbackMetrics", () => {
   });
 
   describe("emitTransformationSuccess", () => {
-    it("should emit TransformationsSuccessful metric with correct dimensions", () => {
+    it("should emit TransformationsSuccessful metric with correct properties", () => {
       callbackMetrics.emitTransformationSuccess(
         "channel.status.transitioned",
         "client-456",
       );
 
-      expect(mockSetDimensions).toHaveBeenCalledWith({
-        EventType: "channel.status.transitioned",
-        ClientId: "client-456",
-      });
+      expect(mockSetProperty).toHaveBeenCalledWith(
+        "EventType",
+        "channel.status.transitioned",
+      );
+      expect(mockSetProperty).toHaveBeenCalledWith("ClientId", "client-456");
       expect(mockPutMetric).toHaveBeenCalledWith(
         "TransformationsSuccessful",
         1,
@@ -104,16 +115,22 @@ describe("CallbackMetrics", () => {
   });
 
   describe("emitTransformationFailure", () => {
-    it("should emit TransformationsFailed metric with correct dimensions", () => {
+    it("should emit TransformationsFailed metric with correct properties", () => {
       callbackMetrics.emitTransformationFailure(
         "message.status.transitioned",
+        "client-123",
         "ValidationError",
       );
 
-      expect(mockSetDimensions).toHaveBeenCalledWith({
-        EventType: "message.status.transitioned",
-        ErrorType: "ValidationError",
-      });
+      expect(mockSetProperty).toHaveBeenCalledWith(
+        "EventType",
+        "message.status.transitioned",
+      );
+      expect(mockSetProperty).toHaveBeenCalledWith("ClientId", "client-123");
+      expect(mockSetProperty).toHaveBeenCalledWith(
+        "ErrorType",
+        "ValidationError",
+      );
       expect(mockPutMetric).toHaveBeenCalledWith(
         "TransformationsFailed",
         1,
@@ -123,12 +140,17 @@ describe("CallbackMetrics", () => {
   });
 
   describe("emitDeliveryInitiated", () => {
-    it("should emit CallbacksInitiated metric with correct dimensions", () => {
-      callbackMetrics.emitDeliveryInitiated("client-xyz");
+    it("should emit CallbacksInitiated metric with correct properties", () => {
+      callbackMetrics.emitDeliveryInitiated(
+        "message.status.transitioned",
+        "client-xyz",
+      );
 
-      expect(mockSetDimensions).toHaveBeenCalledWith({
-        ClientId: "client-xyz",
-      });
+      expect(mockSetProperty).toHaveBeenCalledWith(
+        "EventType",
+        "message.status.transitioned",
+      );
+      expect(mockSetProperty).toHaveBeenCalledWith("ClientId", "client-xyz");
       expect(mockPutMetric).toHaveBeenCalledWith(
         "CallbacksInitiated",
         1,
@@ -138,13 +160,18 @@ describe("CallbackMetrics", () => {
   });
 
   describe("emitValidationError", () => {
-    it("should emit ValidationErrors metric with correct dimensions", () => {
-      callbackMetrics.emitValidationError("invalid.event.type");
+    it("should emit ValidationErrors metric with correct properties", () => {
+      callbackMetrics.emitValidationError("invalid.event.type", "client-abc");
 
-      expect(mockSetDimensions).toHaveBeenCalledWith({
-        EventType: "invalid.event.type",
-        ErrorType: "ValidationError",
-      });
+      expect(mockSetProperty).toHaveBeenCalledWith(
+        "EventType",
+        "invalid.event.type",
+      );
+      expect(mockSetProperty).toHaveBeenCalledWith("ClientId", "client-abc");
+      expect(mockSetProperty).toHaveBeenCalledWith(
+        "ErrorType",
+        "ValidationError",
+      );
       expect(mockPutMetric).toHaveBeenCalledWith(
         "ValidationErrors",
         1,

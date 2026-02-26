@@ -141,8 +141,12 @@ export function formatErrorForLogging(error: unknown): {
 export function getEventError(
   error: unknown,
   metrics: {
-    emitValidationError: (type: string) => void;
-    emitTransformationFailure: (type: string, reason: string) => void;
+    emitValidationError: (type: string, clientId: string) => void;
+    emitTransformationFailure: (
+      type: string,
+      clientId: string,
+      reason: string,
+    ) => void;
   },
   eventLogger: { error: (message: string, context: object) => void },
   eventErrorType = "unknown",
@@ -157,7 +161,7 @@ export function getEventError(
       correlationId,
       error,
     });
-    metrics.emitValidationError(eventErrorType);
+    metrics.emitValidationError(eventErrorType, "unknown");
     return error;
   }
 
@@ -167,7 +171,11 @@ export function getEventError(
       eventType: eventErrorType,
       error,
     });
-    metrics.emitTransformationFailure(eventErrorType, "TransformationError");
+    metrics.emitTransformationFailure(
+      eventErrorType,
+      "unknown",
+      "TransformationError",
+    );
     return error;
   }
 
@@ -176,6 +184,6 @@ export function getEventError(
     correlationId,
     error: wrappedError,
   });
-  metrics.emitTransformationFailure(eventErrorType, "UnknownError");
+  metrics.emitTransformationFailure(eventErrorType, "unknown", "UnknownError");
   return wrappedError;
 }

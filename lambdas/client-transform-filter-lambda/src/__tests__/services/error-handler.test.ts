@@ -477,6 +477,7 @@ describe("getEventError", () => {
     );
     expect(mockMetrics.emitValidationError).toHaveBeenCalledWith(
       "message.status.transitioned",
+      "unknown",
     );
     expect(mockMetrics.emitTransformationFailure).not.toHaveBeenCalled();
   });
@@ -505,6 +506,7 @@ describe("getEventError", () => {
     );
     expect(mockMetrics.emitTransformationFailure).toHaveBeenCalledWith(
       "channel.status.transitioned",
+      "unknown",
       "TransformationError",
     );
     expect(mockMetrics.emitValidationError).not.toHaveBeenCalled();
@@ -534,6 +536,7 @@ describe("getEventError", () => {
     );
     expect(mockMetrics.emitTransformationFailure).toHaveBeenCalledWith(
       "message.status.transitioned",
+      "unknown",
       "UnknownError",
     );
     expect(mockMetrics.emitValidationError).not.toHaveBeenCalled();

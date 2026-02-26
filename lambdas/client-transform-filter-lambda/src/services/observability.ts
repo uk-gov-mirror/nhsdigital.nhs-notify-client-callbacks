@@ -58,7 +58,7 @@ export class ObservabilityService {
     messageId: string;
   }): void {
     logLifecycleEvent(this.logger, "delivery-initiated", context);
-    this.metrics.emitDeliveryInitiated(context.clientId);
+    this.metrics.emitDeliveryInitiated(context.eventType, context.clientId);
   }
 
   recordCallbackGenerated(
