@@ -25,7 +25,6 @@ resource "aws_pipes_pipe" "main" {
 
     input_template = <<EOF
 {
-  "dataschemaversion": <$.dataschemaversion>,
   "type": <$.type>,
   "transformedPayload": <$.transformedPayload>
 }

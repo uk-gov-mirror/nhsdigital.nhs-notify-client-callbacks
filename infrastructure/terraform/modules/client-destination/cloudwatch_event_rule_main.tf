@@ -5,10 +5,7 @@ resource "aws_cloudwatch_event_rule" "main" {
 
   event_pattern = jsonencode({
     "detail" : {
-      "type" : var.client_detail,
-      "dataschemaversion" : [{
-        "prefix" : "1."
-      }]
+      "type" : var.client_detail
     }
   })
 }
