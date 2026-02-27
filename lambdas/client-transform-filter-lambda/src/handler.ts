@@ -103,7 +103,7 @@ function recordDeliveryInitiated(
 ): void {
   for (const transformedEvent of transformedEvents) {
     const { clientId, messageId } = transformedEvent.data;
-    const correlationId = transformedEvent.traceparent;
+    const correlationId = extractCorrelationId(transformedEvent);
 
     observability.recordDeliveryInitiated({
       correlationId,
