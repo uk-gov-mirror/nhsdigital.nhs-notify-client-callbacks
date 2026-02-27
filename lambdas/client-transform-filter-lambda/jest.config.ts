@@ -13,7 +13,7 @@ export const baseJestConfig: Config = {
   coverageDirectory: "./.reports/unit/coverage",
 
   // Indicates which provider should be used to instrument code for coverage
-  coverageProvider: "babel",
+  coverageProvider: "v8",
 
   coverageThreshold: {
     global: {
@@ -55,6 +55,9 @@ const utilsJestConfig = {
     ...(baseJestConfig.coveragePathIgnorePatterns ?? []),
     "zod-validators.ts",
   ],
+
+  // Mirror tsconfig's baseUrl: "src" - automatically resolves non-relative imports
+  modulePaths: ["<rootDir>/src"],
 };
 
 export default utilsJestConfig;

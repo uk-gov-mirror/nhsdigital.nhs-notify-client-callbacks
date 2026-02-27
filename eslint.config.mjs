@@ -4,7 +4,6 @@ import prettierRecommended from "eslint-plugin-prettier/recommended";
 import { importX } from "eslint-plugin-import-x";
 import * as eslintImportResolverTypescript from "eslint-import-resolver-typescript";
 import noRelativeImportPaths from "eslint-plugin-no-relative-import-paths";
-import react from "eslint-plugin-react";
 import security from "eslint-plugin-security";
 import sonarjs from "eslint-plugin-sonarjs";
 import json from "eslint-plugin-json";
@@ -19,17 +18,6 @@ import {
   plugins as airbnbPlugins,
 } from "eslint-config-airbnb-extended";
 import { rules as prettierConfigRules } from "eslint-config-prettier";
-
-import { dirname } from "node:path";
-import { fileURLToPath } from "node:url";
-import { FlatCompat } from "@eslint/eslintrc";
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
-
-const compat = new FlatCompat({
-  baseDirectory: __dirname,
-});
 
 export default defineConfig([
   globalIgnores([
@@ -126,14 +114,6 @@ export default defineConfig([
       ],
     },
   },
-
-  // react
-  react.configs.flat.recommended,
-  airbnbConfigs.react.recommended,
-  airbnbConfigs.react.typescript,
-  airbnbPlugins.react,
-  airbnbPlugins.reactHooks,
-  airbnbPlugins.reactA11y,
 
   // jest
   jest.configs["flat/recommended"],
