@@ -32,7 +32,7 @@ data "aws_iam_policy_document" "target_dlq" {
     ]
 
     resources = [
-      "arn:aws:sqs:${var.region}:${var.aws_account_id}:${var.project}-${var.environment}-${var.component}-${var.connection_name}-dlq"
+      "arn:aws:sqs:${var.region}:${var.aws_account_id}:${var.project}-${var.environment}-${var.component}-${var.connection_name}-dlq-queue"
     ]
   }
 }
