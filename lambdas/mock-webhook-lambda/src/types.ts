@@ -10,8 +10,16 @@ export interface CallbackMessage<T> {
  */
 export interface CallbackPayload {
   type: "MessageStatus" | "ChannelStatus";
-  id: string;
-  attributes: Record<string, unknown>;
+  attributes: {
+    messageId: string;
+    [key: string]: unknown;
+  };
+  links: {
+    message: string;
+  };
+  meta: {
+    idempotencyKey: string;
+  };
 }
 
 /**

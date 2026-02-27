@@ -17,17 +17,17 @@ function isValidCallbackPayload(payload: unknown): payload is CallbackPayload {
 
   const candidate = payload as {
     type?: unknown;
-    id?: unknown;
     attributes?: unknown;
   };
 
   return (
     (candidate.type === "MessageStatus" ||
       candidate.type === "ChannelStatus") &&
-    typeof candidate.id === "string" &&
     typeof candidate.attributes === "object" &&
     candidate.attributes !== null &&
-    !Array.isArray(candidate.attributes)
+    !Array.isArray(candidate.attributes) &&
+    typeof (candidate.attributes as Record<string, unknown>).messageId ===
+      "string"
   );
 }
 
@@ -36,10 +36,7 @@ export async function handler(
 ): Promise<APIGatewayProxyResult> {
   logger.info({ event }, "Received event");
 
-  const correlationId = event.requestContext?.requestId || "unknown";
-
   logger.info({
-    correlationId,
     msg: "Mock webhook invoked",
     path: event.path,
     method: event.httpMethod,
@@ -47,7 +44,6 @@ export async function handler(
 
   if (!event.body) {
     logger.error({
-      correlationId,
       msg: "No event body received",
     });
 
@@ -66,7 +62,6 @@ export async function handler(
 
     if (!messages.data || !Array.isArray(messages.data)) {
       logger.error({
-        correlationId,
         msg: "Invalid message structure - missing or invalid data array",
       });
 
@@ -78,7 +73,6 @@ export async function handler(
 
     if (!messages.data.every((payload) => isValidCallbackPayload(payload))) {
       logger.error({
-        correlationId,
         msg: "Invalid message structure - invalid callback payload",
       });
 
@@ -90,14 +84,12 @@ export async function handler(
 
     // Log each callback in a format that can be queried from CloudWatch
     for (const message of messages.data) {
-      const messageId = message.attributes.messageId as string | undefined;
       const messageType = message.type;
-
+      const correlationId = message.attributes.messageId as string | undefined;
       logger.info({
         correlationId,
-        messageId,
         messageType,
-        msg: `CALLBACK ${messageId} ${messageType} : ${JSON.stringify(message)}`,
+        msg: `CALLBACK ${correlationId} ${messageType} : ${JSON.stringify(message)}`,
       });
     }
 
@@ -107,7 +99,6 @@ export async function handler(
     };
 
     logger.info({
-      correlationId,
       receivedCount: messages.data.length,
       msg: "Callbacks logged successfully",
     });
@@ -119,7 +110,6 @@ export async function handler(
   } catch (error) {
     if (error instanceof SyntaxError) {
       logger.error({
-        correlationId,
         error: error.message,
         msg: "Invalid JSON body",
       });
@@ -131,7 +121,6 @@ export async function handler(
     }
 
     logger.error({
-      correlationId,
       error: error instanceof Error ? error.message : String(error),
       msg: "Failed to process callback",
     });

@@ -72,12 +72,17 @@ describe("Mock Webhook Lambda", () => {
         data: [
           {
             type: "MessageStatus",
-            id: "msg-123",
             attributes: {
               messageId: "msg-123",
               messageReference: "ref-456",
               messageStatus: "delivered",
               timestamp: "2026-01-01T00:00:00Z",
+            },
+            links: {
+              message: "some-message-link",
+            },
+            meta: {
+              idempotencyKey: "some-idempotency-key",
             },
           },
         ],
@@ -97,7 +102,6 @@ describe("Mock Webhook Lambda", () => {
         data: [
           {
             type: "ChannelStatus",
-            id: "msg-123",
             attributes: {
               messageId: "msg-123",
               messageReference: "ref-456",
@@ -105,6 +109,12 @@ describe("Mock Webhook Lambda", () => {
               channelStatus: "delivered",
               supplierStatus: "delivered",
               timestamp: "2026-01-01T00:00:00Z",
+            },
+            links: {
+              message: "some-message-link",
+            },
+            meta: {
+              idempotencyKey: "some-idempotency-key",
             },
           },
         ],
@@ -124,18 +134,28 @@ describe("Mock Webhook Lambda", () => {
         data: [
           {
             type: "MessageStatus",
-            id: "msg-123",
             attributes: {
               messageId: "msg-123",
               messageStatus: "pending",
             },
+            links: {
+              message: "some-message-link",
+            },
+            meta: {
+              idempotencyKey: "some-idempotency-key",
+            },
           },
           {
             type: "MessageStatus",
-            id: "msg-123",
             attributes: {
               messageId: "msg-123",
               messageStatus: "delivered",
+            },
+            links: {
+              message: "some-message-link",
+            },
+            meta: {
+              idempotencyKey: "some-idempotency-key",
             },
           },
         ],
@@ -254,10 +274,15 @@ describe("Mock Webhook Lambda", () => {
         data: [
           {
             type: "MessageStatus",
-            id: "test-msg-789",
             attributes: {
               messageId: "test-msg-789",
               messageStatus: "delivered",
+            },
+            links: {
+              message: "some-message-link",
+            },
+            meta: {
+              idempotencyKey: "some-idempotency-key",
             },
           },
         ],
@@ -280,14 +305,13 @@ describe("Mock Webhook Lambda", () => {
             payload !== null &&
             "msg" in payload &&
             payload.msg ===
-              'CALLBACK test-msg-789 MessageStatus : {"type":"MessageStatus","id":"test-msg-789","attributes":{"messageId":"test-msg-789","messageStatus":"delivered"}}',
+              'CALLBACK test-msg-789 MessageStatus : {"type":"MessageStatus","attributes":{"messageId":"test-msg-789","messageStatus":"delivered"},"links":{"message":"some-message-link"},"meta":{"idempotencyKey":"some-idempotency-key"}}',
         );
 
       expect(callbackLog).toBeDefined();
       expect(callbackLog).toMatchObject({
-        messageId: "test-msg-789",
+        correlationId: "test-msg-789",
         messageType: "MessageStatus",
-        correlationId: "test-request-id",
       });
     });
   });
