@@ -34,6 +34,8 @@ function isValidCallbackPayload(payload: unknown): payload is CallbackPayload {
 export async function handler(
   event: APIGatewayProxyEvent,
 ): Promise<APIGatewayProxyResult> {
+  logger.info({ event }, "Received event");
+
   const correlationId = event.requestContext?.requestId || "unknown";
 
   logger.info({
