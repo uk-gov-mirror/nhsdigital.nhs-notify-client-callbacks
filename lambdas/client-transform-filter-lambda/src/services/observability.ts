@@ -27,9 +27,7 @@ export class ObservabilityService {
     messageId?: string;
   }): void {
     logLifecycleEvent(this.logger, "processing-started", context);
-    if (context.eventType && context.clientId) {
-      this.metrics.emitEventReceived(context.eventType, context.clientId);
-    }
+    this.metrics.emitEventReceived();
   }
 
   recordTransformationStarted(context: {
@@ -58,7 +56,7 @@ export class ObservabilityService {
     messageId: string;
   }): void {
     logLifecycleEvent(this.logger, "delivery-initiated", context);
-    this.metrics.emitDeliveryInitiated(context.eventType, context.clientId);
+    this.metrics.emitDeliveryInitiated();
   }
 
   recordCallbackGenerated(
@@ -74,7 +72,7 @@ export class ObservabilityService {
       correlationId,
       clientId,
     );
-    this.metrics.emitTransformationSuccess(eventType, clientId);
+    this.metrics.emitTransformationSuccess();
   }
 
   createChild(context: {

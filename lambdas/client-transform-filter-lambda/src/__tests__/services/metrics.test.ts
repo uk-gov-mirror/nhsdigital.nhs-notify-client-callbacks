@@ -4,14 +4,12 @@ import { CallbackMetrics, createMetricLogger } from "services/metrics";
 jest.mock("aws-embedded-metrics");
 
 const mockPutMetric = jest.fn();
-const mockSetProperty = jest.fn();
 const mockSetDimensions = jest.fn();
 const mockSetNamespace = jest.fn();
 const mockFlush = jest.fn();
 
 const mockMetricsLogger = {
   putMetric: mockPutMetric,
-  setProperty: mockSetProperty,
   setDimensions: mockSetDimensions,
   setNamespace: mockSetNamespace,
   flush: mockFlush,
@@ -75,17 +73,9 @@ describe("CallbackMetrics", () => {
   });
 
   describe("emitEventReceived", () => {
-    it("should emit EventsReceived metric with correct properties", () => {
-      callbackMetrics.emitEventReceived(
-        "message.status.transitioned",
-        "client-123",
-      );
+    it("should emit EventsReceived metric", () => {
+      callbackMetrics.emitEventReceived();
 
-      expect(mockSetProperty).toHaveBeenCalledWith(
-        "EventType",
-        "message.status.transitioned",
-      );
-      expect(mockSetProperty).toHaveBeenCalledWith("ClientId", "client-123");
       expect(mockPutMetric).toHaveBeenCalledWith(
         "EventsReceived",
         1,
@@ -95,17 +85,9 @@ describe("CallbackMetrics", () => {
   });
 
   describe("emitTransformationSuccess", () => {
-    it("should emit TransformationsSuccessful metric with correct properties", () => {
-      callbackMetrics.emitTransformationSuccess(
-        "channel.status.transitioned",
-        "client-456",
-      );
+    it("should emit TransformationsSuccessful metric", () => {
+      callbackMetrics.emitTransformationSuccess();
 
-      expect(mockSetProperty).toHaveBeenCalledWith(
-        "EventType",
-        "channel.status.transitioned",
-      );
-      expect(mockSetProperty).toHaveBeenCalledWith("ClientId", "client-456");
       expect(mockPutMetric).toHaveBeenCalledWith(
         "TransformationsSuccessful",
         1,
@@ -115,22 +97,9 @@ describe("CallbackMetrics", () => {
   });
 
   describe("emitTransformationFailure", () => {
-    it("should emit TransformationsFailed metric with correct properties", () => {
-      callbackMetrics.emitTransformationFailure(
-        "message.status.transitioned",
-        "client-123",
-        "ValidationError",
-      );
+    it("should emit TransformationsFailed metric", () => {
+      callbackMetrics.emitTransformationFailure();
 
-      expect(mockSetProperty).toHaveBeenCalledWith(
-        "EventType",
-        "message.status.transitioned",
-      );
-      expect(mockSetProperty).toHaveBeenCalledWith("ClientId", "client-123");
-      expect(mockSetProperty).toHaveBeenCalledWith(
-        "ErrorType",
-        "ValidationError",
-      );
       expect(mockPutMetric).toHaveBeenCalledWith(
         "TransformationsFailed",
         1,
@@ -140,17 +109,9 @@ describe("CallbackMetrics", () => {
   });
 
   describe("emitDeliveryInitiated", () => {
-    it("should emit CallbacksInitiated metric with correct properties", () => {
-      callbackMetrics.emitDeliveryInitiated(
-        "message.status.transitioned",
-        "client-xyz",
-      );
+    it("should emit CallbacksInitiated metric", () => {
+      callbackMetrics.emitDeliveryInitiated();
 
-      expect(mockSetProperty).toHaveBeenCalledWith(
-        "EventType",
-        "message.status.transitioned",
-      );
-      expect(mockSetProperty).toHaveBeenCalledWith("ClientId", "client-xyz");
       expect(mockPutMetric).toHaveBeenCalledWith(
         "CallbacksInitiated",
         1,
@@ -160,18 +121,9 @@ describe("CallbackMetrics", () => {
   });
 
   describe("emitValidationError", () => {
-    it("should emit ValidationErrors metric with correct properties", () => {
-      callbackMetrics.emitValidationError("invalid.event.type", "client-abc");
+    it("should emit ValidationErrors metric", () => {
+      callbackMetrics.emitValidationError();
 
-      expect(mockSetProperty).toHaveBeenCalledWith(
-        "EventType",
-        "invalid.event.type",
-      );
-      expect(mockSetProperty).toHaveBeenCalledWith("ClientId", "client-abc");
-      expect(mockSetProperty).toHaveBeenCalledWith(
-        "ErrorType",
-        "ValidationError",
-      );
       expect(mockPutMetric).toHaveBeenCalledWith(
         "ValidationErrors",
         1,

@@ -475,10 +475,7 @@ describe("getEventError", () => {
         error,
       },
     );
-    expect(mockMetrics.emitValidationError).toHaveBeenCalledWith(
-      "message.status.transitioned",
-      "unknown",
-    );
+    expect(mockMetrics.emitValidationError).toHaveBeenCalled();
     expect(mockMetrics.emitTransformationFailure).not.toHaveBeenCalled();
   });
 
@@ -504,11 +501,7 @@ describe("getEventError", () => {
         error,
       },
     );
-    expect(mockMetrics.emitTransformationFailure).toHaveBeenCalledWith(
-      "channel.status.transitioned",
-      "unknown",
-      "TransformationError",
-    );
+    expect(mockMetrics.emitTransformationFailure).toHaveBeenCalled();
     expect(mockMetrics.emitValidationError).not.toHaveBeenCalled();
   });
 
@@ -534,11 +527,7 @@ describe("getEventError", () => {
         error: result,
       },
     );
-    expect(mockMetrics.emitTransformationFailure).toHaveBeenCalledWith(
-      "message.status.transitioned",
-      "unknown",
-      "UnknownError",
-    );
+    expect(mockMetrics.emitTransformationFailure).toHaveBeenCalled();
     expect(mockMetrics.emitValidationError).not.toHaveBeenCalled();
   });
 });

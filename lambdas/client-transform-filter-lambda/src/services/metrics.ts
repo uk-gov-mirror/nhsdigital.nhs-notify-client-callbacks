@@ -20,39 +20,23 @@ export const createMetricLogger = (): MetricsLogger => {
 export class CallbackMetrics {
   constructor(private readonly metrics: MetricsLogger) {}
 
-  emitEventReceived(eventType: string, clientId: string): void {
-    this.metrics.setProperty("EventType", eventType);
-    this.metrics.setProperty("ClientId", clientId);
+  emitEventReceived(): void {
     this.metrics.putMetric("EventsReceived", 1, Unit.Count);
   }
 
-  emitTransformationSuccess(eventType: string, clientId: string): void {
-    this.metrics.setProperty("EventType", eventType);
-    this.metrics.setProperty("ClientId", clientId);
+  emitTransformationSuccess(): void {
     this.metrics.putMetric("TransformationsSuccessful", 1, Unit.Count);
   }
 
-  emitTransformationFailure(
-    eventType: string,
-    clientId: string,
-    errorType: string,
-  ): void {
-    this.metrics.setProperty("EventType", eventType);
-    this.metrics.setProperty("ClientId", clientId);
-    this.metrics.setProperty("ErrorType", errorType);
+  emitTransformationFailure(): void {
     this.metrics.putMetric("TransformationsFailed", 1, Unit.Count);
   }
 
-  emitDeliveryInitiated(eventType: string, clientId: string): void {
-    this.metrics.setProperty("EventType", eventType);
-    this.metrics.setProperty("ClientId", clientId);
+  emitDeliveryInitiated(): void {
     this.metrics.putMetric("CallbacksInitiated", 1, Unit.Count);
   }
 
-  emitValidationError(eventType: string, clientId: string): void {
-    this.metrics.setProperty("EventType", eventType);
-    this.metrics.setProperty("ClientId", clientId);
-    this.metrics.setProperty("ErrorType", "ValidationError");
+  emitValidationError(): void {
     this.metrics.putMetric("ValidationErrors", 1, Unit.Count);
   }
 }
