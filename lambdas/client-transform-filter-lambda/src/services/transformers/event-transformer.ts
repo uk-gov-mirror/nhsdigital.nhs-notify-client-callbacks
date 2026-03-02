@@ -15,12 +15,12 @@ export function transformEvent(
 ): ClientCallbackPayload {
   const eventType = rawEvent.type;
 
-  if (eventType === EventTypes.MESSAGE_STATUS_TRANSITIONED) {
+  if (eventType === EventTypes.MESSAGE_STATUS_PUBLISHED) {
     const typedEvent = rawEvent as StatusPublishEvent<MessageStatusData>;
     return transformMessageStatus(typedEvent);
   }
 
-  if (eventType === EventTypes.CHANNEL_STATUS_TRANSITIONED) {
+  if (eventType === EventTypes.CHANNEL_STATUS_PUBLISHED) {
     const typedEvent = rawEvent as StatusPublishEvent<ChannelStatusData>;
     return transformChannelStatus(typedEvent);
   }

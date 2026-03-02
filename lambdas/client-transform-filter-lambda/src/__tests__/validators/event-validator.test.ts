@@ -1,4 +1,4 @@
-import { validateStatusTransitionEvent } from "services/validators/event-validator";
+import { validateStatusPublishEvent } from "services/validators/event-validator";
 import type {
   ChannelStatusData,
   MessageStatusData,
@@ -10,7 +10,7 @@ type TestEvent<T> = Omit<StatusPublishEvent<T>, "traceparent"> & {
 };
 
 describe("event-validator", () => {
-  describe("validateStatusTransitionEvent", () => {
+  describe("validateStatusPublishEvent", () => {
     const validMessageStatusEvent: TestEvent<MessageStatusData> = {
       specversion: "1.0",
       id: "661f9510-f39c-52e5-b827-557766551111",
@@ -18,7 +18,7 @@ describe("event-validator", () => {
         "/nhs/england/notify/development/primary/data-plane/client-callbacks",
       subject:
         "customer/920fca11-596a-4eca-9c47-99f624614658/message/msg-789-xyz",
-      type: "uk.nhs.notify.client-callbacks.message.status.transitioned.v1",
+      type: "uk.nhs.notify.message.status.PUBLISHED.v1",
       time: "2026-02-05T14:30:00.000Z",
       datacontenttype: "application/json",
       dataschema: "https://nhs.uk/schemas/notify/message-status-data.v1.json",
@@ -47,7 +47,7 @@ describe("event-validator", () => {
 
     it("should validate a valid message status event", () => {
       expect(() =>
-        validateStatusTransitionEvent(validMessageStatusEvent),
+        validateStatusPublishEvent(validMessageStatusEvent),
       ).not.toThrow();
     });
 
@@ -56,7 +56,7 @@ describe("event-validator", () => {
         const invalidEvent = { ...validMessageStatusEvent };
         delete invalidEvent.traceparent;
 
-        expect(() => validateStatusTransitionEvent(invalidEvent)).toThrow(
+        expect(() => validateStatusPublishEvent(invalidEvent)).toThrow(
           "Validation failed: traceparent: Invalid input: expected string, received undefined",
         );
       });
@@ -69,8 +69,8 @@ describe("event-validator", () => {
           type: "uk.nhs.notify.wrong.namespace.v1",
         };
 
-        expect(() => validateStatusTransitionEvent(invalidEvent)).toThrow(
-          'Validation failed: type: Invalid option: expected one of "uk.nhs.notify.client-callbacks.message.status.transitioned.v1"|"uk.nhs.notify.client-callbacks.channel.status.transitioned.v1"',
+        expect(() => validateStatusPublishEvent(invalidEvent)).toThrow(
+          'Validation failed: type: Invalid option: expected one of "uk.nhs.notify.message.status.PUBLISHED.v1"|"uk.nhs.notify.channel.status.PUBLISHED.v1"',
         );
       });
     });
@@ -82,7 +82,7 @@ describe("event-validator", () => {
           datacontenttype: "text/plain",
         };
 
-        expect(() => validateStatusTransitionEvent(invalidEvent)).toThrow(
+        expect(() => validateStatusPublishEvent(invalidEvent)).toThrow(
           'Validation failed: datacontenttype: Invalid input: expected "application/json"',
         );
       });
@@ -98,7 +98,7 @@ describe("event-validator", () => {
           },
         };
 
-        expect(() => validateStatusTransitionEvent(invalidEvent)).toThrow(
+        expect(() => validateStatusPublishEvent(invalidEvent)).toThrow(
           "Validation failed: clientId: Invalid input: expected string, received undefined",
         );
       });
@@ -112,7 +112,7 @@ describe("event-validator", () => {
           },
         };
 
-        expect(() => validateStatusTransitionEvent(invalidEvent)).toThrow(
+        expect(() => validateStatusPublishEvent(invalidEvent)).toThrow(
           "Validation failed: messageId: Invalid input: expected string, received undefined",
         );
       });
@@ -126,7 +126,7 @@ describe("event-validator", () => {
           },
         };
 
-        expect(() => validateStatusTransitionEvent(invalidEvent)).toThrow(
+        expect(() => validateStatusPublishEvent(invalidEvent)).toThrow(
           "Validation failed: timestamp: Invalid input: expected string, received undefined",
         );
       });
@@ -140,7 +140,7 @@ describe("event-validator", () => {
           },
         };
 
-        expect(() => validateStatusTransitionEvent(invalidEvent)).toThrow(
+        expect(() => validateStatusPublishEvent(invalidEvent)).toThrow(
           "data.timestamp must be a valid RFC 3339 timestamp",
         );
       });
@@ -156,7 +156,7 @@ describe("event-validator", () => {
           },
         };
 
-        expect(() => validateStatusTransitionEvent(invalidEvent)).toThrow(
+        expect(() => validateStatusPublishEvent(invalidEvent)).toThrow(
           "Validation failed: messageStatus: Invalid input: expected string, received undefined",
         );
       });
@@ -170,7 +170,7 @@ describe("event-validator", () => {
           },
         };
 
-        expect(() => validateStatusTransitionEvent(invalidEvent)).toThrow(
+        expect(() => validateStatusPublishEvent(invalidEvent)).toThrow(
           "Validation failed: channels: Invalid input: expected array, received undefined",
         );
       });
@@ -184,7 +184,7 @@ describe("event-validator", () => {
           },
         };
 
-        expect(() => validateStatusTransitionEvent(invalidEvent)).toThrow(
+        expect(() => validateStatusPublishEvent(invalidEvent)).toThrow(
           "data.channels must have at least one channel",
         );
       });
@@ -198,7 +198,7 @@ describe("event-validator", () => {
           },
         };
 
-        expect(() => validateStatusTransitionEvent(invalidEvent)).toThrow(
+        expect(() => validateStatusPublishEvent(invalidEvent)).toThrow(
           "Validation failed: channels.0.type: Invalid input: expected string, received undefined",
         );
       });
@@ -212,7 +212,7 @@ describe("event-validator", () => {
           },
         };
 
-        expect(() => validateStatusTransitionEvent(invalidEvent)).toThrow(
+        expect(() => validateStatusPublishEvent(invalidEvent)).toThrow(
           "Validation failed: channels.0.channelStatus: Invalid input: expected string, received undefined",
         );
       });
@@ -221,14 +221,14 @@ describe("event-validator", () => {
     describe("channel status specific validation", () => {
       const validChannelStatusEvent: TestEvent<ChannelStatusData> = {
         ...validMessageStatusEvent,
-        type: "uk.nhs.notify.client-callbacks.channel.status.transitioned.v1",
+        type: "uk.nhs.notify.channel.status.PUBLISHED.v1",
         data: {
           clientId: "client-abc-123",
           messageId: "msg-789-xyz",
           messageReference: "client-ref-12345",
           channel: "NHSAPP",
           channelStatus: "DELIVERED",
-          supplierStatus: "DELIVERED",
+          supplierStatus: "delivered",
           cascadeType: "primary",
           cascadeOrder: 1,
           timestamp: "2026-02-05T14:29:55Z",
@@ -238,7 +238,7 @@ describe("event-validator", () => {
 
       it("should validate a valid channel status event", () => {
         expect(() =>
-          validateStatusTransitionEvent(validChannelStatusEvent),
+          validateStatusPublishEvent(validChannelStatusEvent),
         ).not.toThrow();
       });
 
@@ -251,7 +251,7 @@ describe("event-validator", () => {
           },
         };
 
-        expect(() => validateStatusTransitionEvent(invalidEvent)).toThrow(
+        expect(() => validateStatusPublishEvent(invalidEvent)).toThrow(
           "Validation failed: channel: Invalid input: expected string, received undefined",
         );
       });
@@ -265,7 +265,7 @@ describe("event-validator", () => {
           },
         };
 
-        expect(() => validateStatusTransitionEvent(invalidEvent)).toThrow(
+        expect(() => validateStatusPublishEvent(invalidEvent)).toThrow(
           "Validation failed: channelStatus: Invalid input: expected string, received undefined",
         );
       });
@@ -279,7 +279,7 @@ describe("event-validator", () => {
           },
         };
 
-        expect(() => validateStatusTransitionEvent(invalidEvent)).toThrow(
+        expect(() => validateStatusPublishEvent(invalidEvent)).toThrow(
           "Validation failed: supplierStatus: Invalid input: expected string, received undefined",
         );
       });
@@ -318,7 +318,7 @@ describe("event-validator", () => {
           );
 
           expect(() =>
-            moduleUnderTest.validateStatusTransitionEvent({
+            moduleUnderTest.validateStatusPublishEvent({
               specversion: "1.0",
             }),
           ).toThrow("CloudEvents validation failed: invalid CloudEvent");
@@ -345,7 +345,7 @@ describe("event-validator", () => {
           );
 
           expect(() =>
-            moduleUnderTest.validateStatusTransitionEvent({
+            moduleUnderTest.validateStatusPublishEvent({
               specversion: "1.0",
             }),
           ).toThrow('Validation failed: {"foo":"bar"}');

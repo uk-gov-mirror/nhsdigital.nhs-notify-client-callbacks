@@ -60,7 +60,7 @@ describe("callback-logger", () => {
         logCallbackGenerated(
           mockLogger,
           messageStatusPayload,
-          EventTypes.MESSAGE_STATUS_TRANSITIONED,
+          EventTypes.MESSAGE_STATUS_PUBLISHED,
           "corr-123",
           "client-abc",
         );
@@ -101,7 +101,7 @@ describe("callback-logger", () => {
         logCallbackGenerated(
           mockLogger,
           failedPayload,
-          EventTypes.MESSAGE_STATUS_TRANSITIONED,
+          EventTypes.MESSAGE_STATUS_PUBLISHED,
           "corr-456",
           "client-xyz",
         );
@@ -119,7 +119,7 @@ describe("callback-logger", () => {
         logCallbackGenerated(
           mockLogger,
           messageStatusPayload,
-          EventTypes.MESSAGE_STATUS_TRANSITIONED,
+          EventTypes.MESSAGE_STATUS_PUBLISHED,
           undefined,
           "client-abc",
         );
@@ -133,7 +133,7 @@ describe("callback-logger", () => {
       });
     });
 
-    describe("CHANNEL_STATUS_TRANSITIONED events", () => {
+    describe("CHANNEL_STATUS_PUBLISHED events", () => {
       const channelStatusPayload: ClientCallbackPayload = {
         data: [
           {
@@ -165,7 +165,7 @@ describe("callback-logger", () => {
         logCallbackGenerated(
           mockLogger,
           channelStatusPayload,
-          EventTypes.CHANNEL_STATUS_TRANSITIONED,
+          EventTypes.CHANNEL_STATUS_PUBLISHED,
           "corr-789",
           "client-def",
         );
@@ -203,7 +203,7 @@ describe("callback-logger", () => {
         logCallbackGenerated(
           mockLogger,
           failedPayload,
-          EventTypes.CHANNEL_STATUS_TRANSITIONED,
+          EventTypes.CHANNEL_STATUS_PUBLISHED,
           "corr-999",
           "client-ghi",
         );

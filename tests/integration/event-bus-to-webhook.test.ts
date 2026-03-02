@@ -9,13 +9,15 @@ import {
   SQSClient,
 } from "@aws-sdk/client-sqs";
 import { waitUntil } from "async-wait-until";
-import type { StatusTransitionEvent } from "nhs-notify-client-transform-filter-lambda/src/models/status-transition-event";
-import type { MessageStatusData } from "nhs-notify-client-transform-filter-lambda/src/models/message-status-data";
+import type {
+  MessageStatusData,
+  StatusPublishEvent,
+} from "@nhs-notify-client-callbacks/models";
 
 const publishEvent = async (
   client: EventBridgeClient,
   eventBusName: string,
-  event: StatusTransitionEvent,
+  event: StatusPublishEvent,
 ) => {
   const putEventsCommand = new PutEventsCommand({
     Entries: [
@@ -148,13 +150,13 @@ describe.skip("Event Bus to Webhook Integration", () => {
         throw new Error("TEST_WEBHOOK_LOG_GROUP must be set for this test");
       }
 
-      const messageStatusEvent: StatusTransitionEvent<MessageStatusData> = {
+      const messageStatusEvent: StatusPublishEvent<MessageStatusData> = {
         specversion: "1.0",
         id: crypto.randomUUID(),
         source:
           "/nhs/england/notify/development/primary/data-plane/client-callbacks",
         subject: `customer/${crypto.randomUUID()}/message/test-msg-${Date.now()}`,
-        type: "uk.nhs.notify.client-callbacks.message.status.transitioned.v1",
+        type: "uk.nhs.notify.message.status.PUBLISHED.v1",
         time: new Date().toISOString(),
         datacontenttype: "application/json",
         dataschema: "https://nhs.uk/schemas/notify/message-status-data.v1.json",
@@ -217,13 +219,13 @@ describe.skip("Event Bus to Webhook Integration", () => {
         return;
       }
 
-      const messageStatusEvent: StatusTransitionEvent<MessageStatusData> = {
+      const messageStatusEvent: StatusPublishEvent<MessageStatusData> = {
         specversion: "1.0",
         id: crypto.randomUUID(),
         source:
           "/nhs/england/notify/development/primary/data-plane/client-callbacks",
         subject: `customer/${crypto.randomUUID()}/message/test-msg-${Date.now()}`,
-        type: "uk.nhs.notify.client-callbacks.message.status.transitioned.v1",
+        type: "uk.nhs.notify.message.status.PUBLISHED.v1",
         time: new Date().toISOString(),
         datacontenttype: "application/json",
         dataschema: "https://nhs.uk/schemas/notify/message-status-data.v1.json",
@@ -270,13 +272,13 @@ describe.skip("Event Bus to Webhook Integration", () => {
         return;
       }
 
-      const channelStatusEvent: StatusTransitionEvent = {
+      const channelStatusEvent: StatusPublishEvent = {
         specversion: "1.0",
         id: crypto.randomUUID(),
         source:
           "/nhs/england/notify/development/primary/data-plane/client-callbacks",
         subject: `customer/${crypto.randomUUID()}/message/test-msg-${Date.now()}/channel/nhsapp`,
-        type: "uk.nhs.notify.client-callbacks.channel.status.transitioned.v1",
+        type: "uk.nhs.notify.channel.status.PUBLISHED.v1",
         time: new Date().toISOString(),
         datacontenttype: "application/json",
         dataschema: "https://nhs.uk/schemas/notify/channel-status-data.v1.json",
@@ -288,7 +290,7 @@ describe.skip("Event Bus to Webhook Integration", () => {
           channel: "NHSAPP",
           channelStatus: "DELIVERED",
           channelStatusDescription: "Integration test channel delivered",
-          supplierStatus: "DELIVERED",
+          supplierStatus: "delivered",
           cascadeType: "primary",
           cascadeOrder: 1,
           timestamp: new Date().toISOString(),

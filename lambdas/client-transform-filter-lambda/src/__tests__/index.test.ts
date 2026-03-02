@@ -51,7 +51,7 @@ describe("Lambda handler", () => {
       "/nhs/england/notify/development/primary/data-plane/client-callbacks",
     subject:
       "customer/920fca11-596a-4eca-9c47-99f624614658/message/msg-789-xyz",
-    type: "uk.nhs.notify.client-callbacks.message.status.transitioned.v1",
+    type: "uk.nhs.notify.message.status.PUBLISHED.v1",
     time: "2026-02-05T14:30:00.000Z",
     datacontenttype: "application/json",
     dataschema: "https://nhs.uk/schemas/notify/message-status-data.v1.json",
@@ -174,7 +174,7 @@ describe("Lambda handler", () => {
     };
 
     await expect(handler([sqsMessage])).rejects.toThrow(
-      'Validation failed: type: Invalid option: expected one of "uk.nhs.notify.client-callbacks.message.status.transitioned.v1"|"uk.nhs.notify.client-callbacks.channel.status.transitioned.v1"',
+      'Validation failed: type: Invalid option: expected one of "uk.nhs.notify.message.status.PUBLISHED.v1"|"uk.nhs.notify.channel.status.PUBLISHED.v1"',
     );
   });
 
@@ -186,7 +186,7 @@ describe("Lambda handler", () => {
         "/nhs/england/notify/development/primary/data-plane/client-callbacks",
       subject:
         "customer/920fca11-596a-4eca-9c47-99f624614658/message/msg-456-abc/channel/nhsapp",
-      type: "uk.nhs.notify.client-callbacks.channel.status.transitioned.v1",
+      type: "uk.nhs.notify.channel.status.PUBLISHED.v1",
       time: "2026-02-05T14:30:00.000Z",
       datacontenttype: "application/json",
       dataschema: "https://nhs.uk/schemas/notify/channel-status-data.v1.json",
@@ -198,7 +198,7 @@ describe("Lambda handler", () => {
         channel: "NHSAPP",
         channelStatus: "DELIVERED",
         channelStatusDescription: "Successfully delivered to NHS App",
-        supplierStatus: "DELIVERED",
+        supplierStatus: "delivered",
         cascadeType: "primary",
         cascadeOrder: 1,
         timestamp: "2026-02-05T14:29:55Z",
@@ -303,7 +303,7 @@ describe("Lambda handler", () => {
         "/nhs/england/notify/development/primary/data-plane/client-callbacks",
       subject:
         "customer/920fca11-596a-4eca-9c47-99f624614658/message/msg-456-abc/channel/sms",
-      type: "uk.nhs.notify.client-callbacks.channel.status.transitioned.v1",
+      type: "uk.nhs.notify.channel.status.PUBLISHED.v1",
       time: "2026-02-05T14:30:00.000Z",
       datacontenttype: "application/json",
       dataschema: "https://nhs.uk/schemas/notify/channel-status-data.v1.json",
@@ -316,7 +316,7 @@ describe("Lambda handler", () => {
         channelStatus: "FAILED",
         channelStatusDescription: "SMS delivery failed",
         channelFailureReasonCode: "SMS_001",
-        supplierStatus: "PERMANENT_FAILURE",
+        supplierStatus: "permanent_failure",
         cascadeType: "secondary",
         cascadeOrder: 2,
         timestamp: "2026-02-05T14:30:00Z",

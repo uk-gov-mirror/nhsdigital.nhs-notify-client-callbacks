@@ -16,8 +16,8 @@ const NHSNotifyExtensionsSchema = z.object({
 
 const EventConstraintsSchema = z.object({
   type: z.enum([
-    EventTypes.MESSAGE_STATUS_TRANSITIONED,
-    EventTypes.CHANNEL_STATUS_TRANSITIONED,
+    EventTypes.MESSAGE_STATUS_PUBLISHED,
+    EventTypes.CHANNEL_STATUS_PUBLISHED,
   ]),
   datacontenttype: z.literal("application/json"),
   data: z.unknown(),
@@ -51,11 +51,11 @@ const ChannelStatusDataSchema = BaseDataSchema.extend({
 });
 
 function isMessageStatusEvent(type: string): boolean {
-  return type === EventTypes.MESSAGE_STATUS_TRANSITIONED;
+  return type === EventTypes.MESSAGE_STATUS_PUBLISHED;
 }
 
 function isChannelStatusEvent(type: string): boolean {
-  return type === EventTypes.CHANNEL_STATUS_TRANSITIONED;
+  return type === EventTypes.CHANNEL_STATUS_PUBLISHED;
 }
 
 function formatValidationError(error: unknown, event: unknown): never {
@@ -78,7 +78,7 @@ function formatValidationError(error: unknown, event: unknown): never {
   throw new ValidationError(message, correlationId);
 }
 
-export function validateStatusTransitionEvent(
+export function validateStatusPublishEvent(
   event: unknown,
 ): asserts event is StatusPublishEvent {
   try {

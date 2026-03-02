@@ -16,7 +16,7 @@ describe("message-status-transformer", () => {
         "/nhs/england/notify/development/primary/data-plane/client-callbacks",
       subject:
         "customer/920fca11-596a-4eca-9c47-99f624614658/message/msg-789-xyz",
-      type: "uk.nhs.notify.client-callbacks.message.status.transitioned.v1",
+      type: "uk.nhs.notify.message.status.PUBLISHED.v1",
       time: "2026-02-05T14:30:00.000Z",
       datacontenttype: "application/json",
       dataschema: "https://nhs.uk/schemas/notify/message-status-data.v1.json",

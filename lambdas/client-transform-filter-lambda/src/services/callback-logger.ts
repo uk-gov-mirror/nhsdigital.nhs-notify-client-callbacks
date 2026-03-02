@@ -10,14 +10,14 @@ function isMessageStatusAttributes(
   attributes: MessageStatusAttributes | ChannelStatusAttributes,
   eventType: string,
 ): attributes is MessageStatusAttributes {
-  return eventType === EventTypes.MESSAGE_STATUS_TRANSITIONED;
+  return eventType === EventTypes.MESSAGE_STATUS_PUBLISHED;
 }
 
 function isChannelStatusAttributes(
   attributes: MessageStatusAttributes | ChannelStatusAttributes,
   eventType: string,
 ): attributes is ChannelStatusAttributes {
-  return eventType === EventTypes.CHANNEL_STATUS_TRANSITIONED;
+  return eventType === EventTypes.CHANNEL_STATUS_PUBLISHED;
 }
 
 function buildMessageStatusLogFields(attrs: MessageStatusAttributes) {

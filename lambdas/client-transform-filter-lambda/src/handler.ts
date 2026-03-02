@@ -4,7 +4,7 @@ import type {
   ClientCallbackPayload,
   StatusPublishEvent,
 } from "@nhs-notify-client-callbacks/models";
-import { validateStatusTransitionEvent } from "services/validators/event-validator";
+import { validateStatusPublishEvent } from "services/validators/event-validator";
 import { transformEvent } from "services/transformers/event-transformer";
 import { extractCorrelationId } from "services/logger";
 import { ValidationError, getEventError } from "services/error-handler";
@@ -57,7 +57,7 @@ function parseSqsMessageBody(
       messageId: parsed?.data?.messageId,
     });
 
-    validateStatusTransitionEvent(parsed);
+    validateStatusPublishEvent(parsed);
     return parsed;
   } catch (error) {
     if (error instanceof ValidationError) {

@@ -18,7 +18,7 @@ describe("channel-status-transformer", () => {
         "/nhs/england/notify/development/primary/data-plane/client-callbacks",
       subject:
         "customer/920fca11-596a-4eca-9c47-99f624614658/message/msg-456-abc/channel/nhsapp",
-      type: "uk.nhs.notify.client-callbacks.channel.status.transitioned.v1",
+      type: "uk.nhs.notify.channel.status.PUBLISHED.v1",
       time: "2026-02-05T14:30:00.000Z",
       datacontenttype: "application/json",
       dataschema: "https://nhs.uk/schemas/notify/channel-status-data.v1.json",
@@ -30,7 +30,7 @@ describe("channel-status-transformer", () => {
         channel: "NHSAPP",
         channelStatus: "DELIVERED",
         channelStatusDescription: "Successfully delivered to NHS App",
-        supplierStatus: "DELIVERED",
+        supplierStatus: "delivered",
         cascadeType: "primary",
         cascadeOrder: 1,
         timestamp: "2026-02-05T14:29:55Z",

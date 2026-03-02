@@ -21,7 +21,7 @@ locals {
       header_name                      = "x-api-key"
       header_value                     = "test-api-key-placeholder"
       client_detail = [
-        "uk.nhs.notify.client-callbacks.message.status.transitioned.v1",
+        "uk.nhs.notify.message.status.PUBLISHED.v1",
         "uk.nhs.notify.client-callbacks.channel.status.transitioned.v1"
       ]
     }
