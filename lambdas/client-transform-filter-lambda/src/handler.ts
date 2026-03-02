@@ -1,6 +1,9 @@
 import type { SQSRecord } from "aws-lambda";
 import pMap from "p-map";
-import type { ClientCallbackPayload, StatusTransitionEvent } from "models";
+import type {
+  ClientCallbackPayload,
+  StatusPublishEvent,
+} from "@nhs-notify-client-callbacks/models";
 import { validateStatusTransitionEvent } from "services/validators/event-validator";
 import { transformEvent } from "services/transformers/event-transformer";
 import { extractCorrelationId } from "services/logger";
@@ -9,7 +12,7 @@ import type { ObservabilityService } from "services/observability";
 
 const BATCH_CONCURRENCY = Number(process.env.BATCH_CONCURRENCY) || 10;
 
-export interface TransformedEvent extends StatusTransitionEvent {
+export interface TransformedEvent extends StatusPublishEvent {
   transformedPayload: ClientCallbackPayload;
 }
 
@@ -42,7 +45,7 @@ class BatchStats {
 function parseSqsMessageBody(
   sqsRecord: SQSRecord,
   observability: ObservabilityService,
-): StatusTransitionEvent {
+): StatusPublishEvent {
   let parsed: any;
   try {
     parsed = JSON.parse(sqsRecord.body);
@@ -68,7 +71,7 @@ function parseSqsMessageBody(
 }
 
 function processSingleEvent(
-  event: StatusTransitionEvent,
+  event: StatusPublishEvent,
   observability: ObservabilityService,
 ): TransformedEvent {
   const correlationId = extractCorrelationId(event);

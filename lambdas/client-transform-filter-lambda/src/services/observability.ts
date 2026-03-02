@@ -1,5 +1,5 @@
 import type { MetricsLogger } from "aws-embedded-metrics";
-import type { ClientCallbackPayload } from "models";
+import type { ClientCallbackPayload } from "@nhs-notify-client-callbacks/models";
 import { logCallbackGenerated } from "services/callback-logger";
 import type { Logger } from "services/logger";
 import { logLifecycleEvent } from "services/logger";

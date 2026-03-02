@@ -1,9 +1,9 @@
-import type {
-  ChannelStatusAttributes,
-  ClientCallbackPayload,
-  MessageStatusAttributes,
-} from "models/client-callback-payload";
-import { EventTypes } from "models/status-transition-event";
+import {
+  type ChannelStatusAttributes,
+  type ClientCallbackPayload,
+  EventTypes,
+  type MessageStatusAttributes,
+} from "@nhs-notify-client-callbacks/models";
 import type { Logger } from "services/logger";
 
 function isMessageStatusAttributes(

@@ -5,8 +5,8 @@ import {
 import { z } from "zod";
 import {
   EventTypes,
-  StatusTransitionEvent,
-} from "models/status-transition-event";
+  type StatusPublishEvent,
+} from "@nhs-notify-client-callbacks/models";
 import { ValidationError } from "services/error-handler";
 import { extractCorrelationId } from "services/logger";
 
@@ -80,7 +80,7 @@ function formatValidationError(error: unknown, event: unknown): never {
 
 export function validateStatusTransitionEvent(
   event: unknown,
-): asserts event is StatusTransitionEvent {
+): asserts event is StatusPublishEvent {
   try {
     const ce = new CloudEvent(event as any, true);
 

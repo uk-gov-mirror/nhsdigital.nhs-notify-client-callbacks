@@ -1,15 +1,15 @@
 import { transformMessageStatus } from "services/transformers/message-status-transformer";
-import type { StatusTransitionEvent } from "models/status-transition-event";
-import type { MessageStatusData } from "models/message-status-data";
 import type {
   ClientCallbackPayload,
+  MessageStatus,
   MessageStatusAttributes,
-} from "models/client-callback-payload";
-import type { MessageStatus } from "models/status-types";
+  MessageStatusData,
+  StatusPublishEvent,
+} from "@nhs-notify-client-callbacks/models";
 
 describe("message-status-transformer", () => {
   describe("transformMessageStatus", () => {
-    const messageStatusEvent: StatusTransitionEvent<MessageStatusData> = {
+    const messageStatusEvent: StatusPublishEvent<MessageStatusData> = {
       specversion: "1.0",
       id: "661f9510-f39c-52e5-b827-557766551111",
       source:

@@ -1,15 +1,15 @@
-import type { StatusTransitionEvent } from "models/status-transition-event";
-import type { ChannelStatusData } from "models/channel-status-data";
 import type {
   ChannelStatusAttributes,
+  ChannelStatusData,
   ClientCallbackPayload,
   ClientChannel,
   ClientChannelStatus,
   ClientSupplierStatus,
-} from "models/client-callback-payload";
+  StatusPublishEvent,
+} from "@nhs-notify-client-callbacks/models";
 
 export function transformChannelStatus(
-  event: StatusTransitionEvent<ChannelStatusData>,
+  event: StatusPublishEvent<ChannelStatusData>,
 ): ClientCallbackPayload {
   const notifyData = event.data;
   const { messageId } = notifyData;

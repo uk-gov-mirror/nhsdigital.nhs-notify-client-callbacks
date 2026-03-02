@@ -1,10 +1,11 @@
-/* eslint-disable sonarjs/no-nested-functions */
 import { validateStatusTransitionEvent } from "services/validators/event-validator";
-import type { StatusTransitionEvent } from "models/status-transition-event";
-import type { MessageStatusData } from "models/message-status-data";
-import type { ChannelStatusData } from "models/channel-status-data";
+import type {
+  ChannelStatusData,
+  MessageStatusData,
+  StatusPublishEvent,
+} from "@nhs-notify-client-callbacks/models";
 
-type TestEvent<T> = Omit<StatusTransitionEvent<T>, "traceparent"> & {
+type TestEvent<T> = Omit<StatusPublishEvent<T>, "traceparent"> & {
   traceparent?: string;
 };
 

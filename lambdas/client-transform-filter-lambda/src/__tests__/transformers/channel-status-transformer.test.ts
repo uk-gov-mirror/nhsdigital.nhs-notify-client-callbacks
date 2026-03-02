@@ -1,16 +1,17 @@
 import { transformChannelStatus } from "services/transformers/channel-status-transformer";
-import type { StatusTransitionEvent } from "models/status-transition-event";
-import type { ChannelStatusData } from "models/channel-status-data";
 import type {
+  Channel,
+  ChannelStatus,
   ChannelStatusAttributes,
+  ChannelStatusData,
   ClientCallbackPayload,
-} from "models/client-callback-payload";
-import type { ChannelStatus, SupplierStatus } from "models/status-types";
-import type { Channel } from "models/channel-types";
+  StatusPublishEvent,
+  SupplierStatus,
+} from "@nhs-notify-client-callbacks/models";
 
 describe("channel-status-transformer", () => {
   describe("transformChannelStatus", () => {
-    const channelStatusEvent: StatusTransitionEvent<ChannelStatusData> = {
+    const channelStatusEvent: StatusPublishEvent<ChannelStatusData> = {
       specversion: "1.0",
       id: "SOME-GUID-a123-556677889999",
       source:

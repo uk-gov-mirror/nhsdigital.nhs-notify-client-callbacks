@@ -1,12 +1,12 @@
 import type { SQSRecord } from "aws-lambda";
 import type { MetricsLogger } from "aws-embedded-metrics";
-import type { StatusTransitionEvent } from "models/status-transition-event";
-import type { MessageStatusData } from "models/message-status-data";
-import type { ChannelStatusData } from "models/channel-status-data";
 import type {
   ChannelStatusAttributes,
+  ChannelStatusData,
   MessageStatusAttributes,
-} from "models/client-callback-payload";
+  MessageStatusData,
+  StatusPublishEvent,
+} from "@nhs-notify-client-callbacks/models";
 import type { Logger } from "services/logger";
 import type { CallbackMetrics } from "services/metrics";
 import { ObservabilityService } from "services/observability";
@@ -44,7 +44,7 @@ describe("Lambda handler", () => {
     jest.clearAllMocks();
   });
 
-  const validMessageStatusEvent: StatusTransitionEvent<MessageStatusData> = {
+  const validMessageStatusEvent: StatusPublishEvent<MessageStatusData> = {
     specversion: "1.0",
     id: "661f9510-f39c-52e5-b827-557766551111",
     source:
@@ -179,7 +179,7 @@ describe("Lambda handler", () => {
   });
 
   it("should transform a valid channel status event from SQS", async () => {
-    const validChannelStatusEvent: StatusTransitionEvent<ChannelStatusData> = {
+    const validChannelStatusEvent: StatusPublishEvent<ChannelStatusData> = {
       specversion: "1.0",
       id: "channel-event-123",
       source:
@@ -296,7 +296,7 @@ describe("Lambda handler", () => {
   });
 
   it("should handle mixed message and channel status events in batch", async () => {
-    const channelStatusEvent: StatusTransitionEvent<ChannelStatusData> = {
+    const channelStatusEvent: StatusPublishEvent<ChannelStatusData> = {
       specversion: "1.0",
       id: "channel-event-456",
       source:

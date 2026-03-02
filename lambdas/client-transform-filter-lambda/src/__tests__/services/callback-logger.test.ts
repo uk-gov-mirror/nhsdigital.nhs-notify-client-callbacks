@@ -1,7 +1,9 @@
 import { logCallbackGenerated } from "services/callback-logger";
 import type { Logger } from "services/logger";
-import type { ClientCallbackPayload } from "models/client-callback-payload";
-import { EventTypes } from "models/status-transition-event";
+import {
+  type ClientCallbackPayload,
+  EventTypes,
+} from "@nhs-notify-client-callbacks/models";
 
 describe("callback-logger", () => {
   let mockLogger: jest.Mocked<Logger>;
