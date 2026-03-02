@@ -13,6 +13,7 @@ import type {
   MessageStatusData,
   StatusPublishEvent,
 } from "@nhs-notify-client-callbacks/models";
+import { getMessageStatusCallbacks } from "helpers/index.js";
 
 const publishEvent = async (
   client: EventBridgeClient,
@@ -82,7 +83,6 @@ const awaitMessageStatusCallbacks = async (
   logGroup: string,
   messageId: string,
 ) => {
-  const { getMessageStatusCallbacks } = await import("./helpers/index.js");
   let callbacks: Awaited<ReturnType<typeof getMessageStatusCallbacks>> = [];
 
   await waitUntil(

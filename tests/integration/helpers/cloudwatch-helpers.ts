@@ -2,7 +2,7 @@ import {
   CloudWatchLogsClient,
   FilterLogEventsCommand,
 } from "@aws-sdk/client-cloudwatch-logs";
-import type { CallbackPayload } from "nhs-notify-mock-webhook-lambda/src/types";
+import type { CallbackItem } from "@nhs-notify-client-callbacks/models";
 
 const client = new CloudWatchLogsClient({ region: "eu-west-2" });
 
@@ -27,7 +27,7 @@ export async function getCallbackLogsFromCloudWatch(
   );
 }
 
-export function parseCallbacksFromLogs(logs: unknown[]): CallbackPayload[] {
+export function parseCallbacksFromLogs(logs: unknown[]): CallbackItem[] {
   return logs
     .map((log: unknown) => {
       if (
@@ -39,7 +39,7 @@ export function parseCallbacksFromLogs(logs: unknown[]): CallbackPayload[] {
         const match = /CALLBACK .+ : (.+)$/.exec(log.msg);
         if (match?.[1]) {
           try {
-            return JSON.parse(match[1]) as CallbackPayload;
+            return JSON.parse(match[1]) as CallbackItem;
           } catch {
             return null;
           }
@@ -47,14 +47,14 @@ export function parseCallbacksFromLogs(logs: unknown[]): CallbackPayload[] {
       }
       return null;
     })
-    .filter((payload): payload is CallbackPayload => payload !== null);
+    .filter((payload): payload is CallbackItem => payload !== null);
 }
 
 export async function getMessageStatusCallbacks(
   logGroupName: string,
   requestItemId: string,
   startTime?: Date,
-): Promise<CallbackPayload[]> {
+): Promise<CallbackItem[]> {
   const logs = await getCallbackLogsFromCloudWatch(
     logGroupName,
     `%${requestItemId}%MessageStatus%`,
@@ -67,7 +67,7 @@ export async function getChannelStatusCallbacks(
   logGroupName: string,
   requestItemId: string,
   startTime?: Date,
-): Promise<CallbackPayload[]> {
+): Promise<CallbackItem[]> {
   const logs = await getCallbackLogsFromCloudWatch(
     logGroupName,
     `%${requestItemId}%ChannelStatus%`,
@@ -88,7 +88,7 @@ export async function getAllCallbacks(
   logGroupName: string,
   requestItemId: string,
   startTime?: Date,
-): Promise<CallbackPayload[]> {
+): Promise<CallbackItem[]> {
   const logs = await getCallbackLogsFromCloudWatch(
     logGroupName,
     `"${requestItemId}"`,

@@ -1,6 +1,5 @@
 import type { APIGatewayProxyEvent } from "aws-lambda";
 import { handler } from "index";
-import type { CallbackMessage, CallbackPayload } from "types";
 
 jest.mock("pino", () => {
   const info = jest.fn();
@@ -68,7 +67,7 @@ const createMockEvent = (body: string | null): APIGatewayProxyEvent => ({
 describe("Mock Webhook Lambda", () => {
   describe("Happy Path", () => {
     it("should accept and log MessageStatus callback", async () => {
-      const callback: CallbackMessage<CallbackPayload> = {
+      const callback = {
         data: [
           {
             type: "MessageStatus",
@@ -98,7 +97,7 @@ describe("Mock Webhook Lambda", () => {
     });
 
     it("should accept and log ChannelStatus callback", async () => {
-      const callback: CallbackMessage<CallbackPayload> = {
+      const callback = {
         data: [
           {
             type: "ChannelStatus",
@@ -130,7 +129,7 @@ describe("Mock Webhook Lambda", () => {
     });
 
     it("should accept multiple callbacks in one request", async () => {
-      const callback: CallbackMessage<CallbackPayload> = {
+      const callback = {
         data: [
           {
             type: "MessageStatus",
@@ -270,7 +269,7 @@ describe("Mock Webhook Lambda", () => {
 
   describe("Logging", () => {
     it("should log callback with structured format including messageId", async () => {
-      const callback: CallbackMessage<CallbackPayload> = {
+      const callback = {
         data: [
           {
             type: "MessageStatus",

@@ -1,34 +1,38 @@
 import type { APIGatewayProxyEvent, APIGatewayProxyResult } from "aws-lambda";
 import pino from "pino";
-import type { CallbackMessage, CallbackPayload, LambdaResponse } from "types";
+import type { ClientCallbackPayload } from "@nhs-notify-client-callbacks/models";
 
 const logger = pino({
   level: process.env.LOG_LEVEL || "info",
 });
 
-function isValidCallbackPayload(payload: unknown): payload is CallbackPayload {
+function isClientCallbackPayload(
+  value: unknown,
+): value is ClientCallbackPayload {
   if (
-    typeof payload !== "object" ||
-    payload === null ||
-    Array.isArray(payload)
+    typeof value !== "object" ||
+    value === null ||
+    !("data" in value) ||
+    !Array.isArray((value as { data: unknown }).data)
   ) {
     return false;
   }
 
-  const candidate = payload as {
-    type?: unknown;
-    attributes?: unknown;
-  };
-
-  return (
-    (candidate.type === "MessageStatus" ||
-      candidate.type === "ChannelStatus") &&
-    typeof candidate.attributes === "object" &&
-    candidate.attributes !== null &&
-    !Array.isArray(candidate.attributes) &&
-    typeof (candidate.attributes as Record<string, unknown>).messageId ===
-      "string"
-  );
+  const items = (value as { data: unknown[] }).data;
+  return items.every((item) => {
+    if (typeof item !== "object" || item === null || Array.isArray(item)) {
+      return false;
+    }
+    const candidate = item as Record<string, unknown>;
+    return (
+      (candidate.type === "MessageStatus" ||
+        candidate.type === "ChannelStatus") &&
+      typeof candidate.attributes === "object" &&
+      candidate.attributes !== null &&
+      typeof (candidate.attributes as Record<string, unknown>).messageId ===
+        "string"
+    );
+  });
 }
 
 export async function handler(
@@ -47,20 +51,16 @@ export async function handler(
       msg: "No event body received",
     });
 
-    const response: LambdaResponse = {
-      message: "No body",
-    };
-
     return {
       statusCode: 400,
-      body: JSON.stringify(response),
+      body: JSON.stringify({ message: "No body" }),
     };
   }
 
   try {
-    const messages = JSON.parse(event.body) as CallbackMessage<CallbackPayload>;
+    const parsed = JSON.parse(event.body) as unknown;
 
-    if (!messages.data || !Array.isArray(messages.data)) {
+    if (!isClientCallbackPayload(parsed)) {
       logger.error({
         msg: "Invalid message structure - missing or invalid data array",
       });
@@ -71,41 +71,27 @@ export async function handler(
       };
     }
 
-    if (!messages.data.every((payload) => isValidCallbackPayload(payload))) {
-      logger.error({
-        msg: "Invalid message structure - invalid callback payload",
-      });
-
-      return {
-        statusCode: 400,
-        body: JSON.stringify({ message: "Invalid message structure" }),
-      };
-    }
-
     // Log each callback in a format that can be queried from CloudWatch
-    for (const message of messages.data) {
-      const messageType = message.type;
-      const correlationId = message.attributes.messageId as string | undefined;
+    for (const item of parsed.data) {
+      const { messageId } = item.attributes;
       logger.info({
-        correlationId,
-        messageType,
-        msg: `CALLBACK ${correlationId} ${messageType} : ${JSON.stringify(message)}`,
+        correlationId: messageId,
+        messageType: item.type,
+        msg: `CALLBACK ${messageId} ${item.type} : ${JSON.stringify(item)}`,
       });
     }
-
-    const response: LambdaResponse = {
-      message: "Callback received",
-      receivedCount: messages.data.length,
-    };
 
     logger.info({
-      receivedCount: messages.data.length,
+      receivedCount: parsed.data.length,
       msg: "Callbacks logged successfully",
     });
 
     return {
       statusCode: 200,
-      body: JSON.stringify(response),
+      body: JSON.stringify({
+        message: "Callback received",
+        receivedCount: parsed.data.length,
+      }),
     };
   } catch (error) {
     if (error instanceof SyntaxError) {

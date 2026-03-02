@@ -1,5 +1,6 @@
 {
   "dependencies": {
+    "@nhs-notify-client-callbacks/models": "*",
     "esbuild": "^0.25.0",
     "pino": "^9.5.0"
   },
