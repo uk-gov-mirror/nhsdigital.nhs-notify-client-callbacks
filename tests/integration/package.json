@@ -10,15 +10,15 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@aws-sdk/client-cloudwatch-logs": "^3.991.0",
-    "@aws-sdk/client-eventbridge": "^3.990.0",
-    "@aws-sdk/client-sqs": "^3.990.0",
-    "async-wait-until": "^2.0.12"
+    "@aws-sdk/client-cloudwatch-logs": "^3.991.0"
   },
   "devDependencies": {
+    "@aws-sdk/client-eventbridge": "^3.990.0",
+    "@aws-sdk/client-sqs": "^3.990.0",
     "@nhs-notify-client-callbacks/models": "*",
     "@tsconfig/node22": "^22.0.2",
     "@types/jest": "^29.5.14",
+    "async-wait-until": "^2.0.12",
     "jest": "^29.7.0",
     "typescript": "^5.8.2"
   }
