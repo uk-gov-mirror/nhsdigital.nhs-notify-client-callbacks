@@ -21,4 +21,9 @@ resource "aws_cloudwatch_event_target" "main" {
   dead_letter_config {
     arn = module.target_dlq.sqs_queue_arn
   }
+
+  retry_policy {
+    maximum_retry_attempts       = 3
+    maximum_event_age_in_seconds = 3600
+  }
 }
