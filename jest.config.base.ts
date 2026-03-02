@@ -6,7 +6,7 @@ export const baseJestConfig: Config = {
   collectCoverage: true,
   coverageDirectory: "./.reports/unit/coverage",
   coverageProvider: "v8",
-  coveragePathIgnorePatterns: ["/__tests__/"],
+  coveragePathIgnorePatterns: ["/__tests__/", "/node_modules/"],
   transform: { "^.+\\.ts$": "ts-jest" },
   testPathIgnorePatterns: [".build"],
   testMatch: ["**/?(*.)+(spec|test).[jt]s?(x)"],
