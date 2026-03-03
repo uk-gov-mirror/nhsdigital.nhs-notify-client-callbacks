@@ -24,7 +24,7 @@ export function transformMessageStatus(
   );
 
   const attributes: MessageStatusAttributes = {
-    messageId: notifyData.messageId,
+    messageId,
     messageReference: notifyData.messageReference,
     messageStatus,
     channels,

@@ -4,7 +4,6 @@ locals {
   root_domain_name              = "${var.environment}.${local.acct.route53_zone_names["client-callbacks"]}" # e.g. [main|dev|abxy0].smsnudge.[dev|nonprod|prod].nhsnotify.national.nhs.uk
   root_domain_id                = local.acct.route53_zone_ids["client-callbacks"]
 
-  # Clients from variable
   clients_by_name = {
     for client in var.clients :
     client.connection_name => client
@@ -27,6 +26,5 @@ locals {
     }
   } : {}
 
-  # Merge configured clients with test client
   all_clients = merge(local.clients_by_name, local.test_client)
 }

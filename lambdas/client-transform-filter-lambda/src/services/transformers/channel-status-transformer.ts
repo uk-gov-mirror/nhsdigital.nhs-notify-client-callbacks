@@ -20,7 +20,7 @@ export function transformChannelStatus(
     notifyData.supplierStatus.toLowerCase() as ClientSupplierStatus;
 
   const attributes: ChannelStatusAttributes = {
-    messageId: notifyData.messageId,
+    messageId,
     messageReference: notifyData.messageReference,
     channel,
     channelStatus,
