@@ -159,7 +159,8 @@ describe.skip("Event Bus to Webhook Integration", () => {
         type: "uk.nhs.notify.message.status.PUBLISHED.v1",
         time: new Date().toISOString(),
         datacontenttype: "application/json",
-        dataschema: "https://nhs.uk/schemas/notify/message-status-data.v1.json",
+        dataschema:
+          "https://notify.nhs.uk/schemas/message-status-published-v1.json",
         traceparent: "00-4d678967f96e353c07a0a31c1849b500-07f83ba58dd8df70-01",
         data: {
           clientId: "test-client",
@@ -228,7 +229,8 @@ describe.skip("Event Bus to Webhook Integration", () => {
         type: "uk.nhs.notify.message.status.PUBLISHED.v1",
         time: new Date().toISOString(),
         datacontenttype: "application/json",
-        dataschema: "https://nhs.uk/schemas/notify/message-status-data.v1.json",
+        dataschema:
+          "https://notify.nhs.uk/schemas/message-status-published-v1.json",
         traceparent: "00-4d678967f96e353c07a0a31c1849b500-07f83ba58dd8df70-01",
         data: {
           clientId: "non-existent-client", // Client not in subscription config
@@ -281,7 +283,8 @@ describe.skip("Event Bus to Webhook Integration", () => {
         type: "uk.nhs.notify.channel.status.PUBLISHED.v1",
         time: new Date().toISOString(),
         datacontenttype: "application/json",
-        dataschema: "https://nhs.uk/schemas/notify/channel-status-data.v1.json",
+        dataschema:
+          "https://notify.nhs.uk/schemas/channel-status-published-v1.json",
         traceparent: "00-4d678967f96e353c07a0a31c1849b500-07f83ba58dd8df70-02",
         data: {
           clientId: "test-client",
@@ -295,12 +298,6 @@ describe.skip("Event Bus to Webhook Integration", () => {
           cascadeOrder: 1,
           timestamp: new Date().toISOString(),
           retryCount: 0,
-          routingPlan: {
-            id: `routing-plan-${crypto.randomUUID()}`,
-            name: "Test routing plan",
-            version: "v1.0.0",
-            createdDate: new Date().toISOString(),
-          },
         },
       };
 

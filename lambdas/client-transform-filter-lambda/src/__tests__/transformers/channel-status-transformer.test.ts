@@ -21,7 +21,8 @@ describe("channel-status-transformer", () => {
       type: "uk.nhs.notify.channel.status.PUBLISHED.v1",
       time: "2026-02-05T14:30:00.000Z",
       datacontenttype: "application/json",
-      dataschema: "https://nhs.uk/schemas/notify/channel-status-data.v1.json",
+      dataschema:
+        "https://notify.nhs.uk/schemas/channel-status-published-v1.json",
       traceparent: "00-4d678967f96e353c07a0a31c1849b500-07f83ba58dd8df70-02",
       data: {
         clientId: "client-abc-123",

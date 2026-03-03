@@ -44,7 +44,8 @@
     "start": "npm run start --workspace frontend",
     "test:integration": "npm run test:integration --workspace tests/integration",
     "test:unit": "npm run test:unit --workspaces",
-    "typecheck": "npm run typecheck --workspaces"
+    "typecheck": "npm run typecheck --workspaces",
+    "verify": "npm run lint && npm run typecheck && npm run test:unit"
   },
   "workspaces": [
     "lambdas/client-transform-filter-lambda",

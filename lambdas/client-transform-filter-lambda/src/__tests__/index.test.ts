@@ -54,7 +54,8 @@ describe("Lambda handler", () => {
     type: "uk.nhs.notify.message.status.PUBLISHED.v1",
     time: "2026-02-05T14:30:00.000Z",
     datacontenttype: "application/json",
-    dataschema: "https://nhs.uk/schemas/notify/message-status-data.v1.json",
+    dataschema:
+      "https://notify.nhs.uk/schemas/message-status-published-v1.json",
     traceparent: "00-4d678967f96e353c07a0a31c1849b500-07f83ba58dd8df70-01",
     data: {
       clientId: "client-abc-123",
@@ -189,7 +190,8 @@ describe("Lambda handler", () => {
       type: "uk.nhs.notify.channel.status.PUBLISHED.v1",
       time: "2026-02-05T14:30:00.000Z",
       datacontenttype: "application/json",
-      dataschema: "https://nhs.uk/schemas/notify/channel-status-data.v1.json",
+      dataschema:
+        "https://notify.nhs.uk/schemas/channel-status-published-v1.json",
       traceparent: "00-4d678967f96e353c07a0a31c1849b500-07f83ba58dd8df70-02",
       data: {
         clientId: "client-abc-123",
@@ -306,7 +308,8 @@ describe("Lambda handler", () => {
       type: "uk.nhs.notify.channel.status.PUBLISHED.v1",
       time: "2026-02-05T14:30:00.000Z",
       datacontenttype: "application/json",
-      dataschema: "https://nhs.uk/schemas/notify/channel-status-data.v1.json",
+      dataschema:
+        "https://notify.nhs.uk/schemas/channel-status-published-v1.json",
       traceparent: "00-5e789078g07f464d08b1b42d2950c611-08g94cb69ee9eg81-02",
       data: {
         clientId: "client-xyz-789",
