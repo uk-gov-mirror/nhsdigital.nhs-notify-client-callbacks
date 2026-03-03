@@ -27,4 +27,12 @@ export const nodeJestConfig: Config = {
   ...baseJestConfig,
   testEnvironment: "node",
   modulePaths: ["<rootDir>/src"],
+  coverageThreshold: {
+    global: {
+      branches: 95,
+      functions: 100,
+      lines: 95,
+      statements: 95,
+    },
+  },
 };

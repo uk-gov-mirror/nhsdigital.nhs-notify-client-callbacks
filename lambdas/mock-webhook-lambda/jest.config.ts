@@ -4,10 +4,9 @@ export default {
   ...nodeJestConfig,
   coverageThreshold: {
     global: {
-      branches: 80,
-      functions: 100,
+      ...nodeJestConfig.coverageThreshold?.global,
       lines: 100,
-      statements: -10,
+      statements: 100,
     },
   },
   coveragePathIgnorePatterns: [
