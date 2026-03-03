@@ -43,7 +43,10 @@ const getQueueMessageCount = async (
 
   const queueAttributes = await client.send(queueAttributesCommand);
 
-  return Number(queueAttributes.Attributes?.ApproximateNumberOfMessages || 0);
+  return attributeNames.reduce(
+    (sum, name) => sum + Number(queueAttributes.Attributes?.[name] || 0),
+    0
+  );
 };
 
 const awaitQueueEmpty = async (
