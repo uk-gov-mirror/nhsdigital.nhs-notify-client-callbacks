@@ -1,9 +1,6 @@
-/**
- * Message-level status transition event data.
- */
-import type { RoutingPlan } from "models/routing-plan";
-import type { Channel } from "models/channel-types";
-import type { MessageStatus } from "models/status-types";
+import type { RoutingPlan } from "./routing-plan";
+import type { Channel } from "./channel-types";
+import type { MessageStatus } from "./status-types";
 
 export interface MessageStatusData {
   messageId: string;

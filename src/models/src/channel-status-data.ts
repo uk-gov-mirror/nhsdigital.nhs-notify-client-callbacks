@@ -1,8 +1,5 @@
-/**
- * Channel-level status transition event data.
- */
-import type { Channel } from "models/channel-types";
-import type { ChannelStatus, SupplierStatus } from "models/status-types";
+import type { Channel } from "./channel-types";
+import type { ChannelStatus, SupplierStatus } from "./status-types";
 
 export interface ChannelStatusData {
   messageId: string;

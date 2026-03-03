@@ -1,8 +1,3 @@
-/**
- * Client callback subscription configuration.
- * Array of subscription rules (one per event type/channel combination).
- */
-
 export type ClientSubscriptionConfiguration = (
   | MessageStatusSubscriptionConfiguration
   | ChannelStatusSubscriptionConfiguration

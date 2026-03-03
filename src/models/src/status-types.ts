@@ -1,6 +1,3 @@
-/**
- * Message-level statuses
- */
 export type MessageStatus =
   | "FAILED"
   | "PENDING_ENRICHMENT"
@@ -8,9 +5,6 @@ export type MessageStatus =
   | "ENRICHED"
   | "SENDING";
 
-/**
- * Channel-level statuses
- */
 export type ChannelStatus =
   | "ASSIGNING_BATCH"
   | "CREATED"
@@ -21,9 +15,6 @@ export type ChannelStatus =
   | "SKIPPED"
   | "STALE_PDS";
 
-/**
- * Supplier-reported statuses
- */
 export type SupplierStatus =
   | "accepted"
   | "cancelled"

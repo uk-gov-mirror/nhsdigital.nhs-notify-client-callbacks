@@ -1,5 +1,5 @@
-import type { MessageStatusData } from "models/message-status-data";
-import type { ChannelStatusData } from "models/channel-status-data";
+import type { MessageStatusData } from "./message-status-data";
+import type { ChannelStatusData } from "./channel-status-data";
 
 export interface StatusPublishEvent<T = MessageStatusData | ChannelStatusData> {
   specversion: string;
@@ -21,6 +21,6 @@ export const EventTypes = {
   CHANNEL_STATUS_PUBLISHED: "uk.nhs.notify.channel.status.PUBLISHED.v1",
 } as const;
 
-export { type MessageStatusData } from "models/message-status-data";
+export { type MessageStatusData } from "./message-status-data";
 
-export { type ChannelStatusData } from "models/channel-status-data";
+export { type ChannelStatusData } from "./channel-status-data";

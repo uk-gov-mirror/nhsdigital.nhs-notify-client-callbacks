@@ -1,0 +1,21 @@
+{
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "default": "./src/index.ts"
+    }
+  },
+  "devDependencies": {
+    "@tsconfig/node22": "^22.0.2",
+    "typescript": "^5.8.2"
+  },
+  "name": "@nhs-notify-client-callbacks/models",
+  "private": true,
+  "scripts": {
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "test:unit": "echo \"No unit tests for @nhs-notify-client-callbacks/models\"",
+    "typecheck": "tsc --noEmit"
+  },
+  "version": "0.0.1"
+}

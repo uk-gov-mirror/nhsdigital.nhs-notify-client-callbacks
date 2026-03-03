@@ -1,14 +1,10 @@
-/**
- * Message/Channel Status Callback payload delivered to client webhooks.
- */
-
-import type { RoutingPlan } from "models/routing-plan";
-import type { Channel } from "models/channel-types";
+import type { RoutingPlan } from "./routing-plan";
+import type { Channel } from "./channel-types";
 import type {
   ChannelStatus,
   MessageStatus,
   SupplierStatus,
-} from "models/status-types";
+} from "./status-types";
 
 export type ClientChannel = Lowercase<Channel>;
 export type ClientMessageStatus = Lowercase<MessageStatus>;

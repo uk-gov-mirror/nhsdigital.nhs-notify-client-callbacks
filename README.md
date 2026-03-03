@@ -8,7 +8,7 @@ The Client Callbacks infrastructure processes message and channel status events,
 
 ### Key Features
 
-- **Event-Driven Architecture**: Consumes CloudEvents from the Shared Event Bus (`uk.nhs.notify.client-callbacks.*` namespace)
+- **Event-Driven Architecture**: Consumes CloudEvents from the Shared Event Bus (`uk.nhs.notify...` namespace)
 - **Client Subscription Filtering**: Applies per-client rules for message status and channel status event types
 - **Webhook Delivery**: EventBridge API Destinations with per-client configuration and retry policies
 - **Failure Handling**: Per-client Dead Letter Queues
@@ -38,7 +38,7 @@ The Client Callbacks infrastructure processes message and channel status events,
 ### Components
 
 - **Shared Event Bus**: Cross-domain EventBridge bus receiving events from Core, Routing, and other NHS Notify domains
-- **Callback Event Queue**: SQS queue subscribed to `uk.nhs.notify.client-callbacks.*` events via EventBridge Target Rule
+- **Callback Event Queue**: SQS queue subscribed to `uk.nhs.notify...` events via EventBridge Target Rule
 - **Transform & Filter Lambda**: Processes events, loads client configurations, applies subscription filters, and routes to Callbacks Event Bus
 - **Callbacks Event Bus**: Domain-specific EventBridge bus for webhook orchestration
 - **API Destination Target Rules**: Per-client rules invoking HTTPS endpoints with client-specific authentication
@@ -47,7 +47,7 @@ The Client Callbacks infrastructure processes message and channel status events,
 
 ### Event Flow
 
-1. Status change events published to Shared Event Bus in `uk.nhs.notify.client-callbacks.*` namespace
+1. Status change events published to Shared Event Bus in `uk.nhs.notify...` namespace
 2. SQS Target Rule routes events to Callback Event Queue
 3. EventBridge Pipe invokes Transform & Filter Lambda with event batches
 4. Lambda loads client subscription configs from S3

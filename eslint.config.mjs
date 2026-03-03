@@ -210,6 +210,20 @@ export default defineConfig([
     },
   },
   {
+    // models src uses relative imports for node16 moduleResolution compatibility
+    files: ["src/models/src/**"],
+    rules: {
+      "no-relative-import-paths/no-relative-import-paths": 0,
+    },
+    settings: {
+      "import-x/resolver": {
+        typescript: {
+          project: ["src/models/tsconfig.json"],
+        },
+      },
+    },
+  },
+  {
     files: ["scripts/**"],
     rules: {
       "import-x/no-extraneous-dependencies": [
