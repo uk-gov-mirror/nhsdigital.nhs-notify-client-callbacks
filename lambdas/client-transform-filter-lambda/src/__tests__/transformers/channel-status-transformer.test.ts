@@ -14,8 +14,7 @@ describe("channel-status-transformer", () => {
     const channelStatusEvent: StatusPublishEvent<ChannelStatusData> = {
       specversion: "1.0",
       id: "SOME-GUID-a123-556677889999",
-      source:
-        "/nhs/england/notify/development/primary/data-plane/client-callbacks",
+      source: "/nhs/england/notify/development/primary/data-plane/messaging",
       subject:
         "customer/920fca11-596a-4eca-9c47-99f624614658/message/msg-456-abc/channel/nhsapp",
       type: "uk.nhs.notify.channel.status.PUBLISHED.v1",

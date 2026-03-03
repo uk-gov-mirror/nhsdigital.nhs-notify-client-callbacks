@@ -47,8 +47,7 @@ describe("Lambda handler", () => {
   const validMessageStatusEvent: StatusPublishEvent<MessageStatusData> = {
     specversion: "1.0",
     id: "661f9510-f39c-52e5-b827-557766551111",
-    source:
-      "/nhs/england/notify/development/primary/data-plane/client-callbacks",
+    source: "/nhs/england/notify/development/primary/data-plane/messaging",
     subject:
       "customer/920fca11-596a-4eca-9c47-99f624614658/message/msg-789-xyz",
     type: "uk.nhs.notify.message.status.PUBLISHED.v1",
@@ -183,8 +182,7 @@ describe("Lambda handler", () => {
     const validChannelStatusEvent: StatusPublishEvent<ChannelStatusData> = {
       specversion: "1.0",
       id: "channel-event-123",
-      source:
-        "/nhs/england/notify/development/primary/data-plane/client-callbacks",
+      source: "/nhs/england/notify/development/primary/data-plane/messaging",
       subject:
         "customer/920fca11-596a-4eca-9c47-99f624614658/message/msg-456-abc/channel/nhsapp",
       type: "uk.nhs.notify.channel.status.PUBLISHED.v1",
@@ -301,8 +299,7 @@ describe("Lambda handler", () => {
     const channelStatusEvent: StatusPublishEvent<ChannelStatusData> = {
       specversion: "1.0",
       id: "channel-event-456",
-      source:
-        "/nhs/england/notify/development/primary/data-plane/client-callbacks",
+      source: "/nhs/england/notify/development/primary/data-plane/messaging",
       subject:
         "customer/920fca11-596a-4eca-9c47-99f624614658/message/msg-456-abc/channel/sms",
       type: "uk.nhs.notify.channel.status.PUBLISHED.v1",
