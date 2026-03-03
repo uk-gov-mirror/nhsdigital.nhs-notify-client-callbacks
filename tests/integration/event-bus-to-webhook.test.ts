@@ -1,38 +1,27 @@
 import {
-  EventBridgeClient,
-  PutEventsCommand,
-} from "@aws-sdk/client-eventbridge";
-import type { PutEventsRequestEntry } from "@aws-sdk/client-eventbridge";
-import {
   GetQueueAttributesCommand,
   PurgeQueueCommand,
   SQSClient,
+  SendMessageCommand,
 } from "@aws-sdk/client-sqs";
 import { waitUntil } from "async-wait-until";
 import type {
   MessageStatusData,
   StatusPublishEvent,
 } from "@nhs-notify-client-callbacks/models";
-import { getMessageStatusCallbacks } from "helpers/index.js";
+import { getMessageStatusCallbacks } from "helpers";
 
 const publishEvent = async (
-  client: EventBridgeClient,
-  eventBusName: string,
+  client: SQSClient,
+  queueUrl: string,
   event: StatusPublishEvent,
 ) => {
-  const putEventsCommand = new PutEventsCommand({
-    Entries: [
-      {
-        EventBusName: eventBusName,
-        Source: event.source,
-        DetailType: event.type,
-        Detail: JSON.stringify(event),
-        Time: new Date(event.time),
-      } as PutEventsRequestEntry,
-    ],
+  const sendMessageCommand = new SendMessageCommand({
+    QueueUrl: queueUrl,
+    MessageBody: JSON.stringify(event),
   });
 
-  return client.send(putEventsCommand);
+  return client.send(sendMessageCommand);
 };
 
 const getQueueMessageCount = async (
@@ -104,32 +93,28 @@ const awaitMessageStatusCallbacks = async (
 };
 
 // eslint-disable-next-line jest/no-disabled-tests
-describe.skip("Event Bus to Webhook Integration", () => {
-  let eventBridgeClient: EventBridgeClient;
+describe.skip("SQS to Webhook Integration", () => {
   let sqsClient: SQSClient;
 
-  const TEST_EVENT_BUS_NAME =
-    process.env.TEST_EVENT_BUS_NAME || "nhs-notify-shared-event-bus-dev";
-  const { TEST_QUEUE_URL } = process.env;
-  const { TEST_WEBHOOK_URL } = process.env;
-  const { TEST_WEBHOOK_LOG_GROUP } = process.env;
+  const { TEST_CALLBACK_EVENT_QUEUE_URL } = process.env;
+  const { TEST_MOCK_WEBHOOK_URL } = process.env;
+  const { TEST_MOCK_WEBHOOK_LOG_GROUP } = process.env;
+  const { REGION } = process.env;
 
   beforeAll(() => {
-    eventBridgeClient = new EventBridgeClient({ region: "eu-west-2" });
-    sqsClient = new SQSClient({ region: "eu-west-2" });
+    sqsClient = new SQSClient({ region: REGION });
   });
 
   afterAll(() => {
-    eventBridgeClient.destroy();
     sqsClient.destroy();
   });
 
   beforeEach(async () => {
-    if (TEST_QUEUE_URL) {
+    if (TEST_CALLBACK_EVENT_QUEUE_URL) {
       try {
         await sqsClient.send(
           new PurgeQueueCommand({
-            QueueUrl: TEST_QUEUE_URL,
+            QueueUrl: TEST_CALLBACK_EVENT_QUEUE_URL,
           }),
         );
       } catch (error) {
@@ -141,20 +126,27 @@ describe.skip("Event Bus to Webhook Integration", () => {
   });
 
   describe("Message Status Event Flow", () => {
-    it("should process message status event from Event Bus to webhook", async () => {
-      if (!TEST_WEBHOOK_URL) {
+    it("should process message status event from SQS to webhook", async () => {
+      if (!TEST_MOCK_WEBHOOK_URL) {
         return;
       }
 
-      if (!TEST_WEBHOOK_LOG_GROUP) {
-        throw new Error("TEST_WEBHOOK_LOG_GROUP must be set for this test");
+      if (!TEST_MOCK_WEBHOOK_LOG_GROUP) {
+        throw new Error(
+          "TEST_MOCK_WEBHOOK_LOG_GROUP must be set for this test",
+        );
+      }
+
+      if (!TEST_CALLBACK_EVENT_QUEUE_URL) {
+        throw new Error(
+          "TEST_CALLBACK_EVENT_QUEUE_URL must be set for this test",
+        );
       }
 
       const messageStatusEvent: StatusPublishEvent<MessageStatusData> = {
         specversion: "1.0",
         id: crypto.randomUUID(),
-        source:
-          "/nhs/england/notify/development/primary/data-plane/client-callbacks",
+        source: "/nhs/england/notify/development/primary/data-plane/messaging",
         subject: `customer/${crypto.randomUUID()}/message/test-msg-${Date.now()}`,
         type: "uk.nhs.notify.message.status.PUBLISHED.v1",
         time: new Date().toISOString(),
@@ -184,23 +176,21 @@ describe.skip("Event Bus to Webhook Integration", () => {
         },
       };
 
-      const putEventsResponse = await publishEvent(
-        eventBridgeClient,
-        TEST_EVENT_BUS_NAME,
+      const sendMessageResponse = await publishEvent(
+        sqsClient,
+        TEST_CALLBACK_EVENT_QUEUE_URL,
         messageStatusEvent,
       );
 
-      expect(putEventsResponse.FailedEntryCount).toBe(0);
-      expect(putEventsResponse.Entries).toHaveLength(1);
-      expect(putEventsResponse.Entries![0].EventId).toBeDefined();
+      expect(sendMessageResponse.MessageId).toBeDefined();
 
-      await awaitQueueEmpty(sqsClient, TEST_QUEUE_URL, [
+      await awaitQueueEmpty(sqsClient, TEST_CALLBACK_EVENT_QUEUE_URL, [
         "ApproximateNumberOfMessages",
         "ApproximateNumberOfMessagesNotVisible",
       ]);
 
       const callbacks = await awaitMessageStatusCallbacks(
-        TEST_WEBHOOK_LOG_GROUP,
+        TEST_MOCK_WEBHOOK_LOG_GROUP,
         messageStatusEvent.data.messageId,
       );
 
@@ -214,71 +204,24 @@ describe.skip("Event Bus to Webhook Integration", () => {
         }),
       });
     }, 30_000);
-
-    it("should filter out events not matching client subscription", async () => {
-      if (!TEST_WEBHOOK_URL) {
-        return;
-      }
-
-      const messageStatusEvent: StatusPublishEvent<MessageStatusData> = {
-        specversion: "1.0",
-        id: crypto.randomUUID(),
-        source:
-          "/nhs/england/notify/development/primary/data-plane/client-callbacks",
-        subject: `customer/${crypto.randomUUID()}/message/test-msg-${Date.now()}`,
-        type: "uk.nhs.notify.message.status.PUBLISHED.v1",
-        time: new Date().toISOString(),
-        datacontenttype: "application/json",
-        dataschema:
-          "https://notify.nhs.uk/schemas/message-status-published-v1.json",
-        traceparent: "00-4d678967f96e353c07a0a31c1849b500-07f83ba58dd8df70-01",
-        data: {
-          clientId: "non-existent-client", // Client not in subscription config
-          messageId: `test-msg-${Date.now()}`,
-          messageReference: `test-ref-${Date.now()}`,
-          messageStatus: "DELIVERED",
-          channels: [
-            {
-              type: "NHSAPP",
-              channelStatus: "DELIVERED",
-            },
-          ],
-          timestamp: new Date().toISOString(),
-          routingPlan: {
-            id: `routing-plan-${crypto.randomUUID()}`,
-            name: "Test routing plan",
-            version: "v1.0.0",
-            createdDate: new Date().toISOString(),
-          },
-        },
-      };
-
-      const putEventsResponse = await publishEvent(
-        eventBridgeClient,
-        TEST_EVENT_BUS_NAME,
-        messageStatusEvent,
-      );
-
-      expect(putEventsResponse.FailedEntryCount).toBe(0);
-
-      await awaitQueueEmpty(sqsClient, TEST_QUEUE_URL, [
-        "ApproximateNumberOfMessages",
-        "ApproximateNumberOfMessagesNotVisible",
-      ]);
-    }, 30_000);
   });
 
   describe("Channel Status Event Flow", () => {
-    it("should process channel status event from Event Bus to webhook", async () => {
-      if (!TEST_WEBHOOK_URL) {
+    it("should process channel status event from SQS to webhook", async () => {
+      if (!TEST_MOCK_WEBHOOK_URL) {
         return;
+      }
+
+      if (!TEST_CALLBACK_EVENT_QUEUE_URL) {
+        throw new Error(
+          "TEST_CALLBACK_EVENT_QUEUE_URL must be set for this test",
+        );
       }
 
       const channelStatusEvent: StatusPublishEvent = {
         specversion: "1.0",
         id: crypto.randomUUID(),
-        source:
-          "/nhs/england/notify/development/primary/data-plane/client-callbacks",
+        source: "/nhs/england/notify/development/primary/data-plane/messaging",
         subject: `customer/${crypto.randomUUID()}/message/test-msg-${Date.now()}/channel/nhsapp`,
         type: "uk.nhs.notify.channel.status.PUBLISHED.v1",
         time: new Date().toISOString(),
@@ -301,17 +244,15 @@ describe.skip("Event Bus to Webhook Integration", () => {
         },
       };
 
-      const putEventsResponse = await publishEvent(
-        eventBridgeClient,
-        TEST_EVENT_BUS_NAME,
+      const sendMessageResponse = await publishEvent(
+        sqsClient,
+        TEST_CALLBACK_EVENT_QUEUE_URL,
         channelStatusEvent,
       );
 
-      expect(putEventsResponse.FailedEntryCount).toBe(0);
-      expect(putEventsResponse.Entries).toHaveLength(1);
-      expect(putEventsResponse.Entries![0].EventId).toBeDefined();
+      expect(sendMessageResponse.MessageId).toBeDefined();
 
-      await awaitQueueEmpty(sqsClient, TEST_QUEUE_URL);
+      await awaitQueueEmpty(sqsClient, TEST_CALLBACK_EVENT_QUEUE_URL);
     }, 30_000);
   });
 });

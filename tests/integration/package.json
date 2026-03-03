@@ -13,7 +13,6 @@
     "@aws-sdk/client-cloudwatch-logs": "^3.991.0"
   },
   "devDependencies": {
-    "@aws-sdk/client-eventbridge": "^3.990.0",
     "@aws-sdk/client-sqs": "^3.990.0",
     "@nhs-notify-client-callbacks/models": "*",
     "@tsconfig/node22": "^22.0.2",
