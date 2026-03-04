@@ -103,6 +103,17 @@ variable "clients" {
 
 }
 
+variable "pipe_log_level" {
+  type        = string
+  description = "Log level for the EventBridge Pipe."
+  default     = "ERROR"
+
+  validation {
+    condition     = contains(["OFF", "ERROR", "INFO", "TRACE"], var.pipe_log_level)
+    error_message = "pipe_log_level must be one of: OFF, ERROR, INFO, TRACE."
+  }
+}
+
 variable "pipe_sqs_input_batch_size" {
   type    = number
   default = 1
@@ -111,4 +122,10 @@ variable "pipe_sqs_input_batch_size" {
 variable "pipe_sqs_max_batch_window" {
   type    = number
   default = 2
+}
+
+variable "deploy_mock_webhook" {
+  type        = bool
+  description = "Flag to deploy mock webhook lambda for integration testing (test/dev environments only)"
+  default     = false
 }

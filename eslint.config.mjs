@@ -224,6 +224,13 @@ export default defineConfig([
     },
   },
   {
+    files: ["**/jest.config.ts"],
+    rules: {
+      "no-relative-import-paths/no-relative-import-paths": 0,
+      "import-x/no-relative-packages": 0,
+    },
+  },
+  {
     files: ["scripts/**"],
     rules: {
       "import-x/no-extraneous-dependencies": [

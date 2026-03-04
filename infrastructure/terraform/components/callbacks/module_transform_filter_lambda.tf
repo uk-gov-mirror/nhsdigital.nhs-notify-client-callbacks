@@ -1,5 +1,5 @@
 module "client_transform_filter_lambda" {
-  source = "git::https://github.com/NHSDigital/nhs-notify-shared-modules.git//infrastructure/modules/lambda?ref=v2.0.29"
+  source = "https://github.com/NHSDigital/nhs-notify-shared-modules/releases/download/v2.0.29/terraform-lambda.zip"
 
   function_name = "client-transform-filter"
   description   = "Lambda function that transforms and filters events coming to through the eventpipe"
@@ -35,6 +35,8 @@ module "client_transform_filter_lambda" {
   log_subscription_role_arn = local.acct.log_subscription_role_arn
 
   lambda_env_vars = {
+    ENVIRONMENT       = var.environment
+    METRICS_NAMESPACE = "nhs-notify-client-callbacks"
   }
 }
 
@@ -63,6 +65,19 @@ data "aws_iam_policy_document" "client_transform_filter_lambda" {
 
     resources = [
       "${module.client_config_bucket.arn}/*",
+    ]
+  }
+
+  statement {
+    sid    = "CloudWatchMetrics"
+    effect = "Allow"
+
+    actions = [
+      "cloudwatch:PutMetricData",
+    ]
+
+    resources = [
+      "*",
     ]
   }
 }

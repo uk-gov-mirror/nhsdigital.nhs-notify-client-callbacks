@@ -5,10 +5,7 @@ resource "aws_cloudwatch_event_rule" "main" {
 
   event_pattern = jsonencode({
     "detail" : {
-      "type" : var.client_detail,
-      "dataschemaversion" : [{
-        "prefix" : "1."
-      }]
+      "type" : var.client_detail
     }
   })
 }
@@ -19,8 +16,14 @@ resource "aws_cloudwatch_event_target" "main" {
   target_id      = "${local.csi}-${var.connection_name}"
   role_arn       = aws_iam_role.api_target_role.arn
   event_bus_name = var.client_bus_name
+  input_path     = "$.detail.transformedPayload"
 
   dead_letter_config {
     arn = module.target_dlq.sqs_queue_arn
+  }
+
+  retry_policy {
+    maximum_retry_attempts       = 3
+    maximum_event_age_in_seconds = 3600
   }
 }

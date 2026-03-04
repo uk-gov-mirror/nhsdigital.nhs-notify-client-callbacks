@@ -5,8 +5,8 @@ export default {
   coverageThreshold: {
     global: {
       ...nodeJestConfig.coverageThreshold?.global,
-      lines: 99,
-      statements: 99,
+      lines: 100,
+      statements: 100,
     },
   },
   coveragePathIgnorePatterns: [

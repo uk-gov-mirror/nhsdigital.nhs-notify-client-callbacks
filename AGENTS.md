@@ -81,7 +81,7 @@ When proposing a change, agents should:
 
   to catch formatting and basic lint issues. Domain specific checks will be defined in appropriate nested AGENTS.md files.
 
-- Suggest at least one extra validation step (for example `npm test` in a lambda, or triggering a specific workflow).
+- Suggest at least one extra validation step (for example `npm test:unit` in a lambda, or triggering a specific workflow).
 - Any required follow up activites which fall outside of the current task's scope should be clearly marked with a 'TODO: CCM-12345' comment. The human user should be prompted to create and provide a JIRA ticket ID to be added to the comment.
 
 ## Security & Safety
@@ -93,3 +93,11 @@ When proposing a change, agents should:
 ## Escalation / Blockers
 
 If you are blocked by an unavailable secret, unclear architectural constraint, missing upstream module, or failing tooling you cannot safely fix, stop and ask a single clear clarifying question rather than guessing.
+
+## Comment Policy
+
+- No JSDoc unless it's a public API with non-obvious behavior
+- No inline comments that just describe what the next line does
+- Only comment when explaining WHY, not WHAT
+- Prefer better naming over comments
+- Trust developers can read TypeScript

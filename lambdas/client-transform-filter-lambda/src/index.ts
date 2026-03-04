@@ -1,57 +1,34 @@
-export const handler = async (event: any) => {
-  // eslint-disable-next-line no-console
-  console.log("RAW EVENT:", JSON.stringify(event, null, 2));
+import type { SQSRecord } from "aws-lambda";
+import { Logger } from "services/logger";
+import { CallbackMetrics, createMetricLogger } from "services/metrics";
+import { ObservabilityService } from "services/observability";
+import { type TransformedEvent, processEvents } from "handler";
 
-  let parsedEvent: any;
-  try {
-    parsedEvent = typeof event === "string" ? JSON.parse(event) : event;
-  } catch (error) {
-    // eslint-disable-next-line no-console
-    console.error("Could not parse event string:", error);
-    return { body: {} };
-  }
+export interface HandlerDependencies {
+  createObservabilityService: () => ObservabilityService;
+}
 
-  let dataschemaversion: string | undefined;
-  let type: string | undefined;
+function createDefaultObservabilityService(): ObservabilityService {
+  const metricsLogger = createMetricLogger();
+  const metrics = new CallbackMetrics(metricsLogger);
+  const logger = new Logger();
 
-  function findFields(obj: any) {
-    if (!obj || typeof obj !== "object") return;
-    if (!dataschemaversion && "dataschemaversion" in obj)
-      dataschemaversion = obj.dataschemaversion;
-    if (!type && "type" in obj) type = obj.type;
+  return new ObservabilityService(logger, metrics, metricsLogger);
+}
 
-    for (const key of Object.keys(obj)) {
-      // eslint-disable-next-line security/detect-object-injection
-      const val = obj[key];
-      if (typeof val === "string") {
-        try {
-          const nested = JSON.parse(val);
-          findFields(nested);
-        } catch {
-          /* empty */
-        }
-      } else if (typeof val === "object") {
-        findFields(val);
-      }
-    }
-  }
+export function createHandler(
+  dependencies: Partial<HandlerDependencies> = {},
+): (event: SQSRecord[]) => Promise<TransformedEvent[]> {
+  const createObservabilityService =
+    dependencies.createObservabilityService ??
+    createDefaultObservabilityService;
 
-  if (Array.isArray(parsedEvent)) {
-    for (const item of parsedEvent) findFields(item);
-  } else {
-    findFields(parsedEvent);
-  }
-
-  if (!dataschemaversion || !type) {
-    // eslint-disable-next-line no-console
-    console.error("Failed to extract payload from event!");
-    return { body: {} };
-  }
-
-  return {
-    body: {
-      dataschemaversion,
-      type,
-    },
+  return async (event: SQSRecord[]): Promise<TransformedEvent[]> => {
+    const observability = createObservabilityService();
+    return processEvents(event, observability);
   };
-};
+}
+
+export const handler = createHandler();
+
+export { type TransformedEvent } from "handler";
