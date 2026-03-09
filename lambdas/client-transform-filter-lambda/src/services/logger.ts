@@ -10,15 +10,18 @@ export interface LogContext {
   [key: string]: any;
 }
 
-const basePinoLogger = pino({
-  level: process.env.LOG_LEVEL || "info",
-  formatters: {
-    level: (label: string) => {
-      return { level: label.toUpperCase() };
+const basePinoLogger = pino(
+  {
+    level: process.env.LOG_LEVEL || "info",
+    formatters: {
+      level: (label: string) => {
+        return { level: label.toUpperCase() };
+      },
     },
+    timestamp: () => `,"timestamp":"${new Date().toISOString()}"`,
   },
-  timestamp: () => `,"timestamp":"${new Date().toISOString()}"`,
-});
+  pino.destination({ sync: true }),
+);
 
 export class Logger {
   private pinoLogger: pino.Logger;

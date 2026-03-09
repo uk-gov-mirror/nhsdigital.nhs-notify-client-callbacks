@@ -6,17 +6,11 @@ const TEST_API_KEY = "test-api-key";
 jest.mock("pino", () => {
   const info = jest.fn();
   const error = jest.fn();
-  const mockPino = jest.fn(() => ({
-    info,
-    error,
-  }));
-
-  return {
-    __esModule: true,
-    default: mockPino,
-    info,
-    error,
-  };
+  const mockPino = jest.fn(() => ({ info, error }));
+  Object.defineProperty(mockPino, "destination", {
+    value: jest.fn(() => ({})),
+  });
+  return { __esModule: true, default: mockPino, info, error };
 });
 
 const DEFAULT_HEADERS = { "x-api-key": TEST_API_KEY };

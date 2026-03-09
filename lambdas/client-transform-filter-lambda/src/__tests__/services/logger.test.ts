@@ -8,14 +8,24 @@ import {
 } from "services/logger";
 
 jest.mock("pino", () => {
-  const mockLoggerMethods = {
-    info: jest.fn(),
-    warn: jest.fn(),
-    error: jest.fn(),
-    debug: jest.fn(),
-    child: jest.fn(),
+  const info = jest.fn();
+  const error = jest.fn();
+  const warn = jest.fn();
+  const debug = jest.fn();
+  const child = jest.fn();
+  const mockPino = jest.fn(() => ({ info, error, warn, debug, child }));
+  Object.defineProperty(mockPino, "destination", {
+    value: jest.fn(() => ({})),
+  });
+  return {
+    __esModule: true,
+    default: mockPino,
+    info,
+    error,
+    warn,
+    debug,
+    child,
   };
-  return jest.fn(() => mockLoggerMethods);
 });
 
 const mockLoggerMethods = pino() as any;

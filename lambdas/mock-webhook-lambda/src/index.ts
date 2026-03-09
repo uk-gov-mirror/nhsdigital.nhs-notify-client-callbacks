@@ -2,9 +2,12 @@ import type { APIGatewayProxyEvent, APIGatewayProxyResult } from "aws-lambda";
 import pino from "pino";
 import type { ClientCallbackPayload } from "@nhs-notify-client-callbacks/models";
 
-const logger = pino({
-  level: process.env.LOG_LEVEL || "info",
-});
+const logger = pino(
+  {
+    level: process.env.LOG_LEVEL || "info",
+  },
+  pino.destination({ sync: true }),
+);
 
 function isClientCallbackPayload(
   value: unknown,
