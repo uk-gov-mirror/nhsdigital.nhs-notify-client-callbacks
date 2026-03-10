@@ -47,7 +47,11 @@
 | <a name="module_sqs_inbound_event"></a> [sqs\_inbound\_event](#module\_sqs\_inbound\_event) | https://github.com/NHSDigital/nhs-notify-shared-modules/releases/download/v2.0.29/terraform-sqs.zip | n/a |
 ## Outputs
 
-No outputs.
+| Name | Description |
+|------|-------------|
+| <a name="output_deployment"></a> [deployment](#output\_deployment) | Deployment details used for post-deployment scripts |
+| <a name="output_mock_webhook_lambda_log_group_name"></a> [mock\_webhook\_lambda\_log\_group\_name](#output\_mock\_webhook\_lambda\_log\_group\_name) | CloudWatch log group name for mock webhook lambda (for integration test queries) |
+| <a name="output_mock_webhook_url"></a> [mock\_webhook\_url](#output\_mock\_webhook\_url) | URL endpoint for mock webhook (for TEST\_WEBHOOK\_URL environment variable) |
 <!-- vale on -->
 <!-- markdownlint-enable -->
 <!-- END_TF_DOCS -->

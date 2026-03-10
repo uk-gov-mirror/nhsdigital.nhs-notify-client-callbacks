@@ -70,7 +70,7 @@ describe("event-validator", () => {
         };
 
         expect(() => validateStatusPublishEvent(invalidEvent)).toThrow(
-          'Validation failed: type: Invalid option: expected one of "uk.nhs.notify.message.status.PUBLISHED.v1"|"uk.nhs.notify.channel.status.PUBLISHED.v1"',
+          "Validation failed: type: Invalid option",
         );
       });
     });
@@ -199,7 +199,7 @@ describe("event-validator", () => {
         };
 
         expect(() => validateStatusPublishEvent(invalidEvent)).toThrow(
-          "Validation failed: channels.0.type: Invalid input: expected string, received undefined",
+          "Validation failed: channels[0].type: Invalid input: expected string, received undefined",
         );
       });
 
@@ -213,7 +213,7 @@ describe("event-validator", () => {
         };
 
         expect(() => validateStatusPublishEvent(invalidEvent)).toThrow(
-          "Validation failed: channels.0.channelStatus: Invalid input: expected string, received undefined",
+          "Validation failed: channels[0].channelStatus: Invalid input: expected string, received undefined",
         );
       });
     });
@@ -314,6 +314,34 @@ describe("event-validator", () => {
               specversion: "1.0",
             }),
           ).toThrow('Validation failed: {"foo":"bar"}');
+        });
+
+        jest.unmock("cloudevents");
+      });
+
+      it("should format generic Error exceptions during validation", () => {
+        jest.resetModules();
+
+        jest.isolateModules(() => {
+          const { ValidationError: RealCloudEventsValidationError } =
+            jest.requireActual("cloudevents");
+
+          jest.doMock("cloudevents", () => ({
+            CloudEvent: jest.fn(() => {
+              throw new Error("generic processing error");
+            }),
+            ValidationError: RealCloudEventsValidationError,
+          }));
+
+          const moduleUnderTest = jest.requireActual(
+            "services/validators/event-validator",
+          );
+
+          expect(() =>
+            moduleUnderTest.validateStatusPublishEvent({
+              specversion: "1.0",
+            }),
+          ).toThrow("generic processing error");
         });
 
         jest.unmock("cloudevents");

@@ -21,7 +21,7 @@ describe("callback-logger", () => {
   });
 
   describe("logCallbackGenerated", () => {
-    describe("MESSAGE_STATUS_TRANSITIONED events", () => {
+    describe("MESSAGE_STATUS_PUBLISHED events", () => {
       const messageStatusPayload: ClientCallbackPayload = {
         data: [
           {

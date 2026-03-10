@@ -7,4 +7,7 @@ export default {
     ...(nodeJestConfig.coveragePathIgnorePatterns ?? []),
     "/helpers/",
   ],
+  moduleNameMapper: {
+    "^helpers$": "<rootDir>/helpers/index",
+  },
 };

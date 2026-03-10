@@ -35,8 +35,11 @@ module "client_transform_filter_lambda" {
   log_subscription_role_arn = local.acct.log_subscription_role_arn
 
   lambda_env_vars = {
-    ENVIRONMENT       = var.environment
-    METRICS_NAMESPACE = "nhs-notify-client-callbacks"
+    ENVIRONMENT                           = var.environment
+    METRICS_NAMESPACE                     = "nhs-notify-client-callbacks-metrics"
+    CLIENT_SUBSCRIPTION_CONFIG_BUCKET     = module.client_config_bucket.id
+    CLIENT_SUBSCRIPTION_CONFIG_PREFIX     = "client_subscriptions/"
+    CLIENT_SUBSCRIPTION_CACHE_TTL_SECONDS = "60"
   }
 }
 

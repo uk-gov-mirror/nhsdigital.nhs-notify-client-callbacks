@@ -1,6 +1,7 @@
 {
   "devDependencies": {
     "@stylistic/eslint-plugin": "^3.1.0",
+    "@aws-sdk/client-s3": "^3.821.0",
     "@tsconfig/node22": "^22.0.2",
     "@types/jest": "^29.5.14",
     "@typescript-eslint/parser": "^8.56.1",
@@ -35,7 +36,8 @@
     "pretty-format": {
       "react-is": "19.0.0"
     },
-    "minimatch": "^10.2.2"
+    "minimatch@^3.0.0": "^3.1.5",
+    "minimatch": "^10.2.4"
   },
   "scripts": {
     "generate-dependencies": "npm run generate-dependencies --workspaces --if-present",
@@ -45,12 +47,16 @@
     "test:integration": "npm run test:integration --workspace tests/integration",
     "test:unit": "npm run test:unit --workspaces",
     "typecheck": "npm run typecheck --workspaces",
-    "verify": "npm run lint && npm run typecheck && npm run test:unit"
+    "verify": "npm run lint && npm run typecheck && npm run test:unit",
+    "subscriptions:get": "npm run get-by-client-id --workspace tools/client-subscriptions-management --",
+    "subscriptions:put-channel-status": "npm run put-channel-status --workspace tools/client-subscriptions-management --",
+    "subscriptions:put-message-status": "npm run put-message-status --workspace tools/client-subscriptions-management --"
   },
   "workspaces": [
     "lambdas/client-transform-filter-lambda",
     "src/models",
     "lambdas/mock-webhook-lambda",
-    "tests/integration"
+    "tests/integration",
+    "tools/client-subscriptions-management"
   ]
 }

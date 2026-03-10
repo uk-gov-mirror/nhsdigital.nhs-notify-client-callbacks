@@ -1,24 +1,21 @@
+import type { Channel } from "./channel-types";
+import type {
+  ChannelStatus,
+  MessageStatus,
+  SupplierStatus,
+} from "./status-types";
+
 export type ClientSubscriptionConfiguration = (
   | MessageStatusSubscriptionConfiguration
   | ChannelStatusSubscriptionConfiguration
 )[];
 
 interface SubscriptionConfigurationBase {
-  Name: string;
+  SubscriptionId: string;
   ClientId: string;
-  Description: string;
-  EventSource: string;
-  EventDetail: string;
   Targets: {
     Type: "API";
     TargetId: string;
-    Name: string;
-    InputTransformer: {
-      InputPaths: string;
-      InputHeaders: {
-        "x-hmac-sha256-signature": string;
-      };
-    };
     InvocationEndpoint: string;
     InvocationMethod: "POST";
     InvocationRateLimit: number;
@@ -29,14 +26,16 @@ interface SubscriptionConfigurationBase {
   }[];
 }
 
-export interface MessageStatusSubscriptionConfiguration extends SubscriptionConfigurationBase {
+export interface MessageStatusSubscriptionConfiguration
+  extends SubscriptionConfigurationBase {
   SubscriptionType: "MessageStatus";
-  Statuses: string[];
+  MessageStatuses: MessageStatus[];
 }
 
-export interface ChannelStatusSubscriptionConfiguration extends SubscriptionConfigurationBase {
+export interface ChannelStatusSubscriptionConfiguration
+  extends SubscriptionConfigurationBase {
   SubscriptionType: "ChannelStatus";
-  ChannelType: string;
-  ChannelStatuses: string[];
-  SupplierStatuses: string[];
+  ChannelType: Channel;
+  ChannelStatuses: ChannelStatus[];
+  SupplierStatuses: SupplierStatus[];
 }

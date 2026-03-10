@@ -131,4 +131,28 @@ describe("CallbackMetrics", () => {
       );
     });
   });
+
+  describe("emitFilteringStarted", () => {
+    it("should emit FilteringStarted metric", () => {
+      callbackMetrics.emitFilteringStarted();
+
+      expect(mockPutMetric).toHaveBeenCalledWith(
+        "FilteringStarted",
+        1,
+        Unit.Count,
+      );
+    });
+  });
+
+  describe("emitFilteringMatched", () => {
+    it("should emit FilteringMatched metric", () => {
+      callbackMetrics.emitFilteringMatched();
+
+      expect(mockPutMetric).toHaveBeenCalledWith(
+        "FilteringMatched",
+        1,
+        Unit.Count,
+      );
+    });
+  });
 });

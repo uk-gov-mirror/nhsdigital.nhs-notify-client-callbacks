@@ -2,10 +2,14 @@ import type { SQSRecord } from "aws-lambda";
 import { Logger } from "services/logger";
 import { CallbackMetrics, createMetricLogger } from "services/metrics";
 import { ObservabilityService } from "services/observability";
+import { ConfigLoaderService } from "services/config-loader-service";
 import { type TransformedEvent, processEvents } from "handler";
 
+export const configLoaderService = new ConfigLoaderService();
+
 export interface HandlerDependencies {
-  createObservabilityService: () => ObservabilityService;
+  createObservabilityService?: () => ObservabilityService;
+  createConfigLoaderService?: () => ConfigLoaderService;
 }
 
 function createDefaultObservabilityService(): ObservabilityService {
@@ -16,16 +20,23 @@ function createDefaultObservabilityService(): ObservabilityService {
   return new ObservabilityService(logger, metrics, metricsLogger);
 }
 
+function createDefaultConfigLoaderService(): ConfigLoaderService {
+  return configLoaderService;
+}
+
 export function createHandler(
   dependencies: Partial<HandlerDependencies> = {},
 ): (event: SQSRecord[]) => Promise<TransformedEvent[]> {
   const createObservabilityService =
     dependencies.createObservabilityService ??
     createDefaultObservabilityService;
+  const configLoader = (
+    dependencies.createConfigLoaderService ?? createDefaultConfigLoaderService
+  )();
 
   return async (event: SQSRecord[]): Promise<TransformedEvent[]> => {
     const observability = createObservabilityService();
-    return processEvents(event, observability);
+    return processEvents(event, observability, configLoader.getLoader());
   };
 }
 

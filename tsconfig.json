@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json.schemastore.org/tsconfig",
+  "compilerOptions": {
+    "noEmit": true
+  },
+  "extends": "./tsconfig.base.json",
+  "include": [
+    "lambdas/*/src/**/*",
+    "scripts/*/src/**/*",
+    "tools/*/src/**/*",
+    "src/**/*",
+    "tests/**/*"
+  ]
+}

@@ -1,8 +1,10 @@
 import {
+  ConfigValidationError,
   ErrorType,
   LambdaError,
   TransformationError,
   ValidationError,
+  formatValidationIssuePath,
   getEventError,
   wrapUnknownError,
 } from "services/error-handler";
@@ -122,6 +124,60 @@ describe("TransformationError", () => {
   it("should be instance of LambdaError and Error", () => {
     const error = new TransformationError("Test");
     expect(error).toBeInstanceOf(TransformationError);
+    expect(error).toBeInstanceOf(LambdaError);
+    expect(error).toBeInstanceOf(Error);
+  });
+});
+
+describe("formatValidationIssuePath", () => {
+  it("returns empty string for empty path", () => {
+    expect(formatValidationIssuePath([])).toBe("");
+  });
+
+  it("returns string segment directly at root", () => {
+    expect(formatValidationIssuePath(["traceparent"])).toBe("traceparent");
+  });
+
+  it("uses dot notation for nested string segments", () => {
+    expect(formatValidationIssuePath(["data", "clientId"])).toBe(
+      "data.clientId",
+    );
+  });
+
+  it("uses bracket notation for numeric segments", () => {
+    expect(formatValidationIssuePath([0])).toBe("[0]");
+  });
+
+  it("combines bracket and dot notation for mixed paths", () => {
+    expect(formatValidationIssuePath(["channels", 0, "type"])).toBe(
+      "channels[0].type",
+    );
+  });
+});
+
+describe("ConfigValidationError", () => {
+  it("should create error with issues array", () => {
+    const issues = [
+      {
+        path: "[0].SubscriptionId",
+        message: "Expected SubscriptionId to be unique",
+      },
+    ];
+    const error = new ConfigValidationError(issues);
+
+    expect(error.message).toBe(
+      "Client subscription configuration validation failed",
+    );
+    expect(error.issues).toBe(issues);
+    expect(error.errorType).toBe(ErrorType.VALIDATION_ERROR);
+    expect(error.retryable).toBe(false);
+    expect(error.correlationId).toBeUndefined();
+    expect(error.name).toBe("ConfigValidationError");
+  });
+
+  it("should be instanceof LambdaError and Error", () => {
+    const error = new ConfigValidationError([]);
+    expect(error).toBeInstanceOf(ConfigValidationError);
     expect(error).toBeInstanceOf(LambdaError);
     expect(error).toBeInstanceOf(Error);
   });
@@ -297,5 +353,24 @@ describe("getEventError", () => {
     );
     expect(mockMetrics.emitTransformationFailure).toHaveBeenCalled();
     expect(mockMetrics.emitValidationError).not.toHaveBeenCalled();
+  });
+
+  it("should return ConfigValidationError and emit validation metric", () => {
+    const error = new ConfigValidationError([
+      {
+        path: "[0].SubscriptionId",
+        message: "Expected SubscriptionId to be unique",
+      },
+    ]);
+
+    const result = getEventError(error, mockMetrics, mockEventLogger);
+
+    expect(result).toBe(error);
+    expect(mockEventLogger.error).toHaveBeenCalledWith(
+      "Client config validation failed",
+      { error },
+    );
+    expect(mockMetrics.emitValidationError).toHaveBeenCalled();
+    expect(mockMetrics.emitTransformationFailure).not.toHaveBeenCalled();
   });
 });

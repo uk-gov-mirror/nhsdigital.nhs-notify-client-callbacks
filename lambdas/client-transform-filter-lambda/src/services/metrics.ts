@@ -39,4 +39,12 @@ export class CallbackMetrics {
   emitValidationError(): void {
     this.metrics.putMetric("ValidationErrors", 1, Unit.Count);
   }
+
+  emitFilteringStarted(): void {
+    this.metrics.putMetric("FilteringStarted", 1, Unit.Count);
+  }
+
+  emitFilteringMatched(): void {
+    this.metrics.putMetric("FilteringMatched", 1, Unit.Count);
+  }
 }

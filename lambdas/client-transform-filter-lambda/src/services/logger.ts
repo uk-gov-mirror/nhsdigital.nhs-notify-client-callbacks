@@ -82,6 +82,8 @@ export function logLifecycleEvent(
     | "processing-started"
     | "transformation-started"
     | "transformation-completed"
+    | "filtering-started"
+    | "filtering-matched"
     | "delivery-initiated"
     | "batch-processing-completed",
   context: LogContext,

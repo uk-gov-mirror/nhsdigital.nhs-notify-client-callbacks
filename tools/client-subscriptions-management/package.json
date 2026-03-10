@@ -1,0 +1,32 @@
+{
+  "name": "client-subscriptions-management",
+  "version": "0.0.1",
+  "private": true,
+  "main": "src/index.ts",
+  "scripts": {
+    "get-by-client-id": "tsx ./src/entrypoint/cli/get-client-subscriptions.ts",
+    "put-channel-status": "tsx ./src/entrypoint/cli/put-channel-status.ts",
+    "put-message-status": "tsx ./src/entrypoint/cli/put-message-status.ts",
+    "deploy": "tsx ./src/entrypoint/cli/deploy.ts",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "test:unit": "jest",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@aws-sdk/client-s3": "^3.821.0",
+    "@aws-sdk/client-sts": "^3.1004.0",
+    "@aws-sdk/credential-providers": "^3.1004.0",
+    "@nhs-notify-client-callbacks/models": "*",
+    "table": "^6.9.0",
+    "yargs": "^17.7.2",
+    "zod": "^4.3.6"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.10",
+    "@types/yargs": "^17.0.24",
+    "eslint": "^9.27.0",
+    "tsx": "^4.19.3",
+    "typescript": "^5.8.2"
+  }
+}

@@ -44,6 +44,38 @@ export class TransformationError extends LambdaError {
   }
 }
 
+export type ValidationIssue = {
+  path: string;
+  message: string;
+};
+
+export function formatValidationIssuePath(path: (string | number)[]): string {
+  let formatted = "";
+
+  for (const segment of path) {
+    if (typeof segment === "number") {
+      formatted = `${formatted}[${segment}]`;
+    } else if (formatted) {
+      formatted = `${formatted}.${segment}`;
+    } else {
+      formatted = segment;
+    }
+  }
+
+  return formatted;
+}
+
+export class ConfigValidationError extends LambdaError {
+  constructor(public readonly issues: ValidationIssue[]) {
+    super(
+      ErrorType.VALIDATION_ERROR,
+      "Client subscription configuration validation failed",
+      undefined,
+      false,
+    );
+  }
+}
+
 function serializeUnknownError(error: unknown): string {
   if (typeof error === "string") {
     return error;
@@ -103,6 +135,14 @@ export function getEventError(
     error instanceof ValidationError || error instanceof TransformationError
       ? error.correlationId
       : "unknown";
+
+  if (error instanceof ConfigValidationError) {
+    eventLogger.error("Client config validation failed", {
+      error,
+    });
+    metrics.emitValidationError();
+    return error;
+  }
 
   if (error instanceof ValidationError) {
     eventLogger.error("Event validation failed", {

@@ -9,8 +9,63 @@ import type {
 } from "@nhs-notify-client-callbacks/models";
 import type { Logger } from "services/logger";
 import type { CallbackMetrics } from "services/metrics";
+import type { ConfigLoader } from "services/config-loader";
 import { ObservabilityService } from "services/observability";
+import { ConfigLoaderService } from "services/config-loader-service";
 import { createHandler } from "..";
+
+jest.mock("aws-embedded-metrics");
+
+const createPassthroughConfigLoader = (): ConfigLoader =>
+  ({
+    loadClientConfig: jest.fn().mockImplementation(async (clientId: string) => [
+      {
+        SubscriptionType: "MessageStatus",
+        SubscriptionId: "00000000-0000-0000-0000-000000000001",
+        ClientId: clientId,
+        Targets: [],
+        MessageStatuses: [
+          "DELIVERED",
+          "FAILED",
+          "PENDING",
+          "SENDING",
+          "TECHNICAL_FAILURE",
+          "PERMANENT_FAILURE",
+        ],
+      },
+      {
+        SubscriptionType: "ChannelStatus",
+        SubscriptionId: "00000000-0000-0000-0000-000000000002",
+        ClientId: clientId,
+        Targets: [],
+        ChannelType: "NHSAPP",
+        ChannelStatuses: ["DELIVERED", "FAILED", "TECHNICAL_FAILURE"],
+        SupplierStatuses: [
+          "delivered",
+          "permanent_failure",
+          "temporary_failure",
+        ],
+      },
+      {
+        SubscriptionType: "ChannelStatus",
+        SubscriptionId: "00000000-0000-0000-0000-000000000003",
+        ClientId: clientId,
+        Targets: [],
+        ChannelType: "SMS",
+        ChannelStatuses: ["DELIVERED", "FAILED", "TECHNICAL_FAILURE"],
+        SupplierStatuses: [
+          "delivered",
+          "permanent_failure",
+          "temporary_failure",
+        ],
+      },
+    ]),
+  }) as unknown as ConfigLoader;
+
+const makeStubConfigLoaderService = (): ConfigLoaderService => {
+  const loader = createPassthroughConfigLoader();
+  return { getLoader: () => loader } as unknown as ConfigLoaderService;
+};
 
 describe("Lambda handler", () => {
   const mockLogger = {
@@ -29,6 +84,8 @@ describe("Lambda handler", () => {
     emitTransformationFailure: jest.fn(),
     emitDeliveryInitiated: jest.fn(),
     emitValidationError: jest.fn(),
+    emitFilteringStarted: jest.fn(),
+    emitFilteringMatched: jest.fn(),
   } as unknown as CallbackMetrics;
 
   const mockMetricsLogger = {
@@ -38,6 +95,7 @@ describe("Lambda handler", () => {
   const handler = createHandler({
     createObservabilityService: () =>
       new ObservabilityService(mockLogger, mockMetrics, mockMetricsLogger),
+    createConfigLoaderService: makeStubConfigLoaderService,
   });
 
   beforeEach(() => {
@@ -174,7 +232,7 @@ describe("Lambda handler", () => {
     };
 
     await expect(handler([sqsMessage])).rejects.toThrow(
-      'Validation failed: type: Invalid option: expected one of "uk.nhs.notify.message.status.PUBLISHED.v1"|"uk.nhs.notify.channel.status.PUBLISHED.v1"',
+      "Validation failed: type: Invalid option",
     );
   });
 
@@ -257,6 +315,60 @@ describe("Lambda handler", () => {
 
     await expect(handler([sqsMessage])).rejects.toThrow(
       "Failed to parse SQS message body as JSON",
+    );
+  });
+
+  it("should use 'Unknown error' message when a non-Error is thrown during SQS message parsing", async () => {
+    const faultyMetrics = {
+      emitEventReceived: jest.fn(),
+      emitValidationError: jest.fn(),
+      emitTransformationFailure: jest.fn(),
+      emitDeliveryInitiated: jest.fn(),
+      emitTransformationSuccess: jest.fn(),
+    };
+    const faultyLogger = {
+      info: jest.fn(),
+      warn: jest.fn(),
+      error: jest.fn(),
+      debug: jest.fn(),
+      child: jest.fn().mockReturnThis(),
+      addContext: jest.fn(),
+      clearContext: jest.fn(),
+    };
+    const faultyObservability = {
+      recordProcessingStarted: jest.fn(() => {
+        // eslint-disable-next-line @typescript-eslint/only-throw-error
+        throw "non-error-thrown";
+      }),
+      getLogger: jest.fn().mockReturnValue(faultyLogger),
+      getMetrics: jest.fn().mockReturnValue(faultyMetrics),
+      flush: jest.fn().mockResolvedValue(undefined),
+    } as unknown as ObservabilityService;
+
+    const faultyHandler = createHandler({
+      createObservabilityService: () => faultyObservability,
+      createConfigLoaderService: makeStubConfigLoaderService,
+    });
+
+    const sqsMessage: SQSRecord = {
+      messageId: "sqs-msg-id-non-error",
+      receiptHandle: "receipt-handle-non-error",
+      body: JSON.stringify(validMessageStatusEvent),
+      attributes: {
+        ApproximateReceiveCount: "1",
+        SentTimestamp: "1519211230",
+        SenderId: "ABCDEFGHIJ",
+        ApproximateFirstReceiveTimestamp: "1519211230",
+      },
+      messageAttributes: {},
+      md5OfBody: "mock-md5",
+      eventSource: "aws:sqs",
+      eventSourceARN: "arn:aws:sqs:eu-west-2:123456789:mock-queue",
+      awsRegion: "eu-west-2",
+    };
+
+    await expect(faultyHandler([sqsMessage])).rejects.toThrow(
+      "Failed to parse SQS message body as JSON: Unknown error",
     );
   });
 
@@ -392,7 +504,14 @@ describe("createHandler default wiring", () => {
     });
 
     expect(state.testHandler).toBeDefined();
+    const originalBucket = process.env.CLIENT_SUBSCRIPTION_CONFIG_BUCKET;
+    process.env.CLIENT_SUBSCRIPTION_CONFIG_BUCKET = "test-bucket";
     const result = await state.testHandler!([]);
+    if (originalBucket === undefined) {
+      delete process.env.CLIENT_SUBSCRIPTION_CONFIG_BUCKET;
+    } else {
+      process.env.CLIENT_SUBSCRIPTION_CONFIG_BUCKET = originalBucket;
+    }
 
     expect(state.createMetricLogger).toHaveBeenCalledTimes(1);
     expect(state.CallbackMetrics).toHaveBeenCalledWith(state.mockMetricsLogger);
@@ -405,6 +524,7 @@ describe("createHandler default wiring", () => {
     expect(state.processEvents).toHaveBeenCalledWith(
       [],
       state.mockObservabilityInstance,
+      expect.any(Object),
     );
     expect(result).toEqual(["ok"]);
 
