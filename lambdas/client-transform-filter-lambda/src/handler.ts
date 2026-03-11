@@ -9,6 +9,8 @@ import { transformEvent } from "services/transformers/event-transformer";
 import { extractCorrelationId } from "services/logger";
 import { ValidationError, getEventError } from "services/error-handler";
 import type { ObservabilityService } from "services/observability";
+import type { ConfigLoader } from "services/config-loader";
+import { evaluateSubscriptionFilters } from "services/subscription-filter";
 
 const BATCH_CONCURRENCY = Number(process.env.BATCH_CONCURRENCY) || 10;
 
@@ -20,6 +22,8 @@ class BatchStats {
   successful = 0;
 
   failed = 0;
+
+  filtered = 0;
 
   processed = 0;
 
@@ -33,10 +37,15 @@ class BatchStats {
     this.processed += 1;
   }
 
+  recordFiltered(): void {
+    this.filtered += 1;
+  }
+
   toObject() {
     return {
       successful: this.successful,
       failed: this.failed,
+      filtered: this.filtered,
       processed: this.processed,
     };
   }
@@ -117,6 +126,62 @@ function recordDeliveryInitiated(
   }
 }
 
+async function filterBatch(
+  transformedEvents: TransformedEvent[],
+  configLoader: ConfigLoader,
+  observability: ObservabilityService,
+  stats: BatchStats,
+): Promise<TransformedEvent[]> {
+  observability.recordFilteringStarted({ batchSize: transformedEvents.length });
+
+  const uniqueClientIds = new Set(
+    transformedEvents.map((e) => e.data.clientId),
+  );
+
+  const configEntries = await pMap(
+    uniqueClientIds,
+    async (clientId) => {
+      const config = await configLoader.loadClientConfig(clientId);
+      return [clientId, config] as const;
+    },
+    { concurrency: BATCH_CONCURRENCY },
+  );
+
+  const configByClientId = new Map(configEntries);
+
+  const filtered: TransformedEvent[] = [];
+
+  for (const event of transformedEvents) {
+    const { clientId } = event.data;
+    const config = configByClientId.get(clientId);
+    const filterResult = evaluateSubscriptionFilters(event, config);
+
+    if (filterResult.matched) {
+      filtered.push(event);
+      const targetIds = config?.flatMap((s) =>
+        s.Targets.map((t) => t.TargetId),
+      );
+      observability.recordFilteringMatched({
+        clientId,
+        eventType: event.type,
+        subscriptionType: filterResult.subscriptionType,
+        targetIds,
+      });
+    } else {
+      stats.recordFiltered();
+      observability
+        .getLogger()
+        .info("Event filtered out - no matching subscription", {
+          clientId,
+          eventType: event.type,
+          subscriptionType: filterResult.subscriptionType,
+        });
+    }
+  }
+
+  return filtered;
+}
+
 async function transformBatch(
   sqsRecords: SQSRecord[],
   observability: ObservabilityService,
@@ -146,12 +211,20 @@ async function transformBatch(
 export async function processEvents(
   event: SQSRecord[],
   observability: ObservabilityService,
+  configLoader: ConfigLoader,
 ): Promise<TransformedEvent[]> {
   const startTime = Date.now();
   const stats = new BatchStats();
 
   try {
     const transformedEvents = await transformBatch(event, observability, stats);
+
+    const filteredEvents = await filterBatch(
+      transformedEvents,
+      configLoader,
+      observability,
+      stats,
+    );
 
     const processingTime = Date.now() - startTime;
     observability.logBatchProcessingCompleted({
@@ -160,10 +233,10 @@ export async function processEvents(
       processingTimeMs: processingTime,
     });
 
-    recordDeliveryInitiated(transformedEvents, observability);
+    recordDeliveryInitiated(filteredEvents, observability);
 
     await observability.flush();
-    return transformedEvents;
+    return filteredEvents;
   } catch (error) {
     stats.recordFailure();
 

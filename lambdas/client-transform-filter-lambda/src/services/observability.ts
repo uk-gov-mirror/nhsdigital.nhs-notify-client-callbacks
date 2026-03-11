@@ -39,9 +39,25 @@ export class ObservabilityService {
     logLifecycleEvent(this.logger, "transformation-started", context);
   }
 
+  recordFilteringStarted(context: { batchSize: number }): void {
+    logLifecycleEvent(this.logger, "filtering-started", context);
+    this.metrics.emitFilteringStarted();
+  }
+
+  recordFilteringMatched(context: {
+    clientId: string;
+    eventType: string;
+    subscriptionType: string;
+    targetIds?: string[];
+  }): void {
+    logLifecycleEvent(this.logger, "filtering-matched", context);
+    this.metrics.emitFilteringMatched();
+  }
+
   logBatchProcessingCompleted(context: {
     successful: number;
     failed: number;
+    filtered: number;
     processed: number;
     batchSize: number;
     processingTimeMs: number;

@@ -7,7 +7,10 @@ import {
   EventTypes,
   type StatusPublishEvent,
 } from "@nhs-notify-client-callbacks/models";
-import { ValidationError } from "services/error-handler";
+import {
+  ValidationError,
+  formatValidationIssuePath,
+} from "services/error-handler";
 import { extractCorrelationId } from "services/logger";
 
 const NHSNotifyExtensionsSchema = z.object({
@@ -66,7 +69,15 @@ function formatValidationError(error: unknown, event: unknown): never {
     message = `CloudEvents validation failed: ${error.message}`;
   } else if (error instanceof z.ZodError) {
     const issues = error.issues
-      .map((issue) => `${issue.path.join(".")}: ${issue.message}`)
+      .map((issue) => {
+        const path = formatValidationIssuePath(
+          issue.path.filter(
+            (segment): segment is string | number =>
+              typeof segment === "string" || typeof segment === "number",
+          ),
+        );
+        return path ? `${path}: ${issue.message}` : issue.message;
+      })
       .join(", ");
     message = `Validation failed: ${issues}`;
   } else if (error instanceof Error) {

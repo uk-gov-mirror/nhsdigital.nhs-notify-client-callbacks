@@ -101,6 +101,7 @@ export default defineConfig([
         },
       ],
       "unicorn/no-null": 0,
+      "unicorn/no-useless-undefined": 0,
       "unicorn/prefer-module": 0,
       "unicorn/import-style": [
         2,
@@ -237,6 +238,20 @@ export default defineConfig([
         "error",
         { devDependencies: true },
       ],
+    },
+  },
+  {
+    files: ["tools/client-subscriptions-management/**/*.ts"],
+    rules: {
+      "no-console": "off",
+      "import-x/first": "off",
+    },
+  },
+  {
+    files: ["lambdas/client-transform-filter-lambda/**/*.ts"],
+    rules: {
+      "no-console": "off",
+      "import-x/first": "off",
     },
   },
 

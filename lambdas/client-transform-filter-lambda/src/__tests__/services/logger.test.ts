@@ -309,6 +309,16 @@ describe("extractCorrelationId", () => {
 
     expect(correlationId).toBeUndefined();
   });
+
+  it("should return undefined when id is present but not a string", () => {
+    const event = {
+      id: 42,
+    };
+
+    const correlationId = extractCorrelationId(event);
+
+    expect(correlationId).toBeUndefined();
+  });
 });
 
 describe("logLifecycleEvent", () => {
