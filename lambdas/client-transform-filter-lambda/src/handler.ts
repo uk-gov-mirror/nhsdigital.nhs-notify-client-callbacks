@@ -13,6 +13,7 @@ import type { ConfigLoader } from "services/config-loader";
 import { evaluateSubscriptionFilters } from "services/subscription-filter";
 
 const BATCH_CONCURRENCY = Number(process.env.BATCH_CONCURRENCY) || 10;
+const MESSAGE_ROOT_URI = process.env.MESSAGE_ROOT_URI ?? "";
 
 export interface TransformedEvent extends StatusPublishEvent {
   transformedPayload: ClientCallbackPayload;
@@ -94,7 +95,7 @@ function processSingleEvent(
     messageId,
   });
 
-  const callbackPayload = transformEvent(event, correlationId);
+  const callbackPayload = transformEvent(event, correlationId, MESSAGE_ROOT_URI);
 
   observability.recordCallbackGenerated(
     callbackPayload,

@@ -158,3 +158,8 @@ variable "deploy_mock_webhook" {
   description = "Flag to deploy mock webhook lambda for integration testing (test/dev environments only)"
   default     = false
 }
+
+variable "message_root_uri" {
+  type        = string
+  description = "The root URI used for constructing message links in callback payloads"
+}

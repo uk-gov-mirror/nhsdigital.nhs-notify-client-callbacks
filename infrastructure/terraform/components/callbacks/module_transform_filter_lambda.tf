@@ -41,6 +41,7 @@ module "client_transform_filter_lambda" {
     CLIENT_SUBSCRIPTION_CONFIG_BUCKET     = module.client_config_bucket.id
     CLIENT_SUBSCRIPTION_CONFIG_PREFIX     = "client_subscriptions/"
     CLIENT_SUBSCRIPTION_CACHE_TTL_SECONDS = "60"
+    MESSAGE_ROOT_URI                      = var.message_root_uri
   }
 }
 

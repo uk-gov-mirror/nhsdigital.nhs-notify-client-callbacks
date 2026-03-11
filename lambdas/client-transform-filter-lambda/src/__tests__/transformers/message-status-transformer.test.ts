@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { transformMessageStatus } from "services/transformers/message-status-transformer";
 import type {
   ClientCallbackPayload,
@@ -48,8 +49,31 @@ describe("message-status-transformer", () => {
     };
 
     it("should transform message status event to JSON:API callback payload", () => {
-      const result: ClientCallbackPayload =
-        transformMessageStatus(messageStatusEvent);
+      const idempotencyBody = {
+        messageId: "msg-789-xyz",
+        messageReference: "client-ref-12345",
+        messageStatus: "delivered",
+        messageStatusDescription: "Message successfully delivered",
+        messageFailureReasonCode: undefined,
+        channels: [
+          { type: "nhsapp", channelStatus: "delivered" },
+          { type: "sms", channelStatus: "skipped" },
+        ],
+        routingPlan: {
+          id: "routing-plan-123",
+          name: "NHS App with SMS fallback",
+          version: "ztoe2qRAM8M8vS0bqajhyEBcvXacrGPp",
+          createdDate: "2023-11-17T14:27:51.413Z",
+        },
+      };
+      const expectedIdempotencyKey = createHash("sha256")
+        .update(JSON.stringify(idempotencyBody))
+        .digest("hex");
+
+      const result: ClientCallbackPayload = transformMessageStatus(
+        messageStatusEvent,
+        "https://api.example.com",
+      );
 
       expect(result).toEqual({
         data: [
@@ -79,10 +103,10 @@ describe("message-status-transformer", () => {
               },
             },
             links: {
-              message: "/v1/message-batches/messages/msg-789-xyz",
+              message: "https://api.example.com/messages/msg-789-xyz",
             },
             meta: {
-              idempotencyKey: "661f9510-f39c-52e5-b827-557766551111",
+              idempotencyKey: expectedIdempotencyKey,
             },
           },
         ],
@@ -98,7 +122,10 @@ describe("message-status-transformer", () => {
         },
       };
 
-      const result = transformMessageStatus(eventWithoutDescription);
+      const result = transformMessageStatus(
+        eventWithoutDescription,
+        "https://api.example.com",
+      );
       const attrs = result.data[0].attributes as MessageStatusAttributes;
 
       expect(attrs.messageStatusDescription).toBeUndefined();
@@ -114,7 +141,10 @@ describe("message-status-transformer", () => {
         },
       };
 
-      const result = transformMessageStatus(eventWithFailure);
+      const result = transformMessageStatus(
+        eventWithFailure,
+        "https://api.example.com",
+      );
       const attrs = result.data[0].attributes as MessageStatusAttributes;
 
       expect(attrs.messageFailureReasonCode).toBe("DELIVERY_TIMEOUT");

@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { transformChannelStatus } from "services/transformers/channel-status-transformer";
 import type {
   ChannelStatus,
@@ -37,8 +38,26 @@ describe("channel-status-transformer", () => {
     };
 
     it("should transform channel status event to JSON:API callback payload", () => {
-      const result: ClientCallbackPayload =
-        transformChannelStatus(channelStatusEvent);
+      const idempotencyBody = {
+        messageId: "msg-789-xyz",
+        messageReference: "client-ref-12345",
+        cascadeType: "primary",
+        cascadeOrder: 1,
+        channel: "nhsapp",
+        channelStatus: "delivered",
+        channelStatusDescription: "Successfully delivered to NHS App",
+        channelFailureReasonCode: undefined,
+        supplierStatus: "delivered",
+        retryCount: 0,
+      };
+      const expectedIdempotencyKey = createHash("sha256")
+        .update(JSON.stringify(idempotencyBody))
+        .digest("hex");
+
+      const result: ClientCallbackPayload = transformChannelStatus(
+        channelStatusEvent,
+        "https://api.example.com",
+      );
 
       expect(result).toEqual({
         data: [
@@ -57,10 +76,10 @@ describe("channel-status-transformer", () => {
               retryCount: 0,
             },
             links: {
-              message: "/v1/message-batches/messages/msg-789-xyz",
+              message: "https://api.example.com/messages/msg-789-xyz",
             },
             meta: {
-              idempotencyKey: "SOME-GUID-a123-556677889999",
+              idempotencyKey: expectedIdempotencyKey,
             },
           },
         ],
@@ -76,7 +95,10 @@ describe("channel-status-transformer", () => {
         },
       };
 
-      const result = transformChannelStatus(eventWithoutDescription);
+      const result = transformChannelStatus(
+        eventWithoutDescription,
+        "https://api.example.com",
+      );
       const attrs = result.data[0].attributes as ChannelStatusAttributes;
 
       expect(attrs.channelStatusDescription).toBeUndefined();
@@ -92,7 +114,10 @@ describe("channel-status-transformer", () => {
         },
       };
 
-      const result = transformChannelStatus(eventWithFailure);
+      const result = transformChannelStatus(
+        eventWithFailure,
+        "https://api.example.com",
+      );
       const attrs = result.data[0].attributes as ChannelStatusAttributes;
 
       expect(attrs.channelFailureReasonCode).toBe("RECIPIENT_INVALID");

@@ -58,13 +58,21 @@ const channelStatusEvent: StatusPublishEvent<ChannelStatusData> = {
 describe("event-transformer", () => {
   describe("transformEvent", () => {
     it("transforms a message status event", () => {
-      const result = transformEvent(messageStatusEvent, "corr-id-001");
+      const result = transformEvent(
+        messageStatusEvent,
+        "corr-id-001",
+        "https://api.example.com",
+      );
 
       expect(result.data[0].type).toBe("MessageStatus");
     });
 
     it("transforms a channel status event", () => {
-      const result = transformEvent(channelStatusEvent, "corr-id-002");
+      const result = transformEvent(
+        channelStatusEvent,
+        "corr-id-002",
+        "https://api.example.com",
+      );
 
       expect(result.data[0].type).toBe("ChannelStatus");
     });
@@ -75,13 +83,21 @@ describe("event-transformer", () => {
         type: "uk.nhs.notify.unsupported.event.v1",
       } as unknown as StatusPublishEvent;
 
-      expect(() => transformEvent(unsupportedEvent, "corr-id-003")).toThrow(
-        TransformationError,
-      );
+      expect(() =>
+        transformEvent(
+          unsupportedEvent,
+          "corr-id-003",
+          "https://api.example.com",
+        ),
+      ).toThrow(TransformationError);
 
-      expect(() => transformEvent(unsupportedEvent, "corr-id-003")).toThrow(
-        "Unsupported event type: uk.nhs.notify.unsupported.event.v1",
-      );
+      expect(() =>
+        transformEvent(
+          unsupportedEvent,
+          "corr-id-003",
+          "https://api.example.com",
+        ),
+      ).toThrow("Unsupported event type: uk.nhs.notify.unsupported.event.v1");
     });
 
     it("includes correlationId in TransformationError when provided", () => {
@@ -92,7 +108,11 @@ describe("event-transformer", () => {
 
       let caughtError: unknown;
       try {
-        transformEvent(unsupportedEvent, "test-correlation-id");
+        transformEvent(
+          unsupportedEvent,
+          "test-correlation-id",
+          "https://api.example.com",
+        );
       } catch (error) {
         caughtError = error;
       }

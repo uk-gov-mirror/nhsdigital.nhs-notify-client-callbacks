@@ -19,7 +19,11 @@ import {
 describe("transform pipeline - event transformation", () => {
   describe("message status events", () => {
     it("transforms message status event to callback payload with correct attributes", () => {
-      const result = transformEvent(messageStatusEvent, "corr-msg-001");
+      const result = transformEvent(
+        messageStatusEvent,
+        "corr-msg-001",
+        "/v1/message-batches",
+      );
       const attributes = extractMessageStatusAttributes(result);
 
       expect(attributes).toEqual(expectedMessageStatusAttributes);
@@ -29,6 +33,7 @@ describe("transform pipeline - event transformation", () => {
       const result = transformEvent(
         messageStatusEventWithFailure,
         "corr-msg-002",
+        "/v1/message-batches",
       );
       const attributes = extractMessageStatusAttributes(result);
 
@@ -36,13 +41,21 @@ describe("transform pipeline - event transformation", () => {
     });
 
     it("produces MessageStatus type in data array", () => {
-      const result = transformEvent(messageStatusEvent, "corr-msg-003");
+      const result = transformEvent(
+        messageStatusEvent,
+        "corr-msg-003",
+        "/v1/message-batches",
+      );
 
       expect(result.data[0].type).toBe("MessageStatus");
     });
 
     it("produces correct message link", () => {
-      const result = transformEvent(messageStatusEvent, "corr-msg-004");
+      const result = transformEvent(
+        messageStatusEvent,
+        "corr-msg-004",
+        "/v1/message-batches",
+      );
 
       expect(result.data[0].links.message).toBe(
         `/v1/message-batches/messages/${messageStatusEvent.data.messageId}`,
@@ -52,7 +65,11 @@ describe("transform pipeline - event transformation", () => {
 
   describe("channel status events", () => {
     it("transforms channel status event to callback payload with correct attributes", () => {
-      const result = transformEvent(channelStatusEvent, "corr-ch-001");
+      const result = transformEvent(
+        channelStatusEvent,
+        "corr-ch-001",
+        "/v1/message-batches",
+      );
       const attributes = extractChannelStatusAttributes(result);
 
       expect(attributes).toEqual(expectedChannelStatusAttributes);
@@ -62,6 +79,7 @@ describe("transform pipeline - event transformation", () => {
       const result = transformEvent(
         channelStatusEventWithFailure,
         "corr-ch-002",
+        "/v1/message-batches",
       );
       const attributes = extractChannelStatusAttributes(result);
 
@@ -69,13 +87,21 @@ describe("transform pipeline - event transformation", () => {
     });
 
     it("produces ChannelStatus type in data array", () => {
-      const result = transformEvent(channelStatusEvent, "corr-ch-003");
+      const result = transformEvent(
+        channelStatusEvent,
+        "corr-ch-003",
+        "/v1/message-batches",
+      );
 
       expect(result.data[0].type).toBe("ChannelStatus");
     });
 
     it("produces correct message link", () => {
-      const result = transformEvent(channelStatusEvent, "corr-ch-004");
+      const result = transformEvent(
+        channelStatusEvent,
+        "corr-ch-004",
+        "/v1/message-batches",
+      );
 
       expect(result.data[0].links.message).toBe(
         `/v1/message-batches/messages/${channelStatusEvent.data.messageId}`,

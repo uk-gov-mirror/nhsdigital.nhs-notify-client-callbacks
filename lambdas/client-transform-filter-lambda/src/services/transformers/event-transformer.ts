@@ -12,17 +12,18 @@ import { transformMessageStatus } from "services/transformers/message-status-tra
 export function transformEvent(
   rawEvent: StatusPublishEvent,
   correlationId: string | undefined,
+  messageRootUri: string,
 ): ClientCallbackPayload {
   const eventType = rawEvent.type;
 
   if (eventType === EventTypes.MESSAGE_STATUS_PUBLISHED) {
     const typedEvent = rawEvent as StatusPublishEvent<MessageStatusData>;
-    return transformMessageStatus(typedEvent);
+    return transformMessageStatus(typedEvent, messageRootUri);
   }
 
   if (eventType === EventTypes.CHANNEL_STATUS_PUBLISHED) {
     const typedEvent = rawEvent as StatusPublishEvent<ChannelStatusData>;
-    return transformChannelStatus(typedEvent);
+    return transformChannelStatus(typedEvent, messageRootUri);
   }
 
   throw new TransformationError(
