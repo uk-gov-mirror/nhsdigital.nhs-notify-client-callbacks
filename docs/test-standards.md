@@ -57,7 +57,7 @@ AI must not:
 
 AI must:
 
-- reference the source of truth in-repo (schemas under `specs/.../contracts/`, docs, existing code) before encoding assumptions.
+- reference the source of truth in-repo (docs, existing code) before encoding assumptions.
 - ask clarifying questions when requirements are ambiguous.
 - notify the user of anything unclear and do not proceed without consent of user
 
@@ -109,26 +109,25 @@ AI must:
    - Verify mock return types match the actual function return types.
 
 7. **The "Test Execution" Mandate**:
-   - After creating or modifying a test, you MUST run it using the repo's test command.
+   - After creating or modifying a test, you MUST run it using the repo's test command - npm run test:unit or npm run test:integration
    - If the test fails due to incorrect imports, paths, or signatures, fix and re-run.
    - Only report completion when the test passes (exit code 0).
    - See section 6.2 for the full self-correction loop requirements.
 
 8. **The "Configuration First" Rule**:
    - Before assuming test framework capabilities, read the relevant config files:
-     - `jest.config.js` / `package.json` jest config
+     - `jest.config.base.js` / `package.json` jest config
      - `tsconfig.json` for path aliases and compiler options
      - `.eslintrc` for test-specific rules
    - Do not assume transform, preset, or setup capabilities without verification.
 
 9. **The "Schema Validation" Mandate**:
    - When creating test fixtures that represent schema-validated data, you must:
-     - Read the actual schema file from `specs/.../contracts/`
      - Create a validation test that explicitly validates the fixture against the schema
      - Never assume schema structure from naming alone
 
 10. **The "No Assumptions" Principle**:
-    - If you are less than 100% confident about ANY detail (file location, function signature, config setting, method name, environment variable), you MUST verify it with a tool before proceeding.
+    - If you are less than 100% confident about ANY detail (file location, function signature, config setting, method name, environment variable), you MUST verify it with a tool or the user before proceeding.
     - Confidence based on patterns alone is insufficient—verification is mandatory.
     - When uncertain, read the source file, check the config, or ask the user.
 
@@ -149,6 +148,7 @@ AI must:
 
 - Validate pure logic: transformers, validators, filters, mappers.
 - Mock I/O (AWS SDK, network).
+- Mock services
 
 #### Integration tests
 
@@ -206,7 +206,7 @@ AI must:
 
 When AI changes tests, it must:
 
-- run the narrowest relevant test command(s) locally/CI where possible.
+- run all the tests in the npm workspace.
 - report exactly what it ran and whether it passed.
 
 ### 6.2 AI Self-Correction Loop
