@@ -1,4 +1,5 @@
 ajv
+auditability
 [A-Z]+s
 Bitwarden
 bot
@@ -12,11 +13,14 @@ drawio
 endcapture
 endfor
 endraw
+enum
+file_search
 Git[Hh]ub
 Gitleaks
 Grype
 idempotence
 Jira
+npm
 OAuth
 Octokit
 onboarding
@@ -24,6 +28,8 @@ Podman
 Python
 queryable
 rawContent
+read_file
+repo
 [Rr]unbook
 sed
 Syft

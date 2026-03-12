@@ -13,6 +13,7 @@ next_review_due: "2026-03-26"
 > **Purpose**: This document defines the testing standards for this repository and the guardrails that AI assistants must follow when creating or changing tests and test artifacts.
 >
 > **How to use**:
+>
 > - Humans: agree the standards, then keep this document current.
 > - AI: treat this as a hard constraint. If anything conflicts with this standard, stop and ask.
 >
@@ -28,12 +29,10 @@ next_review_due: "2026-03-26"
 - Test fixtures, test data generators, and test utilities
 - Test documentation and test evidence artifacts (where applicable)
 
-
 ### 1.2 Out of scope
 
 - End-user documentation (unless it is test runbook documentation)
 - Operational monitoring (unless tests validate observability requirements)
-
 
 ---
 
@@ -41,7 +40,6 @@ next_review_due: "2026-03-26"
 
 - **Test artifact**: any test file, fixture, data sample, runbook, report, or evidence output that supports test execution or auditability.
 - **Deterministic test**: a test that produces the same result on repeated runs.
-
 
 ---
 
@@ -72,7 +70,6 @@ AI must:
 - Do not add real secrets, tokens, endpoints, credentials, or identifiable personal data to tests or fixtures.
 - Use placeholders and mocks.
 - Treat logs and fixtures as potentially user-visible.
-
 
 ### 3.4 Accessibility and stakeholder readability
 
@@ -108,7 +105,7 @@ AI must:
    - Verify mock return types match the actual function return types.
 
 7. **The "Test Execution" Mandate**:
-   - After creating or modifying a test, you MUST run it using the repo's test command - e.g. npm run test:unit 
+   - After creating or modifying a test, you MUST run it using the repo's test command - e.g. npm run test:unit
    - If the test fails due to incorrect imports, paths, or signatures, fix and re-run.
    - Only report completion when the test passes (exit code 0) and test coverage checks also pass.
    - See section 6.2 for the full self-correction loop requirements.
@@ -140,7 +137,6 @@ AI must:
 
 ## 4) Test Strategy and Levels
 
-
 ### 4.1 What belongs at each level
 
 #### Unit tests
@@ -154,21 +150,17 @@ AI must:
 - Validate components working together.
 - Define whether integration tests hit real AWS services, or mocks.  Ask for confirmation from user.
 
-
 #### Contract/schema tests
 
 - Validate payloads against JSON Schemas.
-
 
 #### Performance tests
 
 - Validate agreed NFRs (latency, throughput) in a controlled environment.
 
-
 ---
 
 ## 5) Standards for Test Design
-
 
 ### 5.1 Arrange–Act–Assert / Given–When–Then
 
@@ -186,7 +178,6 @@ AI must:
 - Keep fixtures close to the tests that use them.
 - Avoid over-general “god fixtures”.
 
-
 ### 5.4 Boundary and negative testing
 
 - Every validator/transformer must have:
@@ -194,12 +185,9 @@ AI must:
   - at least one “invalid / missing required field” test
   - at least one “unexpected additional field / unknown enum” test (if relevant)
 
-
 ---
 
-
 ## 6) CI / Quality Gates
-
 
 ### 6.1 AI verification requirements
 
@@ -211,15 +199,13 @@ When AI changes tests, it must:
 ### 6.2 AI Self-Correction Loop
 
 Before confirming a task is complete, the AI must:
+
 1. Run the test it just created.
 2. If the test fails, analyze the error.
 3. If the error is due to a hallucinated import or incorrect path, fix it immediately.
 4. Only report "success" if the test command exits with code 0.
 
-
 ---
-
-
 
 ## 7) AI Prompting Guidance (For Humans)
 
@@ -234,15 +220,16 @@ Report commands executed and results.
 
 ---
 
-
 ## Appendix A: Checklist for AI-Authored Tests
 
 **Before starting:**
+
 - [ ] I read at least one existing test file in the same area to understand patterns.
 - [ ] I verified the test framework configuration (jest.config.js, tsconfig.json).
 - [ ] I identified the canonical test location for this type of test.
 
 **During implementation:**
+
 - [ ] I used only existing contracts/schemas/code as sources of truth.
 - [ ] I did not invent APIs, paths, commands, or behaviour.
 - [ ] I verified all import paths exist using file_search or read_file.
@@ -253,12 +240,14 @@ Report commands executed and results.
 - [ ] For schema-related fixtures, I read the actual schema file.
 
 **Test quality:**
+
 - [ ] Tests are deterministic and isolated.
 - [ ] No secrets or sensitive data were added.
 - [ ] Tests follow naming and structure conventions from existing tests.
 - [ ] Test descriptions are clear and follow Given/When/Then or similar patterns.
 
 **Verification:**
+
 - [ ] I ran the test command and it passed (exit code 0).
 - [ ] I recorded the exact command(s) executed and results.
 - [ ] If tests failed, I fixed hallucinated imports/paths and re-ran until passing.
