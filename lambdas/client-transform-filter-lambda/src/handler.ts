@@ -95,7 +95,11 @@ function processSingleEvent(
     messageId,
   });
 
-  const callbackPayload = transformEvent(event, correlationId, MESSAGE_ROOT_URI);
+  const callbackPayload = transformEvent(
+    event,
+    correlationId,
+    MESSAGE_ROOT_URI,
+  );
 
   observability.recordCallbackGenerated(
     callbackPayload,
