@@ -10,13 +10,12 @@ next_review_due: "2026-03-26"
 
 # Test Standards (AI Guardrails)
 
-> **Purpose**: This document defines the testing standards for this repository and the guardrails that AI assistants must follow when creating or changing tests and test artifacts.
->
-> **How to use**:
->
-> - Humans: agree the standards, then keep this document current.
-> - AI: treat this as a hard constraint. If anything conflicts with this standard, stop and ask.
->
+**Purpose**: This document defines the testing standards for this repository and the guardrails that AI assistants must follow when creating or changing tests and test artifacts.
+
+**How to use**:
+
+- Humans: agree the standards, then keep this document current.
+- AI: treat this as a hard constraint. If anything conflicts with this standard, stop and ask.
 
 ## 1) Scope and Audience
 
