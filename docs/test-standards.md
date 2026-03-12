@@ -14,7 +14,7 @@ next_review_due: "2026-03-26"
 >
 > **How to use**:
 > - Humans: agree the standards, then keep this document current.
-> - AI: treat this as a **hard constraint**. If anything conflicts with this standard, stop and ask.
+> - AI: treat this as a hard constraint. If anything conflicts with this standard, stop and ask.
 >
 
 ## 1) Scope and Audience
@@ -52,7 +52,7 @@ next_review_due: "2026-03-26"
 AI must not:
 
 - invent APIs, file paths, contracts, schemas, environment variables, AWS resources, or behaviours.
-- claim tests are passing without actually running them (when tooling is available). If specified tooling is not available, stop and ask the user.
+- claim tests are passing without actually running them. If specified tooling is not available, stop and ask the user.
 - fabricate evidence (screenshots, logs, metrics) or results.
 
 AI must:
@@ -66,7 +66,6 @@ AI must:
 - Prefer minimal diffs.
 - Don’t refactor unrelated code as part of test changes.
 - Keep naming consistent with existing tests.
-
 
 ### 3.3 Security and privacy
 
@@ -109,9 +108,9 @@ AI must:
    - Verify mock return types match the actual function return types.
 
 7. **The "Test Execution" Mandate**:
-   - After creating or modifying a test, you MUST run it using the repo's test command - npm run test:unit or npm run test:integration
+   - After creating or modifying a test, you MUST run it using the repo's test command - e.g. npm run test:unit 
    - If the test fails due to incorrect imports, paths, or signatures, fix and re-run.
-   - Only report completion when the test passes (exit code 0).
+   - Only report completion when the test passes (exit code 0) and test coverage checks also pass.
    - See section 6.2 for the full self-correction loop requirements.
 
 8. **The "Configuration First" Rule**:
