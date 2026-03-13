@@ -182,5 +182,6 @@ variable "enable_debug_log_bucket" {
 
 variable "applications_map_parameter_name" {
   type        = string
+  default     = null
   description = "SSM Parameter Store path for the clientId-to-applicationId map used for payload signing"
 }
