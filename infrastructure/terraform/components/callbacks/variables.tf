@@ -179,3 +179,8 @@ variable "enable_debug_log_bucket" {
   description = "Enable the debug log S3 bucket used for integration testing"
   default     = false
 }
+
+variable "applications_map_parameter_name" {
+  type        = string
+  description = "SSM Parameter Store path for the clientId-to-applicationId map used for payload signing"
+}

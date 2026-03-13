@@ -13,6 +13,7 @@
 
 | Name | Description | Type | Default | Required |
 |------|-------------|------|---------|:--------:|
+| <a name="input_applications_map_parameter_name"></a> [applications\_map\_parameter\_name](#input\_applications\_map\_parameter\_name) | SSM Parameter Store path for the clientId-to-applicationId map used for payload signing | `string` | n/a | yes |
 | <a name="input_aws_account_id"></a> [aws\_account\_id](#input\_aws\_account\_id) | The AWS Account ID (numeric) | `string` | n/a | yes |
 | <a name="input_clients"></a> [clients](#input\_clients) | n/a | <pre>list(object({<br/>    connection_name                  = string<br/>    destination_name                 = string<br/>    invocation_endpoint              = string<br/>    invocation_rate_limit_per_second = optional(number, 10)<br/>    http_method                      = optional(string, "POST")<br/>    header_name                      = optional(string, "x-api-key")<br/>    header_value                     = string<br/>    client_detail                    = list(string)<br/>  }))</pre> | `[]` | no |
 | <a name="input_component"></a> [component](#input\_component) | The variable encapsulating the name of this component | `string` | `"callbacks"` | no |

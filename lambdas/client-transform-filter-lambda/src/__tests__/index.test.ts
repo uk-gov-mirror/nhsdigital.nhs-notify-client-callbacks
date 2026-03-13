@@ -10,11 +10,21 @@ import type {
 import type { Logger } from "services/logger";
 import type { CallbackMetrics } from "services/metrics";
 import type { ConfigLoader } from "services/config-loader";
+import type { ApplicationsMapService } from "services/ssm-applications-map";
 import { ObservabilityService } from "services/observability";
 import { ConfigLoaderService } from "services/config-loader-service";
 import { createHandler } from "..";
 
 jest.mock("aws-embedded-metrics");
+
+const stubTarget = {
+  Type: "API",
+  TargetId: "00000000-0000-4000-8000-000000000001",
+  InvocationEndpoint: "https://example.com/webhook",
+  InvocationMethod: "POST",
+  InvocationRateLimit: 10,
+  APIKey: { HeaderName: "x-api-key", HeaderValue: "test-api-key" },
+};
 
 const createPassthroughConfigLoader = (): ConfigLoader =>
   ({
@@ -23,7 +33,7 @@ const createPassthroughConfigLoader = (): ConfigLoader =>
         SubscriptionType: "MessageStatus",
         SubscriptionId: "00000000-0000-0000-0000-000000000001",
         ClientId: clientId,
-        Targets: [],
+        Targets: [stubTarget],
         MessageStatuses: [
           "DELIVERED",
           "FAILED",
@@ -37,7 +47,7 @@ const createPassthroughConfigLoader = (): ConfigLoader =>
         SubscriptionType: "ChannelStatus",
         SubscriptionId: "00000000-0000-0000-0000-000000000002",
         ClientId: clientId,
-        Targets: [],
+        Targets: [stubTarget],
         ChannelType: "NHSAPP",
         ChannelStatuses: ["DELIVERED", "FAILED", "TECHNICAL_FAILURE"],
         SupplierStatuses: [
@@ -50,7 +60,7 @@ const createPassthroughConfigLoader = (): ConfigLoader =>
         SubscriptionType: "ChannelStatus",
         SubscriptionId: "00000000-0000-0000-0000-000000000003",
         ClientId: clientId,
-        Targets: [],
+        Targets: [stubTarget],
         ChannelType: "SMS",
         ChannelStatuses: ["DELIVERED", "FAILED", "TECHNICAL_FAILURE"],
         SupplierStatuses: [
@@ -66,6 +76,15 @@ const makeStubConfigLoaderService = (): ConfigLoaderService => {
   const loader = createPassthroughConfigLoader();
   return { getLoader: () => loader } as unknown as ConfigLoaderService;
 };
+
+const makeStubApplicationsMapService = (): ApplicationsMapService =>
+  ({
+    getApplicationId: jest
+      .fn()
+      .mockImplementation(
+        async (clientId: string) => `test-app-id-${clientId}`,
+      ),
+  }) as unknown as ApplicationsMapService;
 
 describe("Lambda handler", () => {
   const mockLogger = {
@@ -96,6 +115,7 @@ describe("Lambda handler", () => {
     createObservabilityService: () =>
       new ObservabilityService(mockLogger, mockMetrics, mockMetricsLogger),
     createConfigLoaderService: makeStubConfigLoaderService,
+    createApplicationsMapService: makeStubApplicationsMapService,
   });
 
   beforeEach(() => {
@@ -348,6 +368,7 @@ describe("Lambda handler", () => {
     const faultyHandler = createHandler({
       createObservabilityService: () => faultyObservability,
       createConfigLoaderService: makeStubConfigLoaderService,
+      createApplicationsMapService: makeStubApplicationsMapService,
     });
 
     const sqsMessage: SQSRecord = {
@@ -526,6 +547,7 @@ describe("createHandler default wiring", () => {
     expect(state.processEvents).toHaveBeenCalledWith(
       [],
       state.mockObservabilityInstance,
+      expect.any(Object),
       expect.any(Object),
     );
     expect(result).toEqual(["ok"]);
