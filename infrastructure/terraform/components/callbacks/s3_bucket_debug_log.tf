@@ -1,7 +1,8 @@
-module "client_config_bucket" {
+module "debug_log_bucket" {
+  count  = var.deploy_mock_webhook ? 1 : 0
   source = "https://github.com/NHSDigital/nhs-notify-shared-modules/releases/download/3.0.6/terraform-s3bucket.zip"
 
-  name = "subscription-config"
+  name = "debug-log"
 
   aws_account_id = var.aws_account_id
   component      = var.component
@@ -12,55 +13,56 @@ module "client_config_bucket" {
   default_tags = merge(
     local.default_tags,
     {
-      Description = "Client subscription configuration storage"
+      Description = "Debug log storage for integration testing"
     }
   )
 
   kms_key_arn        = module.kms.key_arn
-  force_destroy      = false
-  versioning         = true
+  force_destroy      = true
+  versioning         = false
   object_ownership   = "BucketOwnerPreferred"
   bucket_key_enabled = true
 
+  lifecycle_rules = [
+    {
+      enabled = true
+
+      expiration = {
+        days = 1
+      }
+
+      abort_incomplete_multipart_upload = {
+        days = 1
+      }
+    }
+  ]
+
   policy_documents = [
-    data.aws_iam_policy_document.client_config_bucket.json
+    data.aws_iam_policy_document.debug_log_bucket[0].json,
   ]
 }
 
-data "aws_iam_policy_document" "client_config_bucket" {
+data "aws_iam_policy_document" "debug_log_bucket" {
+  count = var.deploy_mock_webhook ? 1 : 0
+
   statement {
-    sid    = "AllowLambdaListAccess"
+    sid    = "AllowLambdaWriteAccess"
     effect = "Allow"
 
     principals {
-      type        = "AWS"
-      identifiers = [module.client_transform_filter_lambda.iam_role_arn]
+      type = "AWS"
+      identifiers = [
+        module.mock_webhook_lambda[0].iam_role_arn,
+        module.client_transform_filter_lambda.iam_role_arn,
+      ]
     }
 
     actions = [
-      "s3:ListBucket",
+      "s3:PutObject",
     ]
 
     resources = [
-      module.client_config_bucket.arn,
-    ]
-  }
-
-  statement {
-    sid    = "AllowLambdaReadAccess"
-    effect = "Allow"
-
-    principals {
-      type        = "AWS"
-      identifiers = [module.client_transform_filter_lambda.iam_role_arn]
-    }
-
-    actions = [
-      "s3:GetObject",
-    ]
-
-    resources = [
-      "${module.client_config_bucket.arn}/*",
+      "${module.debug_log_bucket[0].arn}/*",
     ]
   }
 
@@ -78,8 +80,8 @@ data "aws_iam_policy_document" "client_config_bucket" {
     ]
 
     resources = [
-      module.client_config_bucket.arn,
-      "${module.client_config_bucket.arn}/*"
+      module.debug_log_bucket[0].arn,
+      "${module.debug_log_bucket[0].arn}/*",
     ]
 
     condition {

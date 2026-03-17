@@ -171,7 +171,7 @@ jobs:
             --terraformAction "apply" \
             --overrideProjectName "nhs" \
             --overrideRoleName "nhs-main-acct-client-callbacks-github-deploy" \
-            --overrides "branch_name=${GITHUB_HEAD_REF:-${GITHUB_REF#refs/heads/}}"
+            --overrides "branch_name=${GITHUB_HEAD_REF:-${GITHUB_REF#refs/heads/}},deploy_mock_webhook=true"
   acceptance-stage: # Recommended maximum execution time is 10 minutes
     name: "Acceptance stage"
     needs: [metadata, build-stage, pr-create-dynamic-environment]

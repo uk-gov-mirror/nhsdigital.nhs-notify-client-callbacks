@@ -1,13 +1,8 @@
 import type { APIGatewayProxyEvent, APIGatewayProxyResult } from "aws-lambda";
-import pino from "pino";
+import { Logger, flushLogs } from "@nhs-notify-client-callbacks/logger";
 import type { ClientCallbackPayload } from "@nhs-notify-client-callbacks/models";
 
-const logger = pino(
-  {
-    level: process.env.LOG_LEVEL || "info",
-  },
-  pino.destination({ sync: true }),
-);
+const logger = new Logger();
 
 function isClientCallbackPayload(
   value: unknown,
@@ -38,13 +33,10 @@ function isClientCallbackPayload(
   });
 }
 
-export async function handler(
+async function buildResponse(
   event: APIGatewayProxyEvent,
 ): Promise<APIGatewayProxyResult> {
-  logger.info({ event }, "Received event");
-
-  logger.info({
-    msg: "Mock webhook invoked",
+  logger.info("Mock webhook invoked", {
     path: event.path,
     method: event.httpMethod,
   });
@@ -53,7 +45,7 @@ export async function handler(
   const providedApiKey = event.headers["x-api-key"];
 
   if (!expectedApiKey || providedApiKey !== expectedApiKey) {
-    logger.error({ msg: "Unauthorized: invalid or missing x-api-key" });
+    logger.error("Unauthorized: invalid or missing x-api-key");
     return {
       statusCode: 401,
       body: JSON.stringify({ message: "Unauthorized" }),
@@ -61,9 +53,7 @@ export async function handler(
   }
 
   if (!event.body) {
-    logger.error({
-      msg: "No event body received",
-    });
+    logger.error("No event body received");
 
     return {
       statusCode: 400,
@@ -75,9 +65,7 @@ export async function handler(
     const parsed = JSON.parse(event.body) as unknown;
 
     if (!isClientCallbackPayload(parsed)) {
-      logger.error({
-        msg: "Invalid message structure - missing or invalid data array",
-      });
+      logger.error("Invalid message structure - missing or invalid data array");
 
       return {
         statusCode: 400,
@@ -86,8 +74,7 @@ export async function handler(
     }
 
     if (parsed.data.length !== 1) {
-      logger.error({
-        msg: "Expected exactly 1 callback item in data array",
+      logger.error("Expected exactly 1 callback item in data array", {
         receivedCount: parsed.data.length,
       });
 
@@ -101,11 +88,13 @@ export async function handler(
 
     const [item] = parsed.data;
     const correlationId = item.meta.idempotencyKey;
-    logger.info({
-      correlationId,
-      messageType: item.type,
-      msg: `CALLBACK ${correlationId} ${item.type} : ${JSON.stringify(item)}`,
-    });
+    logger.info(
+      `CALLBACK ${correlationId} ${item.type} : ${JSON.stringify(item)}`,
+      {
+        correlationId,
+        messageType: item.type,
+      },
+    );
 
     return {
       statusCode: 200,
@@ -113,10 +102,7 @@ export async function handler(
     };
   } catch (error) {
     if (error instanceof SyntaxError) {
-      logger.error({
-        error: error.message,
-        msg: "Invalid JSON body",
-      });
+      logger.error("Invalid JSON body", { error: error.message });
 
       return {
         statusCode: 400,
@@ -124,9 +110,8 @@ export async function handler(
       };
     }
 
-    logger.error({
+    logger.error("Failed to process callback", {
       error: error instanceof Error ? error.message : String(error),
-      msg: "Failed to process callback",
     });
 
     return {
@@ -134,4 +119,12 @@ export async function handler(
       body: JSON.stringify({ message: "Internal server error" }),
     };
   }
+}
+
+export async function handler(
+  event: APIGatewayProxyEvent,
+): Promise<APIGatewayProxyResult> {
+  const response = await buildResponse(event);
+  await flushLogs();
+  return response;
 }

@@ -3,9 +3,10 @@ import {
   LogContext,
   Logger,
   extractCorrelationId,
+  flushLogs,
   logLifecycleEvent,
   logger,
-} from "services/logger";
+} from "..";
 
 jest.mock("pino", () => {
   const info = jest.fn();
@@ -28,7 +29,21 @@ jest.mock("pino", () => {
   };
 });
 
-const mockLoggerMethods = pino() as any;
+const mockSend = jest.fn().mockResolvedValue({});
+
+jest.mock("@aws-sdk/client-s3", () => ({
+  S3Client: jest.fn(() => ({ send: mockSend })),
+  PutObjectCommand: jest.fn((input) => ({ ...input })),
+}));
+
+const mockLoggerMethods = pino() as jest.Mocked<ReturnType<typeof pino>>;
+
+type PinoConfig = {
+  formatters: { level: (label: string) => { level: string } };
+  timestamp: () => string;
+};
+const capturedPinoConfig = (pino as unknown as jest.Mock).mock
+  .calls[0][0] as PinoConfig;
 
 describe("Logger", () => {
   beforeEach(() => {
@@ -58,9 +73,7 @@ describe("Logger", () => {
   describe("addContext", () => {
     it("should add new context to logger", () => {
       const testLogger = new Logger();
-      const newContext: LogContext = {
-        correlationId: "corr-789",
-      };
+      const newContext: LogContext = { correlationId: "corr-789" };
 
       testLogger.addContext(newContext);
 
@@ -73,37 +86,25 @@ describe("Logger", () => {
         clientId: "client-456",
       };
       const testLogger = new Logger(initialContext);
-
       mockLoggerMethods.child.mockClear();
 
-      const additionalContext: LogContext = {
-        messageId: "msg-101",
-      };
-
-      testLogger.addContext(additionalContext);
+      testLogger.addContext({ messageId: "msg-101" });
 
       expect(mockLoggerMethods.child).toHaveBeenCalledWith({
         correlationId: "corr-123",
         clientId: "client-456",
-
         messageId: "msg-101",
       });
     });
 
     it("should override existing context keys", () => {
-      const initialContext: LogContext = {
+      const testLogger = new Logger({
         correlationId: "old-corr",
         clientId: "client-123",
-      };
-      const testLogger = new Logger(initialContext);
-
+      });
       mockLoggerMethods.child.mockClear();
 
-      const newContext: LogContext = {
-        correlationId: "new-corr",
-      };
-
-      testLogger.addContext(newContext);
+      testLogger.addContext({ correlationId: "new-corr" });
 
       expect(mockLoggerMethods.child).toHaveBeenCalledWith({
         correlationId: "new-corr",
@@ -114,14 +115,8 @@ describe("Logger", () => {
 
   describe("clearContext", () => {
     it("should clear all context from logger", () => {
-      const initialContext: LogContext = {
-        correlationId: "corr-123",
-        clientId: "client-456",
-      };
-      const testLogger = new Logger(initialContext);
-
+      const testLogger = new Logger({ correlationId: "corr-123" });
       testLogger.clearContext();
-
       expect(testLogger).toBeInstanceOf(Logger);
     });
   });
@@ -129,36 +124,27 @@ describe("Logger", () => {
   describe("child", () => {
     it("should create a child logger with new context", () => {
       const testLogger = new Logger();
-      const childContext: LogContext = {
-        correlationId: "corr-123",
-      };
-
-      const childLogger = testLogger.child(childContext);
+      const childLogger = testLogger.child({ correlationId: "corr-123" });
 
       expect(childLogger).toBeInstanceOf(Logger);
-      expect(mockLoggerMethods.child).toHaveBeenCalledWith(childContext);
+      expect(mockLoggerMethods.child).toHaveBeenCalledWith({
+        correlationId: "corr-123",
+      });
     });
 
     it("should merge parent context with child context", () => {
-      const parentContext: LogContext = {
+      const testLogger = new Logger({
         correlationId: "parent-corr",
         clientId: "client-123",
-      };
-      const testLogger = new Logger(parentContext);
-
+      });
       mockLoggerMethods.child.mockClear();
 
-      const childContext: LogContext = {
-        messageId: "msg-101",
-      };
-
-      const childLogger = testLogger.child(childContext);
+      const childLogger = testLogger.child({ messageId: "msg-101" });
 
       expect(childLogger).toBeInstanceOf(Logger);
       expect(mockLoggerMethods.child).toHaveBeenCalledWith({
         correlationId: "parent-corr",
         clientId: "client-123",
-
         messageId: "msg-101",
       });
     });
@@ -225,10 +211,9 @@ describe("Logger", () => {
 
     it("should log error message with additional context", () => {
       const testLogger = new Logger();
-      const error = new Error("Something failed");
       const context: LogContext = {
         correlationId: "corr-789",
-        error,
+        error: new Error("fail"),
       };
 
       testLogger.error("Operation failed", context);
@@ -250,9 +235,7 @@ describe("Logger", () => {
 
     it("should log debug message with additional context", () => {
       const testLogger = new Logger();
-      const context: LogContext = {
-        correlationId: "corr-101",
-      };
+      const context: LogContext = { correlationId: "corr-101" };
 
       testLogger.debug("Debug info", context);
 
@@ -270,44 +253,142 @@ describe("Logger", () => {
   });
 });
 
+describe("S3 debug bucket writes", () => {
+  beforeAll(() => {
+    process.env.DEBUG_BUCKET_NAME = "test-debug-bucket";
+  });
+
+  afterAll(() => {
+    delete process.env.DEBUG_BUCKET_NAME;
+  });
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it("should write to S3 when DEBUG_BUCKET_NAME is set", () => {
+    const { PutObjectCommand } = jest.requireMock("@aws-sdk/client-s3");
+
+    const testLogger = new Logger();
+    testLogger.info("Test message", { correlationId: "corr-123" });
+
+    expect(PutObjectCommand).toHaveBeenCalledWith(
+      expect.objectContaining({
+        Bucket: "test-debug-bucket",
+        Key: expect.stringMatching(/^\d+-.+\.json$/),
+        ContentType: "application/json",
+        Body: expect.stringContaining('"message":"Test message"'),
+      }),
+    );
+    expect(mockSend).toHaveBeenCalled();
+  });
+
+  it("should include context fields in S3 entry body", () => {
+    const { PutObjectCommand } = jest.requireMock("@aws-sdk/client-s3");
+
+    const testLogger = new Logger();
+    testLogger.error("Something failed", {
+      correlationId: "corr-xyz",
+      statusCode: 500,
+    });
+
+    const call = PutObjectCommand.mock.calls[0][0] as { Body: string };
+    const entry = JSON.parse(call.Body) as Record<string, unknown>;
+
+    expect(entry).toMatchObject({
+      level: "ERROR",
+      message: "Something failed",
+      correlationId: "corr-xyz",
+      statusCode: 500,
+    });
+    expect(typeof entry.timestamp).toBe("string");
+  });
+
+  it("should write for warn and debug levels", () => {
+    const { PutObjectCommand } = jest.requireMock("@aws-sdk/client-s3");
+
+    const testLogger = new Logger();
+    testLogger.warn("A warning");
+    testLogger.debug("A debug");
+
+    expect(PutObjectCommand).toHaveBeenCalledTimes(2);
+
+    const levels = PutObjectCommand.mock.calls.map(
+      (call: [{ Body: string }]) => {
+        const entry = JSON.parse(call[0].Body) as {
+          level: string;
+        };
+        return entry.level;
+      },
+    );
+    expect(levels).toContain("WARN");
+    expect(levels).toContain("DEBUG");
+  });
+
+  it("should not write to S3 when DEBUG_BUCKET_NAME is absent", () => {
+    const { PutObjectCommand } = jest.requireMock("@aws-sdk/client-s3");
+    delete process.env.DEBUG_BUCKET_NAME;
+
+    const testLogger = new Logger();
+    testLogger.info("No bucket");
+
+    expect(PutObjectCommand).not.toHaveBeenCalled();
+
+    process.env.DEBUG_BUCKET_NAME = "test-debug-bucket";
+  });
+
+  it("should log an error when the S3 write fails", async () => {
+    mockSend.mockRejectedValueOnce(new Error("S3 unavailable"));
+
+    const testLogger = new Logger();
+    testLogger.info("write will fail");
+
+    await flushLogs();
+
+    const { default: pinoMock } = jest.requireMock<{
+      default: jest.Mock & { error: jest.Mock };
+    }>("pino");
+    expect(pinoMock().error).toHaveBeenCalledWith(
+      expect.objectContaining({ error: expect.any(Error) }),
+      "Failed to write debug log entry to S3",
+    );
+  });
+
+  it("flushLogs should resolve once all pending writes complete", async () => {
+    const testLogger = new Logger();
+    testLogger.info("flush test");
+    testLogger.warn("flush test 2");
+
+    // Should resolve without throwing even if writes are in-flight
+    await expect(flushLogs()).resolves.toBeUndefined();
+  });
+});
+
 describe("extractCorrelationId", () => {
   it("should extract correlation ID from event.id", () => {
-    const event = {
-      id: "test-corr-123",
-      type: "status-update",
-    };
-
-    const correlationId = extractCorrelationId(event);
-
-    expect(correlationId).toBe("test-corr-123");
+    expect(
+      extractCorrelationId({ id: "test-corr-123", type: "status-update" }),
+    ).toBe("test-corr-123");
   });
 
   it("should return undefined when id is not present", () => {
-    const event = {
-      type: "status-update",
-    };
-
-    const correlationId = extractCorrelationId(event);
-
-    expect(correlationId).toBeUndefined();
+    expect(extractCorrelationId({ type: "status-update" })).toBeUndefined();
   });
 
   it("should return undefined for null event", () => {
-    const correlationId = extractCorrelationId(null);
-
-    expect(correlationId).toBeUndefined();
+    expect(extractCorrelationId(null)).toBeUndefined();
   });
 
   it("should return undefined for undefined event", () => {
-    const correlationId = extractCorrelationId(undefined as unknown);
-
-    expect(correlationId).toBeUndefined();
+    expect(extractCorrelationId(undefined as unknown)).toBeUndefined();
   });
 
   it("should return undefined for empty object", () => {
-    const correlationId = extractCorrelationId({});
+    expect(extractCorrelationId({})).toBeUndefined();
+  });
 
-    expect(correlationId).toBeUndefined();
+  it("should return undefined when id is not a string", () => {
+    expect(extractCorrelationId({ id: 42 })).toBeUndefined();
   });
 
   it("should return undefined when id is present but not a string", () => {
@@ -318,6 +399,22 @@ describe("extractCorrelationId", () => {
     const correlationId = extractCorrelationId(event);
 
     expect(correlationId).toBeUndefined();
+  });
+});
+
+describe("pino configuration", () => {
+  it("level formatter should uppercase the label", () => {
+    expect(capturedPinoConfig.formatters.level("info")).toEqual({
+      level: "INFO",
+    });
+    expect(capturedPinoConfig.formatters.level("error")).toEqual({
+      level: "ERROR",
+    });
+  });
+
+  it("timestamp should return a JSON-fragment with an ISO timestamp", () => {
+    const result = capturedPinoConfig.timestamp();
+    expect(result).toMatch(/^,"timestamp":"\d{4}-\d{2}-\d{2}T/);
   });
 });
 
@@ -337,7 +434,6 @@ describe("logLifecycleEvent", () => {
     "should log %s lifecycle event",
     (event) => {
       const testLogger = new Logger();
-
       logLifecycleEvent(testLogger, event, context);
 
       expect(mockLoggerMethods.info).toHaveBeenCalledWith(

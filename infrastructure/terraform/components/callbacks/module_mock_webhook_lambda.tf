@@ -1,6 +1,6 @@
 module "mock_webhook_lambda" {
   count  = var.deploy_mock_webhook ? 1 : 0
-  source = "https://github.com/NHSDigital/nhs-notify-shared-modules/releases/download/v2.0.29/terraform-lambda.zip"
+  source = "https://github.com/NHSDigital/nhs-notify-shared-modules/releases/download/3.0.6/terraform-lambda.zip"
 
   function_name = "mock-webhook"
   description   = "Mock webhook endpoint for integration testing - logs received callbacks to CloudWatch"
@@ -36,8 +36,9 @@ module "mock_webhook_lambda" {
   log_subscription_role_arn = local.acct.log_subscription_role_arn
 
   lambda_env_vars = {
-    LOG_LEVEL = var.log_level
-    API_KEY   = random_password.mock_webhook_api_key[0].result
+    LOG_LEVEL         = var.log_level
+    API_KEY           = random_password.mock_webhook_api_key[0].result
+    DEBUG_BUCKET_NAME = module.debug_log_bucket[0].id
   }
 }
 
@@ -61,6 +62,19 @@ data "aws_iam_policy_document" "mock_webhook_lambda" {
 
     resources = [
       module.kms.key_arn,
+    ]
+  }
+
+  statement {
+    sid    = "DebugLogBucketWrite"
+    effect = "Allow"
+
+    actions = [
+      "s3:PutObject",
+    ]
+
+    resources = [
+      "${module.debug_log_bucket[0].arn}/*",
     ]
   }
 }

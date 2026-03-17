@@ -1,8 +1,8 @@
 {
   "dependencies": {
+    "@nhs-notify-client-callbacks/logger": "*",
     "@nhs-notify-client-callbacks/models": "*",
-    "esbuild": "^0.25.0",
-    "pino": "^9.5.0"
+    "esbuild": "^0.25.0"
   },
   "devDependencies": {
     "@tsconfig/node22": "^22.0.2",

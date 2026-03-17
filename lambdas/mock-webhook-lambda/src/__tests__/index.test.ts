@@ -3,15 +3,24 @@ import { handler } from "index";
 
 const TEST_API_KEY = "test-api-key";
 
-jest.mock("pino", () => {
-  const info = jest.fn();
-  const error = jest.fn();
-  const mockPino = jest.fn(() => ({ info, error }));
-  Object.defineProperty(mockPino, "destination", {
-    value: jest.fn(() => ({})),
-  });
-  return { __esModule: true, default: mockPino, info, error };
+jest.mock("@nhs-notify-client-callbacks/logger", () => {
+  const instance = {
+    info: jest.fn(),
+    error: jest.fn(),
+    warn: jest.fn(),
+    debug: jest.fn(),
+  };
+  return {
+    Logger: jest.fn().mockReturnValue(instance),
+
+    flushLogs: jest.fn().mockResolvedValue(undefined),
+    instance,
+  };
 });
+
+const mockLogger = jest.requireMock(
+  "@nhs-notify-client-callbacks/logger",
+).instance;
 
 const DEFAULT_HEADERS = { "x-api-key": TEST_API_KEY };
 
@@ -274,27 +283,21 @@ describe("Mock Webhook Lambda", () => {
       };
 
       const event = createMockEvent(JSON.stringify(callback));
-
       await handler(event);
 
-      const logger = jest.requireMock("pino");
-      const infoCalls = logger.info.mock.calls as unknown[][];
+      const callbackCall = mockLogger.info.mock.calls.find(
+        ([message]: [string]) =>
+          typeof message === "string" && message.startsWith("CALLBACK"),
+      );
 
-      expect(logger).toBeDefined();
-
-      const callbackLog = infoCalls
-        .map(([payload]: unknown[]) => payload)
-        .find(
-          (payload: unknown) =>
-            typeof payload === "object" &&
-            payload !== null &&
-            "msg" in payload &&
-            payload.msg ===
-              'CALLBACK some-idempotency-key MessageStatus : {"type":"MessageStatus","attributes":{"messageId":"test-msg-789","messageStatus":"delivered"},"links":{"message":"some-message-link"},"meta":{"idempotencyKey":"some-idempotency-key"}}',
-        );
-
-      expect(callbackLog).toBeDefined();
-      expect(callbackLog).toMatchObject({
+      expect(callbackCall).toBeDefined();
+      const [message, context] = callbackCall as [
+        string,
+        Record<string, unknown>,
+      ];
+      expect(message).toContain("some-idempotency-key");
+      expect(message).toContain("MessageStatus");
+      expect(context).toMatchObject({
         correlationId: "some-idempotency-key",
         messageType: "MessageStatus",
       });

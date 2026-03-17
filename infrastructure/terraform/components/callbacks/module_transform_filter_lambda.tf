@@ -1,5 +1,5 @@
 module "client_transform_filter_lambda" {
-  source = "https://github.com/NHSDigital/nhs-notify-shared-modules/releases/download/v2.0.29/terraform-lambda.zip"
+  source = "https://github.com/NHSDigital/nhs-notify-shared-modules/releases/download/3.0.6/terraform-lambda.zip"
 
   function_name = "client-transform-filter"
   description   = "Lambda function that transforms and filters events coming to through the eventpipe"
@@ -36,7 +36,8 @@ module "client_transform_filter_lambda" {
 
   lambda_env_vars = {
     ENVIRONMENT                           = var.environment
-    METRICS_NAMESPACE                     = "nhs-notify-client-callbacks-metrics"
+    METRICS_NAMESPACE                     = "nhs-notify-client-callbacks"
+    DEBUG_BUCKET_NAME                     = var.deploy_mock_webhook ? module.debug_log_bucket[0].id : ""
     CLIENT_SUBSCRIPTION_CONFIG_BUCKET     = module.client_config_bucket.id
     CLIENT_SUBSCRIPTION_CONFIG_PREFIX     = "client_subscriptions/"
     CLIENT_SUBSCRIPTION_CACHE_TTL_SECONDS = "60"
@@ -55,6 +56,19 @@ data "aws_iam_policy_document" "client_transform_filter_lambda" {
 
     resources = [
       module.kms.key_arn, ## Requires shared kms module
+    ]
+  }
+
+  statement {
+    sid    = "S3ClientConfigListAccess"
+    effect = "Allow"
+
+    actions = [
+      "s3:ListBucket",
+    ]
+
+    resources = [
+      module.client_config_bucket.arn,
     ]
   }
 
@@ -82,5 +96,22 @@ data "aws_iam_policy_document" "client_transform_filter_lambda" {
     resources = [
       "*",
     ]
+  }
+
+  dynamic "statement" {
+    for_each = var.deploy_mock_webhook ? toset(["enabled"]) : toset([])
+
+    content {
+      sid    = "DebugLogBucketWrite"
+      effect = "Allow"
+
+      actions = [
+        "s3:PutObject",
+      ]
+
+      resources = [
+        "${module.debug_log_bucket[0].arn}/*",
+      ]
+    }
   }
 }

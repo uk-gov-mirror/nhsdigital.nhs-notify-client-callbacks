@@ -1,6 +1,10 @@
 import { HeadBucketCommand } from "@aws-sdk/client-s3";
 import type { S3Client } from "@aws-sdk/client-s3";
-import { buildBucketName, createS3Client, getDeploymentDetails } from "helpers";
+import {
+  buildSubscriptionConfigBucketName,
+  createS3Client,
+  getDeploymentDetails,
+} from "helpers";
 
 describe("Infrastructure exists", () => {
   let s3Client: S3Client;
@@ -8,10 +12,7 @@ describe("Infrastructure exists", () => {
 
   beforeAll(async () => {
     const deploymentDetails = getDeploymentDetails();
-    bucketName = buildBucketName(
-      deploymentDetails,
-      "callbacks-subscription-config",
-    );
+    bucketName = buildSubscriptionConfigBucketName(deploymentDetails);
     s3Client = createS3Client();
   });
 

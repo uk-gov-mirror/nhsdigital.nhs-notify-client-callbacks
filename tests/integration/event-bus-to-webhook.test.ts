@@ -1,132 +1,15 @@
-import {
-  GetQueueAttributesCommand,
-  PurgeQueueCommand,
-  SQSClient,
-  SendMessageCommand,
-} from "@aws-sdk/client-sqs";
-import { waitUntil } from "async-wait-until";
+import { PurgeQueueCommand, SQSClient } from "@aws-sdk/client-sqs";
 import type {
   MessageStatusData,
   StatusPublishEvent,
 } from "@nhs-notify-client-callbacks/models";
-import { getChannelStatusCallbacks, getMessageStatusCallbacks } from "helpers";
-
-const publishEvent = async (
-  client: SQSClient,
-  queueUrl: string,
-  event: StatusPublishEvent,
-) => {
-  const sendMessageCommand = new SendMessageCommand({
-    QueueUrl: queueUrl,
-    MessageBody: JSON.stringify(event),
-  });
-
-  return client.send(sendMessageCommand);
-};
-
-const getQueueMessageCount = async (
-  client: SQSClient,
-  queueUrl?: string,
-  attributeNames: (
-    | "ApproximateNumberOfMessages"
-    | "ApproximateNumberOfMessagesNotVisible"
-  )[] = ["ApproximateNumberOfMessages"],
-) => {
-  if (!queueUrl) {
-    return 0;
-  }
-
-  const queueAttributesCommand = new GetQueueAttributesCommand({
-    QueueUrl: queueUrl,
-    AttributeNames: attributeNames,
-  });
-
-  const queueAttributes = await client.send(queueAttributesCommand);
-  const { ApproximateNumberOfMessages, ApproximateNumberOfMessagesNotVisible } =
-    queueAttributes.Attributes ?? {};
-
-  let count = 0;
-
-  if (attributeNames.includes("ApproximateNumberOfMessages")) {
-    count += Number(ApproximateNumberOfMessages || 0);
-  }
-
-  if (attributeNames.includes("ApproximateNumberOfMessagesNotVisible")) {
-    count += Number(ApproximateNumberOfMessagesNotVisible || 0);
-  }
-
-  return count;
-};
-
-const awaitQueueEmpty = async (
-  client: SQSClient,
-  queueUrl?: string,
-  attributeNames: (
-    | "ApproximateNumberOfMessages"
-    | "ApproximateNumberOfMessagesNotVisible"
-  )[] = ["ApproximateNumberOfMessages"],
-) => {
-  if (!queueUrl) {
-    return;
-  }
-
-  await waitUntil(
-    async () =>
-      (await getQueueMessageCount(client, queueUrl, attributeNames)) === 0,
-    {
-      intervalBetweenAttempts: 250,
-      timeout: 10_000,
-    },
-  );
-};
-
-const awaitMessageStatusCallbacks = async (
-  logGroup: string,
-  messageId: string,
-) => {
-  let callbacks: Awaited<ReturnType<typeof getMessageStatusCallbacks>> = [];
-
-  await waitUntil(
-    async () => {
-      callbacks = await getMessageStatusCallbacks(logGroup, messageId);
-      return callbacks.length > 0;
-    },
-    {
-      intervalBetweenAttempts: 500,
-      timeout: 10_000,
-    },
-  );
-
-  if (callbacks.length === 0) {
-    throw new Error("Timed out waiting for message status callbacks");
-  }
-
-  return callbacks;
-};
-
-const awaitChannelStatusCallbacks = async (
-  logGroup: string,
-  messageId: string,
-) => {
-  let callbacks: Awaited<ReturnType<typeof getChannelStatusCallbacks>> = [];
-
-  await waitUntil(
-    async () => {
-      callbacks = await getChannelStatusCallbacks(logGroup, messageId);
-      return callbacks.length > 0;
-    },
-    {
-      intervalBetweenAttempts: 500,
-      timeout: 10_000,
-    },
-  );
-
-  if (callbacks.length === 0) {
-    throw new Error("Timed out waiting for channel status callbacks");
-  }
-
-  return callbacks;
-};
+import {
+  awaitCallbacks,
+  awaitChannelStatusCallbacks,
+  awaitQueueEmpty,
+  getMessageStatusCallbacks,
+  sendSqsEvent,
+} from "helpers";
 
 // eslint-disable-next-line jest/no-disabled-tests
 describe.skip("SQS to Webhook Integration", () => {
@@ -212,7 +95,7 @@ describe.skip("SQS to Webhook Integration", () => {
         },
       };
 
-      const sendMessageResponse = await publishEvent(
+      const sendMessageResponse = await sendSqsEvent(
         sqsClient,
         TEST_CALLBACK_EVENT_QUEUE_URL,
         messageStatusEvent,
@@ -225,9 +108,13 @@ describe.skip("SQS to Webhook Integration", () => {
         "ApproximateNumberOfMessagesNotVisible",
       ]);
 
-      const callbacks = await awaitMessageStatusCallbacks(
-        TEST_MOCK_WEBHOOK_LOG_GROUP,
-        messageStatusEvent.data.messageId,
+      const callbacks = await awaitCallbacks(
+        () =>
+          getMessageStatusCallbacks(
+            TEST_MOCK_WEBHOOK_LOG_GROUP,
+            messageStatusEvent.data.messageId,
+          ),
+        10_000,
       );
 
       expect(callbacks).toHaveLength(1);
@@ -286,7 +173,7 @@ describe.skip("SQS to Webhook Integration", () => {
         },
       };
 
-      const sendMessageResponse = await publishEvent(
+      const sendMessageResponse = await sendSqsEvent(
         sqsClient,
         TEST_CALLBACK_EVENT_QUEUE_URL,
         channelStatusEvent,

@@ -1,5 +1,5 @@
 import type { SQSRecord } from "aws-lambda";
-import { Logger } from "services/logger";
+import { Logger, flushLogs } from "services/logger";
 import { CallbackMetrics, createMetricLogger } from "services/metrics";
 import { ObservabilityService } from "services/observability";
 import { ConfigLoaderService } from "services/config-loader-service";
@@ -36,7 +36,13 @@ export function createHandler(
 
   return async (event: SQSRecord[]): Promise<TransformedEvent[]> => {
     const observability = createObservabilityService();
-    return processEvents(event, observability, configLoader.getLoader());
+    const result = await processEvents(
+      event,
+      observability,
+      configLoader.getLoader(),
+    );
+    await flushLogs();
+    return result;
   };
 }
 
