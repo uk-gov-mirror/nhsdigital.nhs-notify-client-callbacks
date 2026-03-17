@@ -1,72 +1,115 @@
-import {
-  type ChannelStatusData,
-  type MessageStatusData,
-  type StatusPublishEvent,
+import type {
+  ChannelStatusAttributes,
+  MessageStatusAttributes,
+  StatusPublishEvent,
 } from "@nhs-notify-client-callbacks/models";
 import { TransformationError } from "services/error-handler";
 import { transformEvent } from "services/transformers/event-transformer";
-
-const baseEvent = {
-  specversion: "1.0",
-  source: "/nhs/england/notify/development/primary/data-plane/messaging",
-  subject: "customer/client-abc-123/message/msg-789-xyz",
-  time: "2026-02-05T14:30:00.000Z",
-  datacontenttype: "application/json",
-  traceparent: "00-4d678967f96e353c07a0a31c1849b500-07f83ba58dd8df70-01",
-};
-
-const messageStatusEvent: StatusPublishEvent<MessageStatusData> = {
-  ...baseEvent,
-  id: "msg-event-id-001",
-  dataschema: "https://notify.nhs.uk/schemas/message-status-published-v1.json",
-  type: "uk.nhs.notify.message.status.PUBLISHED.v1",
-  data: {
-    clientId: "client-abc-123",
-    messageId: "msg-789-xyz",
-    messageReference: "client-ref-12345",
-    messageStatus: "DELIVERED",
-    channels: [{ type: "NHSAPP", channelStatus: "DELIVERED" }],
-    timestamp: "2026-02-05T14:29:55Z",
-    routingPlan: {
-      id: "routing-plan-123",
-      name: "NHS App",
-      version: "v1",
-      createdDate: "2023-11-17T14:27:51.413Z",
-    },
-  },
-};
-
-const channelStatusEvent: StatusPublishEvent<ChannelStatusData> = {
-  ...baseEvent,
-  id: "ch-event-id-001",
-  dataschema: "https://notify.nhs.uk/schemas/channel-status-published-v1.json",
-  type: "uk.nhs.notify.channel.status.PUBLISHED.v1",
-  data: {
-    clientId: "client-abc-123",
-    messageId: "msg-789-xyz",
-    messageReference: "client-ref-12345",
-    channel: "NHSAPP",
-    channelStatus: "DELIVERED",
-    supplierStatus: "delivered",
-    cascadeType: "primary",
-    cascadeOrder: 1,
-    retryCount: 0,
-    timestamp: "2026-02-05T14:29:55Z",
-  },
-};
+import {
+  expectedMessageStatusAttributes,
+  expectedMessageStatusAttributesWithFailure,
+  messageStatusEvent,
+  messageStatusEventWithFailure,
+} from "__tests__/fixtures/core-domain-events/message-status-event";
+import {
+  channelStatusEvent,
+  channelStatusEventWithFailure,
+  expectedChannelStatusAttributes,
+  expectedChannelStatusAttributesWithFailure,
+} from "__tests__/fixtures/core-domain-events/channel-status-event";
 
 describe("event-transformer", () => {
   describe("transformEvent", () => {
-    it("transforms a message status event", () => {
-      const result = transformEvent(messageStatusEvent, "corr-id-001");
+    describe("message status events", () => {
+      it("transforms message status event to callback payload with correct attributes", () => {
+        const result = transformEvent(
+          messageStatusEvent,
+          "corr-msg-001",
+          "/v1/message-batches",
+        );
+        const attributes = result.data[0].attributes as MessageStatusAttributes;
 
-      expect(result.data[0].type).toBe("MessageStatus");
+        expect(attributes).toEqual(expectedMessageStatusAttributes);
+      });
+
+      it("transforms failed message status event with failure fields", () => {
+        const result = transformEvent(
+          messageStatusEventWithFailure,
+          "corr-msg-002",
+          "/v1/message-batches",
+        );
+        const attributes = result.data[0].attributes as MessageStatusAttributes;
+
+        expect(attributes).toEqual(expectedMessageStatusAttributesWithFailure);
+      });
+
+      it("produces MessageStatus type in data array", () => {
+        const result = transformEvent(
+          messageStatusEvent,
+          "corr-msg-003",
+          "/v1/message-batches",
+        );
+
+        expect(result.data[0].type).toBe("MessageStatus");
+      });
+
+      it("produces correct message link", () => {
+        const result = transformEvent(
+          messageStatusEvent,
+          "corr-msg-004",
+          "/v1/message-batches",
+        );
+
+        expect(result.data[0].links.message).toBe(
+          `/v1/message-batches/messages/${messageStatusEvent.data.messageId}`,
+        );
+      });
     });
 
-    it("transforms a channel status event", () => {
-      const result = transformEvent(channelStatusEvent, "corr-id-002");
+    describe("channel status events", () => {
+      it("transforms channel status event to callback payload with correct attributes", () => {
+        const result = transformEvent(
+          channelStatusEvent,
+          "corr-ch-001",
+          "/v1/message-batches",
+        );
+        const attributes = result.data[0].attributes as ChannelStatusAttributes;
 
-      expect(result.data[0].type).toBe("ChannelStatus");
+        expect(attributes).toEqual(expectedChannelStatusAttributes);
+      });
+
+      it("transforms failed channel status event with failure fields", () => {
+        const result = transformEvent(
+          channelStatusEventWithFailure,
+          "corr-ch-002",
+          "/v1/message-batches",
+        );
+        const attributes = result.data[0].attributes as ChannelStatusAttributes;
+
+        expect(attributes).toEqual(expectedChannelStatusAttributesWithFailure);
+      });
+
+      it("produces ChannelStatus type in data array", () => {
+        const result = transformEvent(
+          channelStatusEvent,
+          "corr-ch-003",
+          "/v1/message-batches",
+        );
+
+        expect(result.data[0].type).toBe("ChannelStatus");
+      });
+
+      it("produces correct message link", () => {
+        const result = transformEvent(
+          channelStatusEvent,
+          "corr-ch-004",
+          "/v1/message-batches",
+        );
+
+        expect(result.data[0].links.message).toBe(
+          `/v1/message-batches/messages/${channelStatusEvent.data.messageId}`,
+        );
+      });
     });
 
     it("throws TransformationError for unsupported event type", () => {
@@ -75,13 +118,21 @@ describe("event-transformer", () => {
         type: "uk.nhs.notify.unsupported.event.v1",
       } as unknown as StatusPublishEvent;
 
-      expect(() => transformEvent(unsupportedEvent, "corr-id-003")).toThrow(
-        TransformationError,
-      );
+      expect(() =>
+        transformEvent(
+          unsupportedEvent,
+          "corr-id-003",
+          "https://api.example.com",
+        ),
+      ).toThrow(TransformationError);
 
-      expect(() => transformEvent(unsupportedEvent, "corr-id-003")).toThrow(
-        "Unsupported event type: uk.nhs.notify.unsupported.event.v1",
-      );
+      expect(() =>
+        transformEvent(
+          unsupportedEvent,
+          "corr-id-003",
+          "https://api.example.com",
+        ),
+      ).toThrow("Unsupported event type: uk.nhs.notify.unsupported.event.v1");
     });
 
     it("includes correlationId in TransformationError when provided", () => {
@@ -92,7 +143,11 @@ describe("event-transformer", () => {
 
       let caughtError: unknown;
       try {
-        transformEvent(unsupportedEvent, "test-correlation-id");
+        transformEvent(
+          unsupportedEvent,
+          "test-correlation-id",
+          "https://api.example.com",
+        );
       } catch (error) {
         caughtError = error;
       }

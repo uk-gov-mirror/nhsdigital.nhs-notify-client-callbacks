@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import type {
   ChannelStatusAttributes,
   ChannelStatusData,
@@ -10,6 +11,7 @@ import type {
 
 export function transformChannelStatus(
   event: StatusPublishEvent<ChannelStatusData>,
+  messageRootUri: string,
 ): ClientCallbackPayload {
   const notifyData = event.data;
   const { messageId } = notifyData;
@@ -18,6 +20,23 @@ export function transformChannelStatus(
     notifyData.channelStatus.toLowerCase() as ClientChannelStatus;
   const supplierStatus =
     notifyData.supplierStatus.toLowerCase() as ClientSupplierStatus;
+
+  const idempotencyBody = {
+    messageId,
+    messageReference: notifyData.messageReference,
+    cascadeType: notifyData.cascadeType,
+    cascadeOrder: notifyData.cascadeOrder,
+    channel,
+    channelStatus,
+    channelStatusDescription: notifyData.channelStatusDescription,
+    channelFailureReasonCode: notifyData.channelFailureReasonCode,
+    supplierStatus,
+    retryCount: notifyData.retryCount,
+  };
+
+  const idempotencyKey = createHash("sha256")
+    .update(JSON.stringify(idempotencyBody))
+    .digest("hex");
 
   const attributes: ChannelStatusAttributes = {
     messageId,
@@ -45,10 +64,10 @@ export function transformChannelStatus(
         type: "ChannelStatus",
         attributes,
         links: {
-          message: `/v1/message-batches/messages/${messageId}`,
+          message: `${messageRootUri}/messages/${messageId}`,
         },
         meta: {
-          idempotencyKey: event.id,
+          idempotencyKey,
         },
       },
     ],
