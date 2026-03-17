@@ -1,4 +1,8 @@
-import type { StatusPublishEvent } from "@nhs-notify-client-callbacks/models";
+import type {
+  ChannelStatusAttributes,
+  MessageStatusAttributes,
+  StatusPublishEvent,
+} from "@nhs-notify-client-callbacks/models";
 import { TransformationError } from "services/error-handler";
 import { transformEvent } from "services/transformers/event-transformer";
 import {
@@ -13,10 +17,6 @@ import {
   expectedChannelStatusAttributes,
   expectedChannelStatusAttributesWithFailure,
 } from "__tests__/fixtures/core-domain-events/channel-status-event";
-import {
-  extractChannelStatusAttributes,
-  extractMessageStatusAttributes,
-} from "__tests__/utils/payload-comparator";
 
 describe("event-transformer", () => {
   describe("transformEvent", () => {
@@ -27,7 +27,7 @@ describe("event-transformer", () => {
           "corr-msg-001",
           "/v1/message-batches",
         );
-        const attributes = extractMessageStatusAttributes(result);
+        const attributes = result.data[0].attributes as MessageStatusAttributes;
 
         expect(attributes).toEqual(expectedMessageStatusAttributes);
       });
@@ -38,7 +38,7 @@ describe("event-transformer", () => {
           "corr-msg-002",
           "/v1/message-batches",
         );
-        const attributes = extractMessageStatusAttributes(result);
+        const attributes = result.data[0].attributes as MessageStatusAttributes;
 
         expect(attributes).toEqual(expectedMessageStatusAttributesWithFailure);
       });
@@ -73,7 +73,7 @@ describe("event-transformer", () => {
           "corr-ch-001",
           "/v1/message-batches",
         );
-        const attributes = extractChannelStatusAttributes(result);
+        const attributes = result.data[0].attributes as ChannelStatusAttributes;
 
         expect(attributes).toEqual(expectedChannelStatusAttributes);
       });
@@ -84,7 +84,7 @@ describe("event-transformer", () => {
           "corr-ch-002",
           "/v1/message-batches",
         );
-        const attributes = extractChannelStatusAttributes(result);
+        const attributes = result.data[0].attributes as ChannelStatusAttributes;
 
         expect(attributes).toEqual(expectedChannelStatusAttributesWithFailure);
       });
