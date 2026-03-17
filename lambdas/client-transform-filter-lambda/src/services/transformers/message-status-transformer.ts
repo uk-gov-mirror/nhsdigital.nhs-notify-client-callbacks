@@ -29,7 +29,7 @@ export function transformMessageStatus(
     messageId,
     messageReference: notifyData.messageReference,
     messageStatus,
-    messageStatusDescription: notifyData.messageStatusDescription ?? "",
+    messageStatusDescription: notifyData.messageStatusDescription,
     messageFailureReasonCode: notifyData.messageFailureReasonCode,
     channels,
     routingPlan: notifyData.routingPlan,
