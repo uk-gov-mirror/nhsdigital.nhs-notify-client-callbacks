@@ -1,4 +1,4 @@
-import hmacsha256 from "crypto-js/hmac-sha256";
+import { createHmac } from "node:crypto";
 import type { ClientCallbackPayload } from "@nhs-notify-client-callbacks/models";
 import { signPayload } from "services/payload-signer";
 
@@ -11,10 +11,9 @@ describe("signPayload", () => {
     const applicationId = "app-id-1";
     const apiKey = "api-key-1";
 
-    const expected = hmacsha256(
-      JSON.stringify(payload),
-      `${applicationId}.${apiKey}`,
-    ).toString();
+    const expected = createHmac("sha256", `${applicationId}.${apiKey}`)
+      .update(JSON.stringify(payload))
+      .digest("hex");
 
     expect(signPayload(payload, applicationId, apiKey)).toBe(expected);
   });
