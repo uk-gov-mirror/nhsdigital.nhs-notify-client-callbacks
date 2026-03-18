@@ -1,5 +1,4 @@
 import type { SQSRecord } from "aws-lambda";
-import { SSMClient } from "@aws-sdk/client-ssm";
 import { Logger, flushLogs } from "services/logger";
 import { CallbackMetrics, createMetricLogger } from "services/metrics";
 import { ObservabilityService } from "services/observability";
@@ -9,24 +8,7 @@ import { type TransformedEvent, processEvents } from "handler";
 
 export const configLoaderService = new ConfigLoaderService();
 
-const DEFAULT_SSM_CACHE_TTL_SECONDS = 60;
-
-export const createSsmClient = (
-  env: NodeJS.ProcessEnv = process.env,
-): SSMClient => {
-  const endpoint = env.AWS_ENDPOINT_URL;
-  return new SSMClient({ endpoint });
-};
-
-export const applicationsMapService = new ApplicationsMapService(
-  createSsmClient(),
-  process.env.APPLICATIONS_MAP_PARAMETER ?? "",
-  (Number.parseInt(
-    process.env.APPLICATIONS_MAP_CACHE_TTL_SECONDS ??
-      `${DEFAULT_SSM_CACHE_TTL_SECONDS}`,
-    10,
-  ) || DEFAULT_SSM_CACHE_TTL_SECONDS) * 1000,
-);
+export const applicationsMapService = new ApplicationsMapService();
 
 export interface HandlerDependencies {
   createObservabilityService?: () => ObservabilityService;

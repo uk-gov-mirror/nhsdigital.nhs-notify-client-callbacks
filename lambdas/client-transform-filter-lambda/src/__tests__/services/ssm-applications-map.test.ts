@@ -1,5 +1,9 @@
 import { GetParameterCommand, SSMClient } from "@aws-sdk/client-ssm";
-import { ApplicationsMapService } from "services/ssm-applications-map";
+import {
+  ApplicationsMapService,
+  createSsmClient,
+  resolveCacheTtlMs,
+} from "services/ssm-applications-map";
 
 jest.mock("services/logger", () => ({
   logger: {
@@ -86,6 +90,15 @@ describe("ApplicationsMapService", () => {
     );
   });
 
+  it("throws when APPLICATIONS_MAP_PARAMETER is not set", async () => {
+    const ssmClient = makeSsmClient(JSON.stringify({ "client-1": "app-id-1" }));
+    const service = new ApplicationsMapService(ssmClient, undefined);
+
+    await expect(service.getApplicationId("client-1")).rejects.toThrow(
+      "APPLICATIONS_MAP_PARAMETER is required",
+    );
+  });
+
   it("throws when SSM parameter has empty value", async () => {
     const ssmClient = {
       send: jest.fn().mockResolvedValue({ Parameter: { Value: "" } }),
@@ -115,5 +128,29 @@ describe("ApplicationsMapService", () => {
     await service.getApplicationId("client-1");
 
     expect(ssmClient.send).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe("resolveCacheTtlMs", () => {
+  it("returns configured value in ms", () => {
+    expect(
+      resolveCacheTtlMs({ APPLICATIONS_MAP_CACHE_TTL_SECONDS: "30" }),
+    ).toBe(30_000);
+  });
+
+  it("returns default when env var is absent", () => {
+    expect(resolveCacheTtlMs({})).toBe(60_000);
+  });
+
+  it("returns default when env var is not a valid number", () => {
+    expect(
+      resolveCacheTtlMs({ APPLICATIONS_MAP_CACHE_TTL_SECONDS: "invalid" }),
+    ).toBe(60_000);
+  });
+});
+
+describe("createSsmClient", () => {
+  it("returns an SSMClient instance", () => {
+    expect(createSsmClient({})).toBeInstanceOf(SSMClient);
   });
 });
