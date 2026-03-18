@@ -1,6 +1,15 @@
 import { GetParameterCommand, SSMClient } from "@aws-sdk/client-ssm";
 import { ApplicationsMapService } from "services/ssm-applications-map";
 
+jest.mock("services/logger", () => ({
+  logger: {
+    debug: jest.fn(),
+    info: jest.fn(),
+    warn: jest.fn(),
+    error: jest.fn(),
+  },
+}));
+
 const makeSsmClient = (value: string | undefined) =>
   ({
     send: jest
@@ -85,6 +94,15 @@ describe("ApplicationsMapService", () => {
 
     await expect(service.getApplicationId("client-1")).rejects.toThrow(
       "SSM parameter '/test/param' not found or has no value",
+    );
+  });
+
+  it("throws when SSM parameter contains invalid JSON", async () => {
+    const ssmClient = makeSsmClient("not valid json");
+    const service = new ApplicationsMapService(ssmClient, "/test/param");
+
+    await expect(service.getApplicationId("client-1")).rejects.toThrow(
+      "SSM parameter '/test/param' contains invalid JSON",
     );
   });
 

@@ -38,10 +38,14 @@ export class ApplicationsMapService {
       );
     }
 
-    const parsed = JSON.parse(response.Parameter.Value) as Record<
-      string,
-      string
-    >;
+    let parsed: Record<string, string>;
+    try {
+      parsed = JSON.parse(response.Parameter.Value) as Record<string, string>;
+    } catch {
+      throw new Error(
+        `SSM parameter '${this.parameterName}' contains invalid JSON`,
+      );
+    }
     this.cachedMap = new Map(Object.entries(parsed));
     this.cacheExpiresAt = Date.now() + this.cacheTtlMs;
     logger.info("Applications map loaded from SSM", {
