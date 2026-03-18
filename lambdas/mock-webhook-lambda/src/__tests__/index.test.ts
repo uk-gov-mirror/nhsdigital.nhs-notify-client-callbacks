@@ -22,7 +22,10 @@ const mockLogger = jest.requireMock(
   "@nhs-notify-client-callbacks/logger",
 ).instance;
 
-const DEFAULT_HEADERS = { "x-api-key": TEST_API_KEY };
+const DEFAULT_HEADERS = {
+  "x-api-key": TEST_API_KEY,
+  "x-hmac-sha256-signature": "abc123",
+};
 
 const createMockEvent = (
   body: string | null,
@@ -60,6 +63,18 @@ describe("Mock Webhook Lambda", () => {
       expect(result.statusCode).toBe(401);
       const body = JSON.parse(result.body);
       expect(body.message).toBe("Unauthorized");
+    });
+
+    it("should return 400 when x-hmac-sha256-signature header is missing", async () => {
+      const callback = { data: [] };
+      const event = createMockEvent(JSON.stringify(callback), {
+        "x-api-key": TEST_API_KEY,
+      });
+      const result = await handler(event);
+
+      expect(result.statusCode).toBe(400);
+      const body = JSON.parse(result.body);
+      expect(body.message).toBe("Missing x-hmac-sha256-signature");
     });
   });
 

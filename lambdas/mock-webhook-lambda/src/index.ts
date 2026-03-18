@@ -52,6 +52,14 @@ async function buildResponse(
     };
   }
 
+  if (!event.headers["x-hmac-sha256-signature"]) {
+    logger.error("Bad request: missing x-hmac-sha256-signature header");
+    return {
+      statusCode: 400,
+      body: JSON.stringify({ message: "Missing x-hmac-sha256-signature" }),
+    };
+  }
+
   if (!event.body) {
     logger.error("No event body received");
 
