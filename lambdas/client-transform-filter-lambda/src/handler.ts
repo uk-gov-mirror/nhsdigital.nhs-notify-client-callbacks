@@ -2,6 +2,7 @@ import type { SQSRecord } from "aws-lambda";
 import pMap from "p-map";
 import type {
   ClientCallbackPayload,
+  ClientSubscriptionConfiguration,
   StatusPublishEvent,
 } from "@nhs-notify-client-callbacks/models";
 import { validateStatusPublishEvent } from "services/validators/event-validator";
@@ -121,10 +122,12 @@ function processSingleEvent(
   };
 }
 
+type ClientConfigMap = Map<string, ClientSubscriptionConfiguration | undefined>;
+
 async function signBatch(
   filteredEvents: UnsignedEvent[],
   applicationsMapService: ApplicationsMapService,
-  configLoader: ConfigLoader,
+  configByClientId: ClientConfigMap,
   stats: BatchStats,
 ): Promise<TransformedEvent[]> {
   const results = await pMap(
@@ -144,7 +147,7 @@ async function signBatch(
         return undefined;
       }
 
-      const clientConfig = await configLoader.loadClientConfig(clientId);
+      const clientConfig = configByClientId.get(clientId);
       const apiKey = clientConfig?.[0]?.Targets?.[0]?.APIKey?.HeaderValue;
       if (!apiKey) {
         stats.recordFiltered();
@@ -184,19 +187,12 @@ function recordDeliveryInitiated(
   }
 }
 
-async function filterBatch(
-  transformedEvents: UnsignedEvent[],
+async function loadClientConfigs(
+  events: UnsignedEvent[],
   configLoader: ConfigLoader,
-  observability: ObservabilityService,
-  stats: BatchStats,
-): Promise<UnsignedEvent[]> {
-  observability.recordFilteringStarted({ batchSize: transformedEvents.length });
-
-  const uniqueClientIds = new Set(
-    transformedEvents.map((e) => e.data.clientId),
-  );
-
-  const configEntries = await pMap(
+): Promise<ClientConfigMap> {
+  const uniqueClientIds = new Set(events.map((e) => e.data.clientId));
+  const entries = await pMap(
     uniqueClientIds,
     async (clientId) => {
       const config = await configLoader.loadClientConfig(clientId);
@@ -204,8 +200,16 @@ async function filterBatch(
     },
     { concurrency: BATCH_CONCURRENCY },
   );
+  return new Map(entries);
+}
 
-  const configByClientId = new Map(configEntries);
+async function filterBatch(
+  transformedEvents: UnsignedEvent[],
+  configByClientId: ClientConfigMap,
+  observability: ObservabilityService,
+  stats: BatchStats,
+): Promise<UnsignedEvent[]> {
+  observability.recordFilteringStarted({ batchSize: transformedEvents.length });
 
   const filtered: UnsignedEvent[] = [];
 
@@ -278,9 +282,14 @@ export async function processEvents(
   try {
     const transformedEvents = await transformBatch(event, observability, stats);
 
-    const filteredEvents = await filterBatch(
+    const configByClientId = await loadClientConfigs(
       transformedEvents,
       configLoader,
+    );
+
+    const filteredEvents = await filterBatch(
+      transformedEvents,
+      configByClientId,
       observability,
       stats,
     );
@@ -288,7 +297,7 @@ export async function processEvents(
     const signedEvents = await signBatch(
       filteredEvents,
       applicationsMapService,
-      configLoader,
+      configByClientId,
       stats,
     );
 
