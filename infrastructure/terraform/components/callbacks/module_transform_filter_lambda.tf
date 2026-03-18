@@ -37,7 +37,7 @@ module "client_transform_filter_lambda" {
   lambda_env_vars = {
     ENVIRONMENT                           = var.environment
     METRICS_NAMESPACE                     = "nhs-notify-client-callbacks"
-    DEBUG_BUCKET_NAME                     = var.deploy_mock_webhook ? module.debug_log_bucket[0].id : ""
+    DEBUG_BUCKET_NAME                     = var.enable_debug_log_bucket ? module.debug_log_bucket[0].id : ""
     CLIENT_SUBSCRIPTION_CONFIG_BUCKET     = module.client_config_bucket.id
     CLIENT_SUBSCRIPTION_CONFIG_PREFIX     = "client_subscriptions/"
     CLIENT_SUBSCRIPTION_CACHE_TTL_SECONDS = "60"
@@ -100,7 +100,7 @@ data "aws_iam_policy_document" "client_transform_filter_lambda" {
   }
 
   dynamic "statement" {
-    for_each = var.deploy_mock_webhook ? toset(["enabled"]) : toset([])
+    for_each = var.enable_debug_log_bucket ? toset(["enabled"]) : toset([])
 
     content {
       sid    = "DebugLogBucketWrite"

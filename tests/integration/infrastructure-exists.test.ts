@@ -13,7 +13,7 @@ describe("Infrastructure exists", () => {
   beforeAll(async () => {
     const deploymentDetails = getDeploymentDetails();
     bucketName = buildSubscriptionConfigBucketName(deploymentDetails);
-    s3Client = createS3Client();
+    s3Client = createS3Client(deploymentDetails);
   });
 
   afterAll(() => {

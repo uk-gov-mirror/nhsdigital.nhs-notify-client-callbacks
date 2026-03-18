@@ -1,5 +1,5 @@
 module "debug_log_bucket" {
-  count  = var.deploy_mock_webhook ? 1 : 0
+  count  = var.enable_debug_log_bucket ? 1 : 0
   source = "https://github.com/NHSDigital/nhs-notify-shared-modules/releases/download/3.0.6/terraform-s3bucket.zip"
 
   name = "debug-log"
@@ -43,7 +43,7 @@ module "debug_log_bucket" {
 }
 
 data "aws_iam_policy_document" "debug_log_bucket" {
-  count = var.deploy_mock_webhook ? 1 : 0
+  count = var.enable_debug_log_bucket ? 1 : 0
 
   statement {
     sid    = "AllowLambdaWriteAccess"

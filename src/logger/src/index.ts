@@ -43,12 +43,15 @@ function writeToDebugBucket(
   const bucketName = process.env.DEBUG_BUCKET_NAME;
   if (!bucketName) return;
 
-  const key = `${Date.now()}-${crypto.randomUUID()}.json`;
+  const context = getContext();
+  if (!context.correlationId) return;
+
+  const key = `${context.correlationId}/${Date.now()}-${crypto.randomUUID()}.json`;
   const body = JSON.stringify({
     level,
     message,
     timestamp: new Date().toISOString(),
-    ...getContext(),
+    ...context,
   });
 
   const write = getS3Client()

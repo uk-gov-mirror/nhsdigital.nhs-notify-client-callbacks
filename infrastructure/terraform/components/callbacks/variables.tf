@@ -124,6 +124,16 @@ variable "pipe_sqs_max_batch_window" {
   default = 2
 }
 
+variable "sqs_inbound_event_visibility_timeout_seconds" {
+  type    = number
+  default = 60
+}
+
+variable "sqs_inbound_event_max_receive_count" {
+  type    = number
+  default = 3
+}
+
 variable "enable_event_anomaly_detection" {
   type        = bool
   description = "Enable CloudWatch anomaly detection alarm for inbound event queue message reception"
@@ -162,4 +172,10 @@ variable "deploy_mock_webhook" {
 variable "message_root_uri" {
   type        = string
   description = "The root URI used for constructing message links in callback payloads"
+}
+
+variable "enable_debug_log_bucket" {
+  type        = bool
+  description = "Enable the debug log S3 bucket used for integration testing"
+  default     = false
 }

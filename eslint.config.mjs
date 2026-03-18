@@ -211,6 +211,25 @@ export default defineConfig([
     },
   },
   {
+    // Files inside helpers/ are loaded transitively by globalSetup/globalTeardown which run
+    // outside Jest's module system, so moduleNameMapper does not apply — relative imports only
+    files: ["tests/integration/helpers/**"],
+    rules: {
+      "no-relative-import-paths/no-relative-import-paths": 0,
+    },
+  },
+  {
+    // globalSetup/globalTeardown run outside Jest's module system so moduleNameMapper
+    // does not apply — relative imports are the only way to reach local helpers
+    files: [
+      "tests/integration/jest.global-setup.ts",
+      "tests/integration/jest.global-teardown.ts",
+    ],
+    rules: {
+      "no-relative-import-paths/no-relative-import-paths": 0,
+    },
+  },
+  {
     // models src uses relative imports for node16 moduleResolution compatibility
     files: ["src/models/src/**"],
     rules: {

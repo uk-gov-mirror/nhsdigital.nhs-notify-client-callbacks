@@ -29,6 +29,6 @@ output "mock_webhook_url" {
 }
 
 output "debug_log_bucket_name" {
-  description = "S3 bucket name for debug logs (integration testing, deploy_mock_webhook=true only)"
-  value       = var.deploy_mock_webhook ? module.debug_log_bucket[0].id : null
+  description = "S3 bucket name for debug logs (integration testing only)"
+  value       = var.enable_debug_log_bucket ? module.debug_log_bucket[0].id : null
 }

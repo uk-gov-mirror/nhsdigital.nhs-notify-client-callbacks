@@ -1,120 +1,76 @@
-import { PurgeQueueCommand, SQSClient } from "@aws-sdk/client-sqs";
-import type {
-  MessageStatusData,
-  StatusPublishEvent,
+import { DeleteMessageCommand, SQSClient } from "@aws-sdk/client-sqs";
+import {
+  type ChannelStatusData,
+  type MessageStatusData,
+  type StatusPublishEvent,
 } from "@nhs-notify-client-callbacks/models";
 import {
-  awaitCallbacks,
-  awaitChannelStatusCallbacks,
-  awaitQueueEmpty,
-  getMessageStatusCallbacks,
+  awaitQueueMessage,
+  awaitQueueMessageByMessageId,
+  buildDebugLogBucketName,
+  buildInboundEventDlqQueueUrl,
+  buildInboundEventQueueUrl,
+  buildMockClientDlqQueueUrl,
+  createChannelStatusPublishEvent,
+  createMessageStatusPublishEvent,
+  createS3Client,
+  createSqsClient,
+  ensureInboundQueueIsEmpty,
+  getDeploymentDetails,
+  processChannelStatusEvent,
+  processMessageStatusEvent,
+  purgeQueues,
   sendSqsEvent,
 } from "helpers";
+import { S3Client } from "@aws-sdk/client-s3";
 
-// eslint-disable-next-line jest/no-disabled-tests
-describe.skip("SQS to Webhook Integration", () => {
+describe("SQS to Webhook Integration", () => {
   let sqsClient: SQSClient;
+  let s3Client: S3Client;
+  let callbackEventQueueUrl: string;
+  let clientDlqQueueUrl: string;
+  let inboundEventDlqQueueUrl: string;
+  let debugLogBucketName: string;
 
-  const { TEST_CALLBACK_EVENT_QUEUE_URL } = process.env;
-  const { TEST_MOCK_WEBHOOK_URL } = process.env;
-  const { TEST_MOCK_WEBHOOK_LOG_GROUP } = process.env;
-  const { REGION } = process.env;
+  beforeAll(async () => {
+    const deploymentDetails = getDeploymentDetails();
 
-  beforeAll(() => {
-    sqsClient = new SQSClient({ region: REGION });
+    sqsClient = createSqsClient(deploymentDetails);
+    s3Client = createS3Client(deploymentDetails);
+    callbackEventQueueUrl = buildInboundEventQueueUrl(deploymentDetails);
+    clientDlqQueueUrl = buildMockClientDlqQueueUrl(deploymentDetails);
+    debugLogBucketName = buildDebugLogBucketName(deploymentDetails);
+    inboundEventDlqQueueUrl = buildInboundEventDlqQueueUrl(deploymentDetails);
+
+    await purgeQueues(sqsClient, [
+      inboundEventDlqQueueUrl,
+      clientDlqQueueUrl,
+      callbackEventQueueUrl,
+    ]);
   });
 
-  afterAll(() => {
+  afterAll(async () => {
+    await purgeQueues(sqsClient, [
+      inboundEventDlqQueueUrl,
+      clientDlqQueueUrl,
+      callbackEventQueueUrl,
+    ]);
+
     sqsClient.destroy();
-  });
-
-  beforeEach(async () => {
-    if (TEST_CALLBACK_EVENT_QUEUE_URL) {
-      try {
-        await sqsClient.send(
-          new PurgeQueueCommand({
-            QueueUrl: TEST_CALLBACK_EVENT_QUEUE_URL,
-          }),
-        );
-      } catch (error) {
-        if (error instanceof Error && error.name !== "PurgeQueueInProgress") {
-          throw error;
-        }
-      }
-    }
+    s3Client.destroy();
   });
 
   describe("Message Status Event Flow", () => {
     it("should process message status event from SQS to webhook", async () => {
-      if (!TEST_MOCK_WEBHOOK_URL) {
-        return;
-      }
+      const messageStatusEvent: StatusPublishEvent<MessageStatusData> =
+        createMessageStatusPublishEvent();
 
-      if (!TEST_MOCK_WEBHOOK_LOG_GROUP) {
-        throw new Error(
-          "TEST_MOCK_WEBHOOK_LOG_GROUP must be set for this test",
-        );
-      }
-
-      if (!TEST_CALLBACK_EVENT_QUEUE_URL) {
-        throw new Error(
-          "TEST_CALLBACK_EVENT_QUEUE_URL must be set for this test",
-        );
-      }
-
-      const messageStatusEvent: StatusPublishEvent<MessageStatusData> = {
-        specversion: "1.0",
-        id: crypto.randomUUID(),
-        source: "/nhs/england/notify/development/primary/data-plane/messaging",
-        subject: `customer/${crypto.randomUUID()}/message/test-msg-${Date.now()}`,
-        type: "uk.nhs.notify.message.status.PUBLISHED.v1",
-        time: new Date().toISOString(),
-        datacontenttype: "application/json",
-        dataschema:
-          "https://notify.nhs.uk/schemas/message-status-published-v1.json",
-        traceparent: "00-4d678967f96e353c07a0a31c1849b500-07f83ba58dd8df70-01",
-        data: {
-          clientId: "mock-client",
-          messageId: `test-msg-${Date.now()}`,
-          messageReference: `test-ref-${Date.now()}`,
-          messageStatus: "DELIVERED",
-          messageStatusDescription: "Integration test message delivered",
-          channels: [
-            {
-              type: "NHSAPP",
-              channelStatus: "DELIVERED",
-            },
-          ],
-          timestamp: new Date().toISOString(),
-          routingPlan: {
-            id: `routing-plan-${crypto.randomUUID()}`,
-            name: "Test routing plan",
-            version: "v1.0.0",
-            createdDate: new Date().toISOString(),
-          },
-        },
-      };
-
-      const sendMessageResponse = await sendSqsEvent(
+      const callbacks = await processMessageStatusEvent(
         sqsClient,
-        TEST_CALLBACK_EVENT_QUEUE_URL,
+        s3Client,
+        callbackEventQueueUrl,
+        debugLogBucketName,
         messageStatusEvent,
-      );
-
-      expect(sendMessageResponse.MessageId).toBeDefined();
-
-      await awaitQueueEmpty(sqsClient, TEST_CALLBACK_EVENT_QUEUE_URL, [
-        "ApproximateNumberOfMessages",
-        "ApproximateNumberOfMessagesNotVisible",
-      ]);
-
-      const callbacks = await awaitCallbacks(
-        () =>
-          getMessageStatusCallbacks(
-            TEST_MOCK_WEBHOOK_LOG_GROUP,
-            messageStatusEvent.data.messageId,
-          ),
-        10_000,
       );
 
       expect(callbacks).toHaveLength(1);
@@ -126,66 +82,20 @@ describe.skip("SQS to Webhook Integration", () => {
           messageStatus: "delivered",
         }),
       });
-    }, 30_000);
+    }, 120_000);
   });
 
   describe("Channel Status Event Flow", () => {
     it("should process channel status event from SQS to webhook", async () => {
-      if (!TEST_MOCK_WEBHOOK_URL) {
-        return;
-      }
+      const channelStatusEvent: StatusPublishEvent<ChannelStatusData> =
+        createChannelStatusPublishEvent();
 
-      if (!TEST_MOCK_WEBHOOK_LOG_GROUP) {
-        throw new Error(
-          "TEST_MOCK_WEBHOOK_LOG_GROUP must be set for this test",
-        );
-      }
-
-      if (!TEST_CALLBACK_EVENT_QUEUE_URL) {
-        throw new Error(
-          "TEST_CALLBACK_EVENT_QUEUE_URL must be set for this test",
-        );
-      }
-
-      const channelStatusEvent: StatusPublishEvent = {
-        specversion: "1.0",
-        id: crypto.randomUUID(),
-        source: "/nhs/england/notify/development/primary/data-plane/messaging",
-        subject: `customer/${crypto.randomUUID()}/message/test-msg-${Date.now()}/channel/nhsapp`,
-        type: "uk.nhs.notify.channel.status.PUBLISHED.v1",
-        time: new Date().toISOString(),
-        datacontenttype: "application/json",
-        dataschema:
-          "https://notify.nhs.uk/schemas/channel-status-published-v1.json",
-        traceparent: "00-4d678967f96e353c07a0a31c1849b500-07f83ba58dd8df70-02",
-        data: {
-          clientId: "mock-client",
-          messageId: `test-msg-${Date.now()}`,
-          messageReference: `test-ref-${Date.now()}`,
-          channel: "NHSAPP",
-          channelStatus: "DELIVERED",
-          channelStatusDescription: "Integration test channel delivered",
-          supplierStatus: "delivered",
-          cascadeType: "primary",
-          cascadeOrder: 1,
-          timestamp: new Date().toISOString(),
-          retryCount: 0,
-        },
-      };
-
-      const sendMessageResponse = await sendSqsEvent(
+      const callbacks = await processChannelStatusEvent(
         sqsClient,
-        TEST_CALLBACK_EVENT_QUEUE_URL,
+        s3Client,
+        callbackEventQueueUrl,
+        debugLogBucketName,
         channelStatusEvent,
-      );
-
-      expect(sendMessageResponse.MessageId).toBeDefined();
-
-      await awaitQueueEmpty(sqsClient, TEST_CALLBACK_EVENT_QUEUE_URL);
-
-      const callbacks = await awaitChannelStatusCallbacks(
-        TEST_MOCK_WEBHOOK_LOG_GROUP,
-        channelStatusEvent.data.messageId,
       );
 
       expect(callbacks).toHaveLength(1);
@@ -199,6 +109,73 @@ describe.skip("SQS to Webhook Integration", () => {
           messageId: channelStatusEvent.data.messageId,
         }),
       });
-    }, 30_000);
+    }, 120_000);
+  });
+
+  describe("Client Webhook DLQ", () => {
+    it("should route a non-retriable (4xx) webhook response to the per-client DLQ", async () => {
+      const event: StatusPublishEvent<MessageStatusData> =
+        createMessageStatusPublishEvent({
+          data: {
+            messageId: `force-400-${Date.now()}`,
+          },
+        });
+
+      await sendSqsEvent(sqsClient, callbackEventQueueUrl, event);
+
+      const dlqMessage = await awaitQueueMessage(sqsClient, clientDlqQueueUrl);
+
+      expect(dlqMessage.Body).toBeDefined();
+      expect(dlqMessage.MessageAttributes?.ERROR_CODE?.StringValue).toBe(
+        "INVALID_PARAMETER",
+      );
+      expect(
+        dlqMessage.MessageAttributes?.ERROR_MESSAGE?.StringValue,
+      ).toContain("Forced status 400");
+
+      await sqsClient.send(
+        new DeleteMessageCommand({
+          QueueUrl: clientDlqQueueUrl,
+          ReceiptHandle: dlqMessage.ReceiptHandle!,
+        }),
+      );
+    }, 120_000);
+  });
+
+  describe("Inbound Event DLQ", () => {
+    it("should move an invalid inbound event to the inbound-event DLQ when schema validation fails", async () => {
+      const messageId = `invalid-schema-${Date.now()}`;
+      const invalidEvent = createMessageStatusPublishEvent({
+        data: {
+          messageId,
+          channels: [
+            // @ts-expect-error - intentionally invalid for schema-failure DLQ path
+            {
+              channelStatus: "DELIVERED",
+            },
+          ],
+        },
+      });
+
+      await sendSqsEvent(sqsClient, callbackEventQueueUrl, invalidEvent);
+      await ensureInboundQueueIsEmpty(sqsClient, callbackEventQueueUrl);
+
+      const dlqMessage = await awaitQueueMessageByMessageId(
+        sqsClient,
+        inboundEventDlqQueueUrl,
+        messageId,
+      );
+
+      expect(dlqMessage.Body).toBeDefined();
+      const dlqPayload = JSON.parse(dlqMessage.Body as string);
+      expect(dlqPayload.data.messageId).toBe(messageId);
+
+      await sqsClient.send(
+        new DeleteMessageCommand({
+          QueueUrl: inboundEventDlqQueueUrl,
+          ReceiptHandle: dlqMessage.ReceiptHandle!,
+        }),
+      );
+    }, 120_000);
   });
 });

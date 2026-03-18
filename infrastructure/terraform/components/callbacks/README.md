@@ -18,6 +18,7 @@
 | <a name="input_component"></a> [component](#input\_component) | The variable encapsulating the name of this component | `string` | `"callbacks"` | no |
 | <a name="input_default_tags"></a> [default\_tags](#input\_default\_tags) | A map of default tags to apply to all taggable resources within the component | `map(string)` | `{}` | no |
 | <a name="input_deploy_mock_webhook"></a> [deploy\_mock\_webhook](#input\_deploy\_mock\_webhook) | Flag to deploy mock webhook lambda for integration testing (test/dev environments only) | `bool` | `false` | no |
+| <a name="input_enable_debug_log_bucket"></a> [enable\_debug\_log\_bucket](#input\_enable\_debug\_log\_bucket) | Enable the debug log S3 bucket used for integration testing | `bool` | `false` | no |
 | <a name="input_enable_event_anomaly_detection"></a> [enable\_event\_anomaly\_detection](#input\_enable\_event\_anomaly\_detection) | Enable CloudWatch anomaly detection alarm for inbound event queue message reception | `bool` | `true` | no |
 | <a name="input_environment"></a> [environment](#input\_environment) | The name of the tfscaffold environment | `string` | n/a | yes |
 | <a name="input_event_anomaly_band_width"></a> [event\_anomaly\_band\_width](#input\_event\_anomaly\_band\_width) | The width of the anomaly detection band. Higher values (e.g. 4-6) reduce sensitivity and noise, lower values (e.g. 2-3) increase sensitivity. Recommended: 2-4. | `number` | `3` | no |
@@ -36,6 +37,8 @@
 | <a name="input_pipe_sqs_max_batch_window"></a> [pipe\_sqs\_max\_batch\_window](#input\_pipe\_sqs\_max\_batch\_window) | n/a | `number` | `2` | no |
 | <a name="input_project"></a> [project](#input\_project) | The name of the tfscaffold project | `string` | n/a | yes |
 | <a name="input_region"></a> [region](#input\_region) | The AWS Region | `string` | n/a | yes |
+| <a name="input_sqs_inbound_event_max_receive_count"></a> [sqs\_inbound\_event\_max\_receive\_count](#input\_sqs\_inbound\_event\_max\_receive\_count) | n/a | `number` | `3` | no |
+| <a name="input_sqs_inbound_event_visibility_timeout_seconds"></a> [sqs\_inbound\_event\_visibility\_timeout\_seconds](#input\_sqs\_inbound\_event\_visibility\_timeout\_seconds) | n/a | `number` | `60` | no |
 ## Modules
 
 | Name | Source | Version |
@@ -51,7 +54,7 @@
 
 | Name | Description |
 |------|-------------|
-| <a name="output_debug_log_bucket_name"></a> [debug\_log\_bucket\_name](#output\_debug\_log\_bucket\_name) | S3 bucket name for debug logs (integration testing, deploy\_mock\_webhook=true only) |
+| <a name="output_debug_log_bucket_name"></a> [debug\_log\_bucket\_name](#output\_debug\_log\_bucket\_name) | S3 bucket name for debug logs (integration testing only) |
 | <a name="output_deployment"></a> [deployment](#output\_deployment) | Deployment details used for post-deployment scripts |
 | <a name="output_mock_webhook_lambda_log_group_name"></a> [mock\_webhook\_lambda\_log\_group\_name](#output\_mock\_webhook\_lambda\_log\_group\_name) | CloudWatch log group name for mock webhook lambda (for integration test queries) |
 | <a name="output_mock_webhook_url"></a> [mock\_webhook\_url](#output\_mock\_webhook\_url) | URL endpoint for mock webhook (for TEST\_WEBHOOK\_URL environment variable) |

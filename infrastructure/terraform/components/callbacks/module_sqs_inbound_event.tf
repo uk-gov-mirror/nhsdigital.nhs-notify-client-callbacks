@@ -10,7 +10,8 @@ module "sqs_inbound_event" {
 
   sqs_kms_key_arn = module.kms.key_arn
 
-  visibility_timeout_seconds = 60
+  visibility_timeout_seconds = var.sqs_inbound_event_visibility_timeout_seconds
+  max_receive_count          = var.sqs_inbound_event_max_receive_count
 
   create_dlq = true
 

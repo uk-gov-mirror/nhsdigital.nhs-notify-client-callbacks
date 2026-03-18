@@ -262,6 +262,54 @@ describe("Mock Webhook Lambda", () => {
     });
   });
 
+  describe("Forced Status Codes", () => {
+    it("should return forced status code when messageId starts with force-400-", async () => {
+      const callback = {
+        data: [
+          {
+            type: "MessageStatus",
+            attributes: {
+              messageId: "force-400-test",
+              messageStatus: "delivered",
+            },
+            links: { message: "some-message-link" },
+            meta: { idempotencyKey: "some-idempotency-key" },
+          },
+        ],
+      };
+
+      const event = createMockEvent(JSON.stringify(callback));
+      const result = await handler(event);
+
+      expect(result.statusCode).toBe(400);
+      const body = JSON.parse(result.body);
+      expect(body.message).toBe("Forced status 400");
+    });
+
+    it("should return forced status code when messageId starts with force-500-", async () => {
+      const callback = {
+        data: [
+          {
+            type: "MessageStatus",
+            attributes: {
+              messageId: "force-500-test",
+              messageStatus: "delivered",
+            },
+            links: { message: "some-message-link" },
+            meta: { idempotencyKey: "some-idempotency-key" },
+          },
+        ],
+      };
+
+      const event = createMockEvent(JSON.stringify(callback));
+      const result = await handler(event);
+
+      expect(result.statusCode).toBe(500);
+      const body = JSON.parse(result.body);
+      expect(body.message).toBe("Forced status 500");
+    });
+  });
+
   describe("Logging", () => {
     it("should log callback with structured format including messageId", async () => {
       const callback = {

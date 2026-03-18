@@ -275,7 +275,7 @@ describe("S3 debug bucket writes", () => {
     expect(PutObjectCommand).toHaveBeenCalledWith(
       expect.objectContaining({
         Bucket: "test-debug-bucket",
-        Key: expect.stringMatching(/^\d+-.+\.json$/),
+        Key: expect.stringMatching(/corr-123\/[0-9a-f-]+\.json$/),
         ContentType: "application/json",
         Body: expect.stringContaining('"message":"Test message"'),
       }),
@@ -307,7 +307,7 @@ describe("S3 debug bucket writes", () => {
   it("should write for warn and debug levels", () => {
     const { PutObjectCommand } = jest.requireMock("@aws-sdk/client-s3");
 
-    const testLogger = new Logger();
+    const testLogger = new Logger({ correlationId: "corr-levels" });
     testLogger.warn("A warning");
     testLogger.debug("A debug");
 
@@ -337,10 +337,19 @@ describe("S3 debug bucket writes", () => {
     process.env.DEBUG_BUCKET_NAME = "test-debug-bucket";
   });
 
+  it("should not write to S3 when correlationId is absent", () => {
+    const { PutObjectCommand } = jest.requireMock("@aws-sdk/client-s3");
+
+    const testLogger = new Logger();
+    testLogger.info("No correlationId");
+
+    expect(PutObjectCommand).not.toHaveBeenCalled();
+  });
+
   it("should log an error when the S3 write fails", async () => {
     mockSend.mockRejectedValueOnce(new Error("S3 unavailable"));
 
-    const testLogger = new Logger();
+    const testLogger = new Logger({ correlationId: "corr-fail" });
     testLogger.info("write will fail");
 
     await flushLogs();
