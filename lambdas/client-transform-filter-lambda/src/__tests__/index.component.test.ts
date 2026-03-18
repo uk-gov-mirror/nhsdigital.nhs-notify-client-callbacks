@@ -49,16 +49,6 @@ jest.mock("aws-embedded-metrics", () => ({
   },
 }));
 
-// Set environment variables before importing the handler/module under test so that
-// services constructed at module import time (e.g. applicationsMapService) see
-// the correct configuration.
-process.env.CLIENT_SUBSCRIPTION_CONFIG_BUCKET = "test-bucket";
-process.env.CLIENT_SUBSCRIPTION_CONFIG_PREFIX = "client_subscriptions/";
-process.env.CLIENT_SUBSCRIPTION_CACHE_TTL_SECONDS = "60";
-process.env.METRICS_NAMESPACE = "test-namespace";
-process.env.ENVIRONMENT = "test";
-process.env.APPLICATIONS_MAP_PARAMETER = "/test/applications-map";
-
 import { GetObjectCommand, NoSuchKey } from "@aws-sdk/client-s3";
 import { GetParameterCommand } from "@aws-sdk/client-ssm";
 import type { SQSRecord } from "aws-lambda";
