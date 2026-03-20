@@ -1,6 +1,7 @@
 {
   "dependencies": {
     "@aws-sdk/client-s3": "^3.821.0",
+    "@aws-sdk/client-ssm": "^3.821.0",
     "@nhs-notify-client-callbacks/logger": "*",
     "@nhs-notify-client-callbacks/models": "*",
     "aws-embedded-metrics": "^4.2.1",

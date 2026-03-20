@@ -70,7 +70,7 @@ export async function sendSqsEvent<T>(
   queueUrl: string,
   event: T,
 ) {
-  logger.debug(
+  logger.info(
     `Sending SQS event to ${queueUrl} (eventId=${(event as any).id})`,
   );
   return client.send(

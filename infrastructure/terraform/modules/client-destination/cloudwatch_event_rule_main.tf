@@ -22,6 +22,12 @@ resource "aws_cloudwatch_event_target" "main" {
     arn = module.target_dlq.sqs_queue_arn
   }
 
+  http_target {
+    header_parameters = {
+      "x-hmac-sha256-signature" = "$.detail.headers.x-hmac-sha256-signature"
+    }
+  }
+
   retry_policy {
     maximum_retry_attempts       = 3
     maximum_event_age_in_seconds = 3600
