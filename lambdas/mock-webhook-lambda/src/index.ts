@@ -52,6 +52,7 @@ async function buildResponse(
     };
   }
 
+  // TODO: verify the signature (CCM-15525)
   if (!event.headers["x-hmac-sha256-signature"]) {
     logger.error("Bad request: missing x-hmac-sha256-signature header");
     return {
