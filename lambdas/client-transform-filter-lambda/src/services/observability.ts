@@ -45,6 +45,7 @@ export class ObservabilityService {
   }
 
   recordFilteringMatched(context: {
+    correlationId?: string;
     clientId: string;
     eventType: string;
     subscriptionType: string;

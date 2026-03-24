@@ -5,37 +5,43 @@ import type {
   SupplierStatus,
 } from "./status-types";
 
-export type ClientSubscriptionConfiguration = (
+export type CallbackTarget = {
+  targetId: string;
+  type: "API";
+  invocationEndpoint: string;
+  invocationMethod: "POST";
+  invocationRateLimit: number;
+  apiKey: {
+    headerName: string;
+    headerValue: string;
+  };
+};
+
+type SubscriptionConfigurationBase = {
+  subscriptionId: string;
+  targetIds: string[];
+};
+
+export type MessageStatusSubscriptionConfiguration =
+  SubscriptionConfigurationBase & {
+    subscriptionType: "MessageStatus";
+    messageStatuses: MessageStatus[];
+  };
+
+export type ChannelStatusSubscriptionConfiguration =
+  SubscriptionConfigurationBase & {
+    subscriptionType: "ChannelStatus";
+    channelType: Channel;
+    channelStatuses: ChannelStatus[];
+    supplierStatuses: SupplierStatus[];
+  };
+
+export type SubscriptionConfiguration =
   | MessageStatusSubscriptionConfiguration
-  | ChannelStatusSubscriptionConfiguration
-)[];
+  | ChannelStatusSubscriptionConfiguration;
 
-interface SubscriptionConfigurationBase {
-  SubscriptionId: string;
-  ClientId: string;
-  Targets: {
-    Type: "API";
-    TargetId: string;
-    InvocationEndpoint: string;
-    InvocationMethod: "POST";
-    InvocationRateLimit: number;
-    APIKey: {
-      HeaderName: string;
-      HeaderValue: string;
-    };
-  }[];
-}
-
-export interface MessageStatusSubscriptionConfiguration
-  extends SubscriptionConfigurationBase {
-  SubscriptionType: "MessageStatus";
-  MessageStatuses: MessageStatus[];
-}
-
-export interface ChannelStatusSubscriptionConfiguration
-  extends SubscriptionConfigurationBase {
-  SubscriptionType: "ChannelStatus";
-  ChannelType: Channel;
-  ChannelStatuses: ChannelStatus[];
-  SupplierStatuses: SupplierStatus[];
-}
+export type ClientSubscriptionConfiguration = {
+  clientId: string;
+  subscriptions: SubscriptionConfiguration[];
+  targets: CallbackTarget[];
+};

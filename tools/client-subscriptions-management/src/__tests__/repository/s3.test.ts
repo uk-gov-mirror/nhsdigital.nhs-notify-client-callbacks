@@ -1,5 +1,6 @@
 import {
   GetObjectCommand,
+  ListObjectsV2Command,
   NoSuchKey,
   PutObjectCommand,
   S3Client,
@@ -64,5 +65,31 @@ describe("S3Repository", () => {
 
     expect(send).toHaveBeenCalledTimes(1);
     expect(send.mock.calls[0][0]).toBeInstanceOf(PutObjectCommand);
+  });
+
+  it("lists keys across paginated responses and ignores missing keys", async () => {
+    const send = jest
+      .fn()
+      .mockResolvedValueOnce({
+        Contents: [{ Key: "client_subscriptions/a.json" }, {}],
+        NextContinuationToken: "token-1",
+      })
+      .mockResolvedValueOnce({
+        Contents: [{ Key: "client_subscriptions/b.json" }],
+        NextContinuationToken: undefined,
+      });
+    const repository = new S3Repository("bucket", {
+      send,
+    } as unknown as S3Client);
+
+    const keys = await repository.listObjectKeys("client_subscriptions/");
+
+    expect(keys).toEqual([
+      "client_subscriptions/a.json",
+      "client_subscriptions/b.json",
+    ]);
+    expect(send).toHaveBeenCalledTimes(2);
+    expect(send.mock.calls[0][0]).toBeInstanceOf(ListObjectsV2Command);
+    expect(send.mock.calls[1][0]).toBeInstanceOf(ListObjectsV2Command);
   });
 });

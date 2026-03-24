@@ -12,10 +12,13 @@ export type {
   MessageStatusAttributes,
 } from "./client-callback-payload";
 export type {
+  CallbackTarget,
   ChannelStatusSubscriptionConfiguration,
   ClientSubscriptionConfiguration,
   MessageStatusSubscriptionConfiguration,
+  SubscriptionConfiguration,
 } from "./client-config";
+export { parseClientSubscriptionConfiguration } from "./client-config-schema";
 export type { MessageStatusData } from "./message-status-data";
 export type { RoutingPlan } from "./routing-plan";
 export { EventTypes } from "./status-publish-event";

@@ -23,16 +23,12 @@ npm --workspace tools/client-subscriptions-management run deploy -- message \
   --api-endpoint https://webhook.example.invalid/callbacks \
   --api-key 1234.4321 \
   --rate-limit 20 \
-  --dry-run false \
-  --terraform-apply \
-  --group dev
+  --dry-run false
 ```
 
 ## Commands
 
-### Deploy a Subscription (upload config + optionally apply Terraform)
-
-Use `deploy` to upload a subscription config to S3 and optionally trigger a Terraform apply in one step.
+### Deploy a Subscription
 
 #### Message status
 
@@ -45,9 +41,7 @@ npm --workspace tools/client-subscriptions-management run deploy -- message \
   --api-key-header-name x-api-key \
   --api-key 1234.4321 \
   --dry-run false \
-  --rate-limit 20 \
-  --terraform-apply \
-  --group dev
+  --rate-limit 20
 ```
 
 #### Channel status
@@ -63,12 +57,10 @@ npm --workspace tools/client-subscriptions-management run deploy -- channel \
   --api-key-header-name x-api-key \
   --api-key 1234.4321 \
   --dry-run false \
-  --rate-limit 20 \
-  --terraform-apply \
-  --group dev
+  --rate-limit 20
 ```
 
-Optional for both: `--client-name "Test Client"` (defaults to client-id if not provided), `--project <name>` (defaults to `nhs`), `--region <region>` (defaults to `eu-west-2`), `--profile <aws-profile>`, `--tf-region <region>`, `--bucket-name <name>` (override derived bucket name)
+Optional for both: `--client-name "Test Client"` (defaults to client-id if not provided), `--project <name>` (defaults to `nhs`), `--region <region>` (defaults to `eu-west-2`), `--profile <aws-profile>`, `--bucket-name <name>` (override derived bucket name)
 
 **Note (channel)**: At least one of `--channel-statuses` or `--supplier-statuses` must be provided.
 

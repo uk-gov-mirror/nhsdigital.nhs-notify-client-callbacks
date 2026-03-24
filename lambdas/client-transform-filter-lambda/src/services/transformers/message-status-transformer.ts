@@ -13,11 +13,10 @@ export function transformMessageStatus(
   event: StatusPublishEvent<MessageStatusData>,
   messageRootUri: string,
 ): ClientCallbackPayload {
-  const notifyData = event.data;
-  const { messageId } = notifyData;
-  const messageStatus =
-    notifyData.messageStatus.toLowerCase() as ClientMessageStatus;
-  const channels = notifyData.channels.map(
+  const { data } = event;
+  const { messageId } = data;
+  const messageStatus = data.messageStatus.toLowerCase() as ClientMessageStatus;
+  const channels = data.channels.map(
     (channel: { type: string; channelStatus: string }) => ({
       ...channel,
       type: channel.type.toLowerCase() as ClientChannel,
@@ -27,12 +26,12 @@ export function transformMessageStatus(
 
   const idempotencyBody = {
     messageId,
-    messageReference: notifyData.messageReference,
+    messageReference: data.messageReference,
     messageStatus,
-    messageStatusDescription: notifyData.messageStatusDescription,
-    messageFailureReasonCode: notifyData.messageFailureReasonCode,
+    messageStatusDescription: data.messageStatusDescription,
+    messageFailureReasonCode: data.messageFailureReasonCode,
     channels,
-    routingPlan: notifyData.routingPlan,
+    routingPlan: data.routingPlan,
   };
 
   const idempotencyKey = createHash("sha256")
@@ -41,19 +40,19 @@ export function transformMessageStatus(
 
   const attributes: MessageStatusAttributes = {
     messageId,
-    messageReference: notifyData.messageReference,
+    messageReference: data.messageReference,
     messageStatus,
     channels,
-    timestamp: notifyData.timestamp,
-    routingPlan: notifyData.routingPlan,
+    timestamp: data.timestamp,
+    routingPlan: data.routingPlan,
   };
 
-  if (notifyData.messageStatusDescription) {
-    attributes.messageStatusDescription = notifyData.messageStatusDescription;
+  if (data.messageStatusDescription) {
+    attributes.messageStatusDescription = data.messageStatusDescription;
   }
 
-  if (notifyData.messageFailureReasonCode) {
-    attributes.messageFailureReasonCode = notifyData.messageFailureReasonCode;
+  if (data.messageFailureReasonCode) {
+    attributes.messageFailureReasonCode = data.messageFailureReasonCode;
   }
 
   const payload: ClientCallbackPayload = {

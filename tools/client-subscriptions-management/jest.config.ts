@@ -3,6 +3,7 @@ import type { Config } from "jest";
 const jestConfig: Config = {
   preset: "ts-jest",
   clearMocks: true,
+  silent: true,
   collectCoverage: true,
   coverageDirectory: "./.reports/unit/coverage",
   coverageProvider: "babel",

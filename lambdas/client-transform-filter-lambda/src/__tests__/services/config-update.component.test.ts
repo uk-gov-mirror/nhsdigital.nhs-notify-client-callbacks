@@ -1,6 +1,10 @@
 import { S3Client } from "@aws-sdk/client-s3";
+import { createMessageStatusConfig } from "__tests__/helpers/client-subscription-fixtures";
 import { ConfigCache } from "services/config-cache";
 import { ConfigLoader } from "services/config-loader";
+
+const makeConfig = (messageStatuses: string[]) =>
+  createMessageStatusConfig(messageStatuses as never);
 
 describe("config update component", () => {
   it("reloads configuration after cache expiry", async () => {
@@ -11,56 +15,16 @@ describe("config update component", () => {
       .fn()
       .mockResolvedValueOnce({
         Body: {
-          transformToString: jest.fn().mockResolvedValue(
-            JSON.stringify([
-              {
-                SubscriptionId: "00000000-0000-0000-0000-000000000001",
-                ClientId: "client-1",
-                Targets: [
-                  {
-                    Type: "API",
-                    TargetId: "target",
-                    InvocationEndpoint: "https://example.com",
-                    InvocationMethod: "POST",
-                    InvocationRateLimit: 10,
-                    APIKey: {
-                      HeaderName: "x-api-key",
-                      HeaderValue: "secret",
-                    },
-                  },
-                ],
-                SubscriptionType: "MessageStatus",
-                MessageStatuses: ["DELIVERED"],
-              },
-            ]),
-          ),
+          transformToString: jest
+            .fn()
+            .mockResolvedValue(JSON.stringify(makeConfig(["DELIVERED"]))),
         },
       })
       .mockResolvedValueOnce({
         Body: {
-          transformToString: jest.fn().mockResolvedValue(
-            JSON.stringify([
-              {
-                SubscriptionId: "00000000-0000-0000-0000-000000000001",
-                ClientId: "client-1",
-                Targets: [
-                  {
-                    Type: "API",
-                    TargetId: "target",
-                    InvocationEndpoint: "https://example.com",
-                    InvocationMethod: "POST",
-                    InvocationRateLimit: 10,
-                    APIKey: {
-                      HeaderName: "x-api-key",
-                      HeaderValue: "secret",
-                    },
-                  },
-                ],
-                SubscriptionType: "MessageStatus",
-                MessageStatuses: ["FAILED"],
-              },
-            ]),
-          ),
+          transformToString: jest
+            .fn()
+            .mockResolvedValue(JSON.stringify(makeConfig(["FAILED"]))),
         },
       });
 
@@ -72,18 +36,18 @@ describe("config update component", () => {
     });
 
     const first = await loader.loadClientConfig("client-1");
-    const firstMessage = first?.find(
-      (subscription) => subscription.SubscriptionType === "MessageStatus",
+    const firstMessage = first?.subscriptions.find(
+      (subscription) => subscription.subscriptionType === "MessageStatus",
     );
-    expect(firstMessage?.MessageStatuses).toEqual(["DELIVERED"]);
+    expect(firstMessage?.messageStatuses).toEqual(["DELIVERED"]);
 
     jest.advanceTimersByTime(1500);
 
     const second = await loader.loadClientConfig("client-1");
-    const secondMessage = second?.find(
-      (subscription) => subscription.SubscriptionType === "MessageStatus",
+    const secondMessage = second?.subscriptions.find(
+      (subscription) => subscription.subscriptionType === "MessageStatus",
     );
-    expect(secondMessage?.MessageStatuses).toEqual(["FAILED"]);
+    expect(secondMessage?.messageStatuses).toEqual(["FAILED"]);
 
     jest.useRealTimers();
   });

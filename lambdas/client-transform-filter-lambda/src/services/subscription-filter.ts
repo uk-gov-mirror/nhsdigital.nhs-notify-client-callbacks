@@ -13,7 +13,10 @@ import { logger } from "services/logger";
 type FilterResult = {
   matched: boolean;
   subscriptionType: "MessageStatus" | "ChannelStatus" | "Unknown";
+  targetIds?: string[];
 };
+
+const unique = (values: string[]): string[] => [...new Set(values)];
 
 export const evaluateSubscriptionFilters = (
   event: StatusPublishEvent,
@@ -27,18 +30,48 @@ export const evaluateSubscriptionFilters = (
   }
 
   if (event.type === EventTypes.MESSAGE_STATUS_PUBLISHED) {
-    const notifyData = event.data as MessageStatusData;
+    const typedEvent = event as StatusPublishEvent<MessageStatusData>;
+    const matchingTargetIds = unique(
+      config.subscriptions
+        .filter((subscription) =>
+          matchesMessageStatusSubscription(
+            {
+              ...config,
+              subscriptions: [subscription],
+            },
+            typedEvent,
+          ),
+        )
+        .flatMap((subscription) => subscription.targetIds),
+    );
+
     return {
-      matched: matchesMessageStatusSubscription(config, { event, notifyData }),
+      matched: matchingTargetIds.length > 0,
       subscriptionType: "MessageStatus",
+      ...(matchingTargetIds.length > 0 ? { targetIds: matchingTargetIds } : {}),
     };
   }
 
   if (event.type === EventTypes.CHANNEL_STATUS_PUBLISHED) {
-    const notifyData = event.data as ChannelStatusData;
+    const typedEvent = event as StatusPublishEvent<ChannelStatusData>;
+    const matchingTargetIds = unique(
+      config.subscriptions
+        .filter((subscription) =>
+          matchesChannelStatusSubscription(
+            {
+              ...config,
+              subscriptions: [subscription],
+            },
+            typedEvent,
+          ),
+        )
+        .flatMap((subscription) => subscription.targetIds),
+    );
+
     return {
-      matched: matchesChannelStatusSubscription(config, { event, notifyData }),
+      matched: matchingTargetIds.length > 0,
       subscriptionType: "ChannelStatus",
+      ...(matchingTargetIds.length > 0 ? { targetIds: matchingTargetIds } : {}),
     };
   }
 

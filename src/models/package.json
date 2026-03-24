@@ -6,15 +6,21 @@
     }
   },
   "devDependencies": {
+    "@types/jest": "^29.5.14",
     "@tsconfig/node22": "^22.0.2",
+    "jest": "^29.7.0",
+    "ts-jest": "^29.4.6",
     "typescript": "^5.8.2"
+  },
+  "dependencies": {
+    "zod": "^4.1.13"
   },
   "name": "@nhs-notify-client-callbacks/models",
   "private": true,
   "scripts": {
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
-    "test:unit": "echo \"No unit tests for @nhs-notify-client-callbacks/models\"",
+    "test:unit": "jest",
     "typecheck": "tsc --noEmit"
   },
   "version": "0.0.1"

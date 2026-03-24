@@ -53,6 +53,7 @@ import { GetObjectCommand, NoSuchKey } from "@aws-sdk/client-s3";
 import { GetParameterCommand } from "@aws-sdk/client-ssm";
 import type { SQSRecord } from "aws-lambda";
 import { EventTypes } from "@nhs-notify-client-callbacks/models";
+import { createMessageStatusConfig } from "__tests__/helpers/client-subscription-fixtures";
 import { createS3Client } from "services/config-loader-service";
 import { applicationsMapService, configLoaderService, handler } from "..";
 
@@ -73,27 +74,8 @@ const makeSqsRecord = (body: object): SQSRecord => ({
   awsRegion: "eu-west-2",
 });
 
-const createValidConfig = (clientId: string) => [
-  {
-    SubscriptionId: "00000000-0000-0000-0000-000000000001",
-    ClientId: clientId,
-    Targets: [
-      {
-        Type: "API",
-        TargetId: "00000000-0000-4000-8000-000000000001",
-        InvocationEndpoint: "https://example.com/webhook",
-        InvocationMethod: "POST",
-        InvocationRateLimit: 10,
-        APIKey: {
-          HeaderName: "x-api-key",
-          HeaderValue: "secret",
-        },
-      },
-    ],
-    SubscriptionType: "MessageStatus",
-    MessageStatuses: ["DELIVERED", "FAILED"],
-  },
-];
+const createValidConfig = (clientId: string) =>
+  createMessageStatusConfig(["DELIVERED", "FAILED"], clientId);
 
 const validMessageStatusEvent = (clientId: string, messageStatus: string) => ({
   specversion: "1.0",

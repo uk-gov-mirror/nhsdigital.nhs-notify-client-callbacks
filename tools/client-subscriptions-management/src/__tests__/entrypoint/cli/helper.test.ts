@@ -1,166 +1,63 @@
-import type {
-  ChannelStatusSubscriptionConfiguration,
-  ClientSubscriptionConfiguration,
-  MessageStatusSubscriptionConfiguration,
-} from "@nhs-notify-client-callbacks/models";
-import {
-  deriveBucketName,
-  formatSubscriptionFileResponse,
-  normalizeClientName,
-  resolveBucketName,
-  resolveProfile,
-  resolveRegion,
-} from "src/entrypoint/cli/helper";
+const mockCreateRepositoryFromOptions = jest.fn();
+const mockResolveBucketName = jest.fn();
+const mockResolveProfile = jest.fn();
+const mockResolveRegion = jest.fn();
 
-jest.mock("@aws-sdk/client-sts", () => ({
-  STSClient: jest.fn().mockImplementation(() => ({
-    send: jest.fn().mockResolvedValue({ Account: "123456789012" }),
-  })),
-  GetCallerIdentityCommand: jest.fn(),
+jest.mock("src/aws", () => ({
+  createRepository: mockCreateRepositoryFromOptions,
+  resolveBucketName: mockResolveBucketName,
+  resolveProfile: mockResolveProfile,
+  resolveRegion: mockResolveRegion,
 }));
 
-describe("cli helper", () => {
-  const messageSubscription: MessageStatusSubscriptionConfiguration = {
-    SubscriptionId: "client-a",
-    SubscriptionType: "MessageStatus",
-    ClientId: "client-a",
-    MessageStatuses: ["DELIVERED"],
-    Targets: [
-      {
-        Type: "API",
-        TargetId: "00000000-0000-4000-8000-000000000001",
-        InvocationEndpoint: "https://example.com/webhook",
-        InvocationMethod: "POST",
-        InvocationRateLimit: 10,
-        APIKey: {
-          HeaderName: "x-api-key",
-          HeaderValue: "secret",
-        },
-      },
-    ],
-  };
+import {
+  type AnyCliCommand,
+  createRepository,
+  runCommands,
+} from "src/entrypoint/cli/helper";
 
-  const channelSubscription: ChannelStatusSubscriptionConfiguration = {
-    SubscriptionId: "client-a-sms",
-    SubscriptionType: "ChannelStatus",
-    ClientId: "client-a",
-    ChannelType: "SMS",
-    ChannelStatuses: ["DELIVERED"],
-    SupplierStatuses: ["delivered"],
-    Targets: [
-      {
-        Type: "API",
-        TargetId: "00000000-0000-4000-8000-000000000002",
-        InvocationEndpoint: "https://example.com/webhook",
-        InvocationMethod: "POST",
-        InvocationRateLimit: 20,
-        APIKey: {
-          HeaderName: "x-api-key",
-          HeaderValue: "secret",
-        },
-      },
-    ],
-  };
+describe("createRepository", () => {
+  it("resolves region, profile and bucket then delegates to createRepository from aws", async () => {
+    const fakeRepo = { listClientIds: jest.fn() };
+    mockResolveRegion.mockReturnValue("eu-west-2");
+    mockResolveProfile.mockReturnValue("my-profile");
+    mockResolveBucketName.mockResolvedValue("my-bucket");
+    mockCreateRepositoryFromOptions.mockReturnValue(fakeRepo);
 
-  it("formats subscription output as a table string", () => {
-    const config: ClientSubscriptionConfiguration = [
-      messageSubscription,
-      channelSubscription,
-    ];
+    const result = await createRepository({
+      "bucket-name": "my-bucket",
+      region: "eu-west-2",
+      profile: "my-profile",
+      environment: "my-env",
+    });
 
-    const result = formatSubscriptionFileResponse(config);
-
-    expect(typeof result).toBe("string");
-    // message status row
-    expect(result).toContain("client-a");
-    expect(result).toContain("MessageStatus");
-    expect(result).toContain("DELIVERED");
-    expect(result).toContain("https://example.com/webhook");
-    expect(result).toContain("POST");
-    expect(result).toContain("x-api-key");
-    expect(result).toContain("secret");
-    // channel status row
-    expect(result).toContain("ChannelStatus");
-    expect(result).toContain("SMS");
+    expect(mockResolveRegion).toHaveBeenCalledWith("eu-west-2");
+    expect(mockResolveProfile).toHaveBeenCalledWith("my-profile");
+    expect(mockResolveBucketName).toHaveBeenCalledWith({
+      bucketName: "my-bucket",
+      environment: "my-env",
+      region: "eu-west-2",
+      profile: "my-profile",
+    });
+    expect(mockCreateRepositoryFromOptions).toHaveBeenCalledWith({
+      bucketName: "my-bucket",
+      region: "eu-west-2",
+      profile: "my-profile",
+    });
+    expect(result).toBe(fakeRepo);
   });
+});
 
-  it("normalizes client name", () => {
-    expect(normalizeClientName("My  Client Name")).toBe("my-client-name");
-  });
+describe("runCommands", () => {
+  it("dispatches to the matching command handler", async () => {
+    const mockHandler = jest.fn().mockResolvedValue(undefined);
+    const command: AnyCliCommand = {
+      command: "test-cmd",
+      handler: mockHandler,
+    };
 
-  it("resolves bucket name from explicit argument", async () => {
-    await expect(resolveBucketName("bucket-1")).resolves.toBe("bucket-1");
-  });
+    await runCommands([command], ["node", "script", "test-cmd"]);
 
-  it("derives bucket name from environment using STS account ID", async () => {
-    await expect(
-      resolveBucketName(undefined, "dev", "eu-west-2"),
-    ).resolves.toBe(
-      "nhs-123456789012-eu-west-2-dev-callbacks-subscription-config",
-    );
-  });
-
-  it("uses default region eu-west-2 when region is not provided", async () => {
-    await expect(resolveBucketName(undefined, "dev")).resolves.toBe(
-      "nhs-123456789012-eu-west-2-dev-callbacks-subscription-config",
-    );
-  });
-
-  it("throws when neither bucket name nor environment provided", async () => {
-    await expect(resolveBucketName()).rejects.toThrow(
-      "Bucket name is required: use --bucket-name to specify directly, or --environment",
-    );
-  });
-
-  it("derives bucket name correctly", () => {
-    expect(deriveBucketName("123456789012", "dev", "eu-west-2")).toBe(
-      "nhs-123456789012-eu-west-2-dev-callbacks-subscription-config",
-    );
-  });
-
-  it("derives bucket name with custom project and component", () => {
-    expect(
-      deriveBucketName("123456789012", "prod", "eu-west-2", "myproj", "mycomp"),
-    ).toBe("myproj-123456789012-eu-west-2-prod-mycomp-subscription-config");
-  });
-
-  it("resolves profile from argument", () => {
-    expect(resolveProfile("my-profile")).toBe("my-profile");
-  });
-
-  it("resolves profile from AWS_PROFILE env", () => {
-    expect(
-      resolveProfile(undefined, {
-        AWS_PROFILE: "env-profile",
-      } as NodeJS.ProcessEnv),
-    ).toBe("env-profile");
-  });
-
-  it("returns undefined when profile is not set", () => {
-    expect(resolveProfile(undefined, {} as NodeJS.ProcessEnv)).toBeUndefined();
-  });
-
-  it("resolves region from argument", () => {
-    expect(resolveRegion("eu-west-2")).toBe("eu-west-2");
-  });
-
-  it("resolves region from AWS_REGION", () => {
-    expect(
-      resolveRegion(undefined, {
-        AWS_REGION: "eu-west-1",
-      } as NodeJS.ProcessEnv),
-    ).toBe("eu-west-1");
-  });
-
-  it("resolves region from AWS_DEFAULT_REGION", () => {
-    expect(
-      resolveRegion(undefined, {
-        AWS_DEFAULT_REGION: "eu-west-3",
-      } as NodeJS.ProcessEnv),
-    ).toBe("eu-west-3");
-  });
-
-  it("returns undefined when region is not set", () => {
-    expect(resolveRegion(undefined, {} as NodeJS.ProcessEnv)).toBeUndefined();
+    expect(mockHandler).toHaveBeenCalled();
   });
 });

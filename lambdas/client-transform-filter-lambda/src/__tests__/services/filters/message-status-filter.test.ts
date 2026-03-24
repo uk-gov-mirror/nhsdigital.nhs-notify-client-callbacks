@@ -1,10 +1,9 @@
 import type {
-  ClientSubscriptionConfiguration,
-  MessageStatus,
   MessageStatusData,
   StatusPublishEvent,
 } from "@nhs-notify-client-callbacks/models";
 import { EventTypes } from "@nhs-notify-client-callbacks/models";
+import { createMessageStatusConfig } from "__tests__/helpers/client-subscription-fixtures";
 import { matchesMessageStatusSubscription } from "services/filters/message-status-filter";
 
 jest.mock("services/logger", () => ({
@@ -19,7 +18,7 @@ jest.mock("services/logger", () => ({
 const createBaseEvent = <T>(
   type: string,
   source: string,
-  notifyData: T,
+  data: T,
 ): StatusPublishEvent<T> => ({
   specversion: "1.0",
   id: "event-id",
@@ -30,33 +29,8 @@ const createBaseEvent = <T>(
   datacontenttype: "application/json",
   dataschema: "schema",
   traceparent: "traceparent",
-  data: notifyData,
+  data,
 });
-
-const createMessageStatusConfig = (
-  statuses: MessageStatus[],
-  clientId = "client-1",
-): ClientSubscriptionConfiguration => [
-  {
-    SubscriptionId: "00000000-0000-0000-0000-000000000001",
-    ClientId: clientId,
-    Targets: [
-      {
-        Type: "API",
-        TargetId: "target",
-        InvocationEndpoint: "https://example.com",
-        InvocationMethod: "POST",
-        InvocationRateLimit: 10,
-        APIKey: {
-          HeaderName: "x-api-key",
-          HeaderValue: "secret",
-        },
-      },
-    ],
-    SubscriptionType: "MessageStatus",
-    MessageStatuses: statuses,
-  },
-];
 
 const createMessageStatusData = (
   overrides: Partial<MessageStatusData> = {},
@@ -78,97 +52,82 @@ const createMessageStatusData = (
 
 describe("matchesMessageStatusSubscription", () => {
   it("matches by client, status, and event pattern", () => {
-    const notifyData = createMessageStatusData();
+    const data = createMessageStatusData();
     const event = createBaseEvent(
       EventTypes.MESSAGE_STATUS_PUBLISHED,
       "source-a",
-      notifyData,
+      data,
     );
     expect(
       matchesMessageStatusSubscription(
         createMessageStatusConfig(["DELIVERED"]),
-        {
-          event,
-          notifyData,
-        },
+        event,
       ),
     ).toBe(true);
   });
 
   it("rejects when clientId does not match", () => {
-    const notifyData = createMessageStatusData({ clientId: "client-2" });
+    const data = createMessageStatusData({ clientId: "client-2" });
     const event = createBaseEvent(
       EventTypes.MESSAGE_STATUS_PUBLISHED,
       "source-a",
-      notifyData,
+      data,
     );
     expect(
       matchesMessageStatusSubscription(
         createMessageStatusConfig(["DELIVERED"]),
-        {
-          event,
-          notifyData,
-        },
+        event,
       ),
     ).toBe(false);
   });
 
   it("rejects when status does not match", () => {
-    const notifyData = createMessageStatusData({ messageStatus: "FAILED" });
+    const data = createMessageStatusData({ messageStatus: "FAILED" });
     const event = createBaseEvent(
       EventTypes.MESSAGE_STATUS_PUBLISHED,
       "source-a",
-      notifyData,
+      data,
     );
     expect(
       matchesMessageStatusSubscription(
         createMessageStatusConfig(["DELIVERED"]),
-        {
-          event,
-          notifyData,
-        },
+        event,
       ),
     ).toBe(false);
   });
 
   it("rejects when status has not changed", () => {
-    const notifyData = createMessageStatusData({
+    const data = createMessageStatusData({
       messageStatus: "DELIVERED",
       previousMessageStatus: "DELIVERED",
     });
     const event = createBaseEvent(
       EventTypes.MESSAGE_STATUS_PUBLISHED,
       "source-a",
-      notifyData,
+      data,
     );
     expect(
       matchesMessageStatusSubscription(
         createMessageStatusConfig(["DELIVERED"]),
-        {
-          event,
-          notifyData,
-        },
+        event,
       ),
     ).toBe(false);
   });
 
   it("matches when status has changed", () => {
-    const notifyData = createMessageStatusData({
+    const data = createMessageStatusData({
       messageStatus: "DELIVERED",
       previousMessageStatus: "PENDING_ENRICHMENT",
     });
     const event = createBaseEvent(
       EventTypes.MESSAGE_STATUS_PUBLISHED,
       "source-a",
-      notifyData,
+      data,
     );
     expect(
       matchesMessageStatusSubscription(
         createMessageStatusConfig(["DELIVERED"]),
-        {
-          event,
-          notifyData,
-        },
+        event,
       ),
     ).toBe(true);
   });

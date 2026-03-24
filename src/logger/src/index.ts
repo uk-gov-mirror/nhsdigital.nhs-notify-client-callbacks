@@ -12,9 +12,11 @@ export interface LogContext {
   [key: string]: any;
 }
 
+const resolveLogLevel = (level = "info"): string => level;
+
 const basePinoLogger = pino(
   {
-    level: process.env.LOG_LEVEL || "info",
+    level: resolveLogLevel(process.env.LOG_LEVEL),
     formatters: {
       level: (label: string) => {
         return { level: label.toUpperCase() };

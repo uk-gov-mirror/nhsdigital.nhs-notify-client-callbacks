@@ -1,372 +1,396 @@
-import { z } from "zod";
 import { ClientSubscriptionRepository } from "src/repository/client-subscriptions";
 import type {
-  ChannelStatusSubscriptionConfiguration,
   ClientSubscriptionConfiguration,
   MessageStatusSubscriptionConfiguration,
 } from "@nhs-notify-client-callbacks/models";
 import type { S3Repository } from "src/repository/s3";
-import type { SubscriptionBuilder } from "src/domain/client-subscription-builder";
+import {
+  DEFAULT_TARGET_ID as TARGET_ID,
+  createChannelStatusSubscription,
+  createClientSubscriptionConfig,
+  createMessageStatusSubscription,
+  createPopulatedClientSubscriptionConfig,
+  createTarget,
+} from "src/__tests__/helpers/client-subscription-fixtures";
 
-const createRepository = (
-  overrides?: Partial<{
-    getObject: jest.Mock;
-    putRawData: jest.Mock;
-    messageStatus: jest.Mock;
-    channelStatus: jest.Mock;
-  }>,
-) => {
+const createRepository = (overrides?: {
+  getObject?: jest.Mock;
+  putRawData?: jest.Mock;
+  listObjectKeys?: jest.Mock;
+}) => {
   const s3Repository = {
     getObject: overrides?.getObject ?? jest.fn(),
     putRawData: overrides?.putRawData ?? jest.fn(),
+    listObjectKeys: overrides?.listObjectKeys ?? jest.fn(),
   } as unknown as S3Repository;
 
-  const configurationBuilder = {
-    messageStatus: overrides?.messageStatus ?? jest.fn(),
-    channelStatus: overrides?.channelStatus ?? jest.fn(),
-  } as unknown as SubscriptionBuilder;
-
-  const repository = new ClientSubscriptionRepository(
+  return {
+    repository: new ClientSubscriptionRepository(s3Repository),
     s3Repository,
-    configurationBuilder,
-  );
-
-  return { repository, s3Repository, configurationBuilder };
+  };
 };
 
+const baseTarget = createTarget();
+const messageSubscription = createMessageStatusSubscription();
+const channelSubscription = createChannelStatusSubscription();
+
+const baseConfig = (clientId = "client-1"): ClientSubscriptionConfiguration =>
+  createPopulatedClientSubscriptionConfig(clientId);
+
 describe("ClientSubscriptionRepository", () => {
-  const baseTarget: MessageStatusSubscriptionConfiguration["Targets"][number] =
-    {
-      Type: "API",
-      TargetId: "00000000-0000-4000-8000-000000000001",
-      InvocationEndpoint: "https://example.com/webhook",
-      InvocationMethod: "POST",
-      InvocationRateLimit: 10,
-      APIKey: {
-        HeaderName: "x-api-key",
-        HeaderValue: "secret",
-      },
-    };
+  describe("listClientIds", () => {
+    it("returns client IDs extracted from S3 object keys", async () => {
+      const listObjectKeys = jest
+        .fn()
+        .mockResolvedValue([
+          "client_subscriptions/client-a.json",
+          "client_subscriptions/client-b.json",
+        ]);
+      const { repository } = createRepository({ listObjectKeys });
 
-  const messageSubscription: MessageStatusSubscriptionConfiguration = {
-    SubscriptionId: "client-1",
-    SubscriptionType: "MessageStatus",
-    ClientId: "client-1",
-    MessageStatuses: ["DELIVERED"],
-    Targets: [baseTarget],
-  };
+      await expect(repository.listClientIds()).resolves.toEqual([
+        "client-a",
+        "client-b",
+      ]);
+    });
 
-  const channelSubscription: ChannelStatusSubscriptionConfiguration = {
-    SubscriptionId: "client-1-SMS",
-    SubscriptionType: "ChannelStatus",
-    ClientId: "client-1",
-    ChannelType: "SMS",
-    ChannelStatuses: ["DELIVERED"],
-    SupplierStatuses: ["delivered"],
-    Targets: [baseTarget],
-  };
+    it("returns empty array when no objects found", async () => {
+      const listObjectKeys = jest.fn().mockResolvedValue([]);
+      const { repository } = createRepository({ listObjectKeys });
 
-  it("returns parsed subscriptions when file exists", async () => {
-    const storedConfig: ClientSubscriptionConfiguration = [messageSubscription];
-    const getObject = jest.fn().mockResolvedValue(JSON.stringify(storedConfig));
-    const { repository } = createRepository({ getObject });
-
-    const result = await repository.getClientSubscriptions("client-1");
-
-    expect(result).toEqual(storedConfig);
+      await expect(repository.listClientIds()).resolves.toEqual([]);
+    });
   });
 
-  it("returns undefined when config file is missing", async () => {
-    const getObject = jest.fn().mockResolvedValue(undefined);
-    const { repository } = createRepository({ getObject });
+  describe("getClientConfig", () => {
+    it("returns parsed config when file exists", async () => {
+      const config = baseConfig();
+      const getObject = jest.fn().mockResolvedValue(JSON.stringify(config));
+      const { repository } = createRepository({ getObject });
 
-    await expect(
-      repository.getClientSubscriptions("client-1"),
-    ).resolves.toBeUndefined();
-  });
-
-  it("replaces existing message subscription", async () => {
-    const storedConfig: ClientSubscriptionConfiguration = [
-      channelSubscription,
-      messageSubscription,
-    ];
-    const getObject = jest.fn().mockResolvedValue(JSON.stringify(storedConfig));
-    const putRawData = jest.fn();
-    const newMessage: MessageStatusSubscriptionConfiguration = {
-      ...messageSubscription,
-      MessageStatuses: ["FAILED"],
-    };
-    const messageStatus = jest.fn().mockReturnValue(newMessage);
-
-    const { repository } = createRepository({
-      getObject,
-      putRawData,
-      messageStatus,
+      await expect(repository.getClientConfig("client-1")).resolves.toEqual(
+        config,
+      );
     });
 
-    const result = await repository.putMessageStatusSubscription({
-      clientName: "Client 1",
-      clientId: "client-1",
-      apiKey: "secret",
-      apiEndpoint: "https://example.com/webhook",
-      statuses: ["FAILED"],
-      rateLimit: 10,
-      dryRun: false,
-    });
-
-    expect(result).toEqual([channelSubscription, newMessage]);
-    expect(putRawData).toHaveBeenCalledWith(
-      JSON.stringify([channelSubscription, newMessage]),
-      "client_subscriptions/client-1.json",
-    );
-  });
-
-  it("skips S3 write when dry run is enabled", async () => {
-    const getObject = jest.fn().mockResolvedValue(undefined);
-    const putRawData = jest.fn();
-    const messageStatus = jest.fn().mockReturnValue(messageSubscription);
-
-    const { repository } = createRepository({
-      getObject,
-      putRawData,
-      messageStatus,
-    });
-
-    await repository.putMessageStatusSubscription({
-      clientName: "Client 1",
-      clientId: "client-1",
-      apiKey: "secret",
-      apiEndpoint: "https://example.com/webhook",
-      statuses: ["DELIVERED"],
-      rateLimit: 10,
-      dryRun: true,
-    });
-
-    expect(putRawData).not.toHaveBeenCalled();
-  });
-
-  it("replaces existing channel subscription for the channel type", async () => {
-    const storedConfig: ClientSubscriptionConfiguration = [
-      channelSubscription,
-      messageSubscription,
-    ];
-    const getObject = jest.fn().mockResolvedValue(JSON.stringify(storedConfig));
-    const putRawData = jest.fn();
-    const newChannel: ChannelStatusSubscriptionConfiguration = {
-      ...channelSubscription,
-      ChannelStatuses: ["FAILED"],
-    };
-    const channelStatus = jest.fn().mockReturnValue(newChannel);
-
-    const { repository } = createRepository({
-      getObject,
-      putRawData,
-      channelStatus,
-    });
-
-    const result = await repository.putChannelStatusSubscription({
-      clientName: "Client 1",
-      clientId: "client-1",
-      apiKey: "secret",
-      apiEndpoint: "https://example.com/webhook",
-      channelStatuses: ["FAILED"],
-      supplierStatuses: ["delivered"],
-      channelType: "SMS",
-      rateLimit: 10,
-      dryRun: false,
-    });
-
-    expect(result).toEqual([messageSubscription, newChannel]);
-    expect(putRawData).toHaveBeenCalledWith(
-      JSON.stringify([messageSubscription, newChannel]),
-      "client_subscriptions/client-1.json",
-    );
-  });
-
-  it("skips S3 write for channel status dry run", async () => {
-    const getObject = jest.fn().mockResolvedValue(undefined);
-    const putRawData = jest.fn();
-    const channelStatus = jest.fn().mockReturnValue(channelSubscription);
-
-    const { repository } = createRepository({
-      getObject,
-      putRawData,
-      channelStatus,
-    });
-
-    await repository.putChannelStatusSubscription({
-      clientName: "Client 1",
-      clientId: "client-1",
-      apiKey: "secret",
-      apiEndpoint: "https://example.com/webhook",
-      channelStatuses: ["DELIVERED"],
-      supplierStatuses: ["delivered"],
-      channelType: "SMS",
-      rateLimit: 10,
-      dryRun: true,
-    });
-
-    expect(putRawData).not.toHaveBeenCalled();
-  });
-
-  describe("validation", () => {
-    it("throws validation error for invalid message status", async () => {
-      const { repository } = createRepository();
+    it("returns undefined when config file is missing", async () => {
+      const getObject = jest.fn().mockResolvedValue(undefined);
+      const { repository } = createRepository({ getObject });
 
       await expect(
-        repository.putMessageStatusSubscription({
-          clientName: "Client 1",
-          clientId: "client-1",
-          apiKey: "secret",
-          apiEndpoint: "https://example.com/webhook",
-          statuses: ["INVALID_STATUS" as never],
-          rateLimit: 10,
-          dryRun: false,
-        }),
-      ).rejects.toThrow(z.ZodError);
+        repository.getClientConfig("client-1"),
+      ).resolves.toBeUndefined();
     });
 
-    it("throws validation error for missing required fields in message subscription", async () => {
-      const { repository } = createRepository();
+    it("throws when stored config is invalid", async () => {
+      const getObject = jest.fn().mockResolvedValue(
+        JSON.stringify(
+          createClientSubscriptionConfig({
+            subscriptions: [messageSubscription],
+          }),
+        ),
+      );
+      const { repository } = createRepository({ getObject });
 
-      await expect(
-        repository.putMessageStatusSubscription({
-          clientName: "Client 1",
-          clientId: "client-1",
-          apiKey: "secret",
-          apiEndpoint: "https://example.com/webhook",
-          // @ts-expect-error Testing missing field
-          statuses: undefined,
-          rateLimit: 10,
-          dryRun: false,
-        }),
-      ).rejects.toThrow(z.ZodError);
+      await expect(repository.getClientConfig("client-1")).rejects.toThrow(
+        /Config validation failed/,
+      );
     });
 
-    it("throws validation error for invalid channel type", async () => {
-      const { repository } = createRepository();
+    it("throws when stored config JSON cannot be parsed", async () => {
+      const getObject = jest.fn().mockResolvedValue("{ not valid json }");
+      const { repository } = createRepository({ getObject });
+
+      await expect(repository.getClientConfig("client-1")).rejects.toThrow(
+        "Failed to parse stored config for client client-1",
+      );
+    });
+  });
+
+  describe("putClientConfig", () => {
+    it("writes config to S3 and returns it", async () => {
+      const putRawData = jest.fn();
+      const config = baseConfig();
+      const { repository } = createRepository({ putRawData });
+
+      const result = await repository.putClientConfig(
+        "client-1",
+        config,
+        false,
+      );
+
+      expect(result).toEqual(config);
+      expect(putRawData).toHaveBeenCalledWith(
+        expect.any(String),
+        "client_subscriptions/client-1.json",
+      );
+      expect(JSON.parse(putRawData.mock.calls[0][0] as string)).toEqual(config);
+    });
+
+    it("skips S3 write on dry run", async () => {
+      const putRawData = jest.fn();
+      const config = baseConfig();
+      const { repository } = createRepository({ putRawData });
+
+      await repository.putClientConfig("client-1", config, true);
+
+      expect(putRawData).not.toHaveBeenCalled();
+    });
+
+    it("throws when config is invalid and does not write to S3", async () => {
+      const putRawData = jest.fn();
+      const invalidConfig = createClientSubscriptionConfig({
+        subscriptions: [messageSubscription],
+      }) as unknown as ClientSubscriptionConfiguration;
+      const { repository } = createRepository({ putRawData });
 
       await expect(
-        repository.putChannelStatusSubscription({
-          clientName: "Client 1",
-          clientId: "client-1",
-          apiKey: "secret",
-          apiEndpoint: "https://example.com/webhook",
+        repository.putClientConfig("client-1", invalidConfig, false),
+      ).rejects.toThrow(/Config validation failed/);
+
+      expect(putRawData).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("addSubscription", () => {
+    it("appends subscription to existing config", async () => {
+      const existing = createClientSubscriptionConfig({
+        subscriptions: [messageSubscription],
+        targets: [baseTarget],
+      });
+      const getObject = jest.fn().mockResolvedValue(JSON.stringify(existing));
+      const putRawData = jest.fn();
+      const { repository } = createRepository({ getObject, putRawData });
+
+      const result = await repository.addSubscription(
+        "client-1",
+        channelSubscription,
+        false,
+      );
+
+      expect(result.subscriptions).toHaveLength(2);
+      expect(result.subscriptions[1]).toEqual(channelSubscription);
+      expect(putRawData).toHaveBeenCalledTimes(1);
+    });
+
+    it("throws when resulting config would be invalid", async () => {
+      const getObject = jest.fn().mockResolvedValue(undefined);
+      const putRawData = jest.fn();
+      const { repository } = createRepository({ getObject, putRawData });
+
+      await expect(
+        repository.addSubscription("client-1", messageSubscription, false),
+      ).rejects.toThrow(/Config validation failed/);
+
+      expect(putRawData).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("deleteSubscription", () => {
+    it("removes subscription by ID", async () => {
+      const config = baseConfig();
+      const getObject = jest.fn().mockResolvedValue(JSON.stringify(config));
+      const putRawData = jest.fn();
+      const { repository } = createRepository({ getObject, putRawData });
+
+      const result = await repository.deleteSubscription(
+        "client-1",
+        "sub-001",
+        false,
+      );
+
+      expect(result.subscriptions).toHaveLength(1);
+      expect(result.subscriptions[0].subscriptionId).toBe("sub-002");
+    });
+
+    it("throws when config not found", async () => {
+      const getObject = jest.fn().mockResolvedValue(undefined);
+      const { repository } = createRepository({ getObject });
+
+      await expect(
+        repository.deleteSubscription("client-1", "sub-001", false),
+      ).rejects.toThrow("No configuration found for client: client-1");
+    });
+
+    it("warns when subscription ID does not exist", async () => {
+      const config = baseConfig();
+      const getObject = jest.fn().mockResolvedValue(JSON.stringify(config));
+      const putRawData = jest.fn();
+      const { repository } = createRepository({ getObject, putRawData });
+      const warnSpy = jest.spyOn(console, "warn").mockImplementation();
+
+      const result = await repository.deleteSubscription(
+        "client-1",
+        "non-existent-id",
+        false,
+      );
+
+      expect(warnSpy).toHaveBeenCalledWith(
+        "Warning: subscription non-existent-id not found for client client-1",
+      );
+      expect(result.subscriptions).toEqual(config.subscriptions);
+      warnSpy.mockRestore();
+    });
+  });
+
+  describe("setSubscriptionStates", () => {
+    it("updates messageStatuses for a MessageStatus subscription", async () => {
+      const config = baseConfig();
+      const getObject = jest.fn().mockResolvedValue(JSON.stringify(config));
+      const putRawData = jest.fn();
+      const { repository } = createRepository({ getObject, putRawData });
+
+      const result = await repository.setSubscriptionStates(
+        "client-1",
+        "sub-001",
+        { messageStatuses: ["FAILED"] },
+        false,
+      );
+
+      const updated = result.subscriptions.find(
+        (s) => s.subscriptionId === "sub-001",
+      ) as MessageStatusSubscriptionConfiguration | undefined;
+      expect(updated?.messageStatuses).toEqual(["FAILED"]);
+    });
+
+    it("throws when config not found", async () => {
+      const getObject = jest.fn().mockResolvedValue(undefined);
+      const { repository } = createRepository({ getObject });
+
+      await expect(
+        repository.setSubscriptionStates("client-1", "sub-001", {}, false),
+      ).rejects.toThrow("No configuration found for client: client-1");
+    });
+
+    it("updates channel and supplier statuses for a ChannelStatus subscription", async () => {
+      const config = baseConfig();
+      const getObject = jest.fn().mockResolvedValue(JSON.stringify(config));
+      const putRawData = jest.fn();
+      const { repository } = createRepository({ getObject, putRawData });
+
+      const result = await repository.setSubscriptionStates(
+        "client-1",
+        "sub-002",
+        {
           channelStatuses: ["DELIVERED"],
-          supplierStatuses: ["delivered"],
-          channelType: "INVALID_CHANNEL" as never,
-          rateLimit: 10,
-          dryRun: false,
-        }),
-      ).rejects.toThrow(z.ZodError);
-    });
+          supplierStatuses: ["read"],
+        },
+        false,
+      );
 
-    it("throws validation error for invalid channel status", async () => {
-      const { repository } = createRepository();
+      const updated = result.subscriptions.find(
+        (s) => s.subscriptionId === "sub-002",
+      );
 
-      await expect(
-        repository.putChannelStatusSubscription({
-          clientName: "Client 1",
-          clientId: "client-1",
-          apiKey: "secret",
-          apiEndpoint: "https://example.com/webhook",
-          channelStatuses: ["INVALID_STATUS" as never],
-          supplierStatuses: ["delivered"],
-          channelType: "SMS",
-          rateLimit: 10,
-          dryRun: false,
-        }),
-      ).rejects.toThrow(z.ZodError);
-    });
-
-    it("throws validation error for invalid supplier status", async () => {
-      const { repository } = createRepository();
-
-      await expect(
-        repository.putChannelStatusSubscription({
-          clientName: "Client 1",
-          clientId: "client-1",
-          apiKey: "secret",
-          apiEndpoint: "https://example.com/webhook",
+      expect(updated).toEqual(
+        expect.objectContaining({
+          subscriptionType: "ChannelStatus",
           channelStatuses: ["DELIVERED"],
-          supplierStatuses: ["INVALID_STATUS" as never],
-          channelType: "SMS",
-          rateLimit: 10,
-          dryRun: false,
+          supplierStatuses: ["read"],
         }),
-      ).rejects.toThrow(z.ZodError);
+      );
     });
 
-    it("throws validation error when neither channelStatuses nor supplierStatuses are provided", async () => {
-      const { repository } = createRepository();
+    it("leaves subscriptions unchanged when subscription ID does not exist", async () => {
+      const config = baseConfig();
+      const getObject = jest.fn().mockResolvedValue(JSON.stringify(config));
+      const putRawData = jest.fn();
+      const { repository } = createRepository({ getObject, putRawData });
+
+      const result = await repository.setSubscriptionStates(
+        "client-1",
+        "missing-subscription-id",
+        { channelStatuses: ["FAILED"] },
+        false,
+      );
+
+      expect(result.subscriptions).toEqual(config.subscriptions);
+    });
+  });
+
+  describe("addTarget", () => {
+    it("appends target to existing config", async () => {
+      const existing = createClientSubscriptionConfig();
+      const getObject = jest.fn().mockResolvedValue(JSON.stringify(existing));
+      const putRawData = jest.fn();
+      const { repository } = createRepository({ getObject, putRawData });
+
+      const result = await repository.addTarget("client-1", baseTarget, false);
+
+      expect(result.targets).toHaveLength(1);
+      expect(result.targets[0]).toEqual(baseTarget);
+    });
+
+    it("creates new config when none exists", async () => {
+      const getObject = jest.fn().mockResolvedValue(undefined);
+      const putRawData = jest.fn();
+      const { repository } = createRepository({ getObject, putRawData });
+
+      const result = await repository.addTarget("client-1", baseTarget, false);
+
+      expect(result.clientId).toBe("client-1");
+      expect(result.targets).toEqual([baseTarget]);
+    });
+  });
+
+  describe("deleteTarget", () => {
+    it("removes target by ID when it is not referenced", async () => {
+      const config = createClientSubscriptionConfig({ targets: [baseTarget] });
+      const getObject = jest.fn().mockResolvedValue(JSON.stringify(config));
+      const putRawData = jest.fn();
+      const { repository } = createRepository({ getObject, putRawData });
+
+      const result = await repository.deleteTarget(
+        "client-1",
+        TARGET_ID,
+        false,
+      );
+
+      expect(result.targets).toHaveLength(0);
+    });
+
+    it("warns when target ID does not exist", async () => {
+      const config = createClientSubscriptionConfig();
+      const getObject = jest.fn().mockResolvedValue(JSON.stringify(config));
+      const putRawData = jest.fn();
+      const { repository } = createRepository({ getObject, putRawData });
+      const warnSpy = jest.spyOn(console, "warn").mockImplementation();
+
+      const result = await repository.deleteTarget(
+        "client-1",
+        "non-existent-target",
+        false,
+      );
+
+      expect(warnSpy).toHaveBeenCalledWith(
+        "Warning: target non-existent-target not found for client client-1",
+      );
+      expect(result.targets).toEqual(config.targets);
+      warnSpy.mockRestore();
+    });
+
+    it("throws when removing a referenced target would invalidate the config", async () => {
+      const config = baseConfig();
+      const getObject = jest.fn().mockResolvedValue(JSON.stringify(config));
+      const putRawData = jest.fn();
+      const { repository } = createRepository({ getObject, putRawData });
 
       await expect(
-        repository.putChannelStatusSubscription({
-          clientName: "Client 1",
-          clientId: "client-1",
-          apiKey: "secret",
-          apiEndpoint: "https://example.com/webhook",
-          channelType: "SMS",
-          rateLimit: 10,
-          dryRun: false,
-        }),
+        repository.deleteTarget("client-1", TARGET_ID, false),
       ).rejects.toThrow(
-        /at least one of channelStatuses or supplierStatuses must be provided/,
+        `Cannot delete target ${TARGET_ID}: still referenced by subscriptions sub-001, sub-002`,
       );
+
+      expect(putRawData).not.toHaveBeenCalled();
     });
 
-    it("applies default value for apiKeyHeaderName on message subscription", async () => {
-      const getObject = jest.fn().mockResolvedValue(undefined as never);
-      const messageStatus = jest.fn().mockReturnValue(messageSubscription);
+    it("throws when config not found", async () => {
+      const getObject = jest.fn().mockResolvedValue(undefined);
+      const { repository } = createRepository({ getObject });
 
-      const { configurationBuilder, repository } = createRepository({
-        getObject,
-        messageStatus,
-      });
-
-      await repository.putMessageStatusSubscription({
-        clientName: "Client 1",
-        clientId: "client-1",
-        apiKey: "secret",
-        apiEndpoint: "https://example.com/webhook",
-        statuses: ["DELIVERED"],
-        rateLimit: 10,
-        dryRun: false,
-      });
-
-      expect(configurationBuilder.messageStatus).toHaveBeenCalledWith(
-        expect.objectContaining({
-          apiKeyHeaderName: "x-api-key",
-        }),
-      );
-    });
-
-    it("applies default value for apiKeyHeaderName on channel subscription", async () => {
-      const getObject = jest.fn().mockResolvedValue(undefined as never);
-      const channelStatus = jest.fn().mockReturnValue(channelSubscription);
-
-      const { configurationBuilder, repository } = createRepository({
-        getObject,
-        channelStatus,
-      });
-
-      await repository.putChannelStatusSubscription({
-        clientName: "Client 1",
-        clientId: "client-1",
-        apiKey: "secret",
-        apiEndpoint: "https://example.com/webhook",
-        channelStatuses: ["DELIVERED"],
-        supplierStatuses: ["delivered"],
-        channelType: "SMS",
-        rateLimit: 10,
-        dryRun: false,
-      });
-
-      expect(configurationBuilder.channelStatus).toHaveBeenCalledWith(
-        expect.objectContaining({
-          apiKeyHeaderName: "x-api-key",
-        }),
-      );
+      await expect(
+        repository.deleteTarget("client-1", TARGET_ID, false),
+      ).rejects.toThrow("No configuration found for client: client-1");
     });
   });
 });

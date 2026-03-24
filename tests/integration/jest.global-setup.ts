@@ -9,48 +9,38 @@ import {
 
 const mockClientSubscriptionKey = "client_subscriptions/mock-client.json";
 
-const mockClientSubscriptionBody = JSON.stringify([
-  {
-    SubscriptionId: "mock-client",
-    SubscriptionType: "MessageStatus",
-    ClientId: "mock-client",
-    MessageStatuses: ["DELIVERED"],
-    Targets: [
-      {
-        Type: "API",
-        TargetId: "445527ff-277b-43a4-a4b0-15eedbd71597",
-        InvocationEndpoint: "https://some-mock-client.endpoint/webhook",
-        InvocationMethod: "POST",
-        InvocationRateLimit: 10,
-        APIKey: {
-          HeaderName: "x-api-key",
-          HeaderValue: "some-api-key",
-        },
+const mockClientSubscriptionBody = JSON.stringify({
+  clientId: "mock-client",
+  subscriptions: [
+    {
+      subscriptionId: "mock-client-message",
+      subscriptionType: "MessageStatus",
+      messageStatuses: ["DELIVERED"],
+      targetIds: ["445527ff-277b-43a4-a4b0-15eedbd71597"],
+    },
+    {
+      subscriptionId: "mock-client-channel",
+      subscriptionType: "ChannelStatus",
+      channelStatuses: ["DELIVERED"],
+      channelType: "NHSAPP",
+      supplierStatuses: ["delivered"],
+      targetIds: ["445527ff-277b-43a4-a4b0-15eedbd71597"],
+    },
+  ],
+  targets: [
+    {
+      type: "API",
+      targetId: "445527ff-277b-43a4-a4b0-15eedbd71597",
+      invocationEndpoint: "https://some-mock-client.endpoint/webhook",
+      invocationMethod: "POST",
+      invocationRateLimit: 10,
+      apiKey: {
+        headerName: "x-api-key",
+        headerValue: "some-api-key",
       },
-    ],
-  },
-  {
-    SubscriptionId: "mock-client-channel",
-    SubscriptionType: "ChannelStatus",
-    ClientId: "mock-client",
-    ChannelStatuses: ["DELIVERED"],
-    ChannelType: "NHSAPP",
-    SupplierStatuses: ["delivered"],
-    Targets: [
-      {
-        Type: "API",
-        TargetId: "445527ff-277b-43a4-a4b0-15eedbd71597",
-        InvocationEndpoint: "https://some-mock-client.endpoint/webhook",
-        InvocationMethod: "POST",
-        InvocationRateLimit: 10,
-        APIKey: {
-          HeaderName: "x-api-key",
-          HeaderValue: "some-api-key",
-        },
-      },
-    ],
-  },
-]);
+    },
+  ],
+});
 
 export default async function globalSetup() {
   const deploymentDetails = getDeploymentDetails();

@@ -63,7 +63,7 @@ export class ConfigLoader {
       this.options.cache.set(clientId, validated);
       logger.info("Config loaded successfully from S3", {
         clientId,
-        subscriptionCount: validated.length,
+        subscriptionCount: validated.subscriptions.length,
       });
       return validated;
     } catch (error) {

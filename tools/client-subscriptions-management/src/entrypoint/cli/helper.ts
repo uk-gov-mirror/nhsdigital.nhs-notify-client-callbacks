@@ -1,103 +1,132 @@
-import { GetCallerIdentityCommand, STSClient } from "@aws-sdk/client-sts";
-import { fromIni } from "@aws-sdk/credential-providers";
-import { table } from "table";
-import type { ClientSubscriptionConfiguration } from "@nhs-notify-client-callbacks/models";
+import {
+  createRepository as createRepositoryFromOptions,
+  resolveBucketName,
+  resolveProfile,
+  resolveRegion,
+} from "src/aws";
+import { hideBin } from "yargs/helpers";
+import yargs from "yargs/yargs";
+import type { Argv, CommandModule } from "yargs";
 
-const SUBSCRIPTION_TABLE_HEADER = [
-  "Client ID",
-  "Subscription Type",
-  "Statuses",
-  "Target ID",
-  "Endpoint",
-  "Method",
-  "Rate Limit",
-  "API Key Header",
-  "API Key Value",
-];
+export const wrapCli =
+  (mainFn: (args: string[]) => Promise<void>) =>
+  async (args: string[] = process.argv): Promise<void> => {
+    try {
+      await mainFn(args);
+    } catch (error) {
+      console.error(error instanceof Error ? error.message : error);
+      process.exitCode = 1;
+    }
+  };
 
-const subscriptionStatuses = (
-  subscription: ClientSubscriptionConfiguration[number],
-): string => {
-  if (subscription.SubscriptionType === "MessageStatus") {
-    return subscription.MessageStatuses.join(", ");
-  }
-  const statuses = [
-    ...subscription.ChannelStatuses,
-    ...subscription.SupplierStatuses,
+export type CommonCliArgs = {
+  "bucket-name"?: string;
+  environment?: string;
+  profile?: string;
+  region?: string;
+};
+
+export type ClientCliArgs = CommonCliArgs & {
+  "client-id": string;
+};
+
+export type WriteCliArgs = {
+  "dry-run": boolean;
+};
+
+export const createRepository = async (argv: CommonCliArgs) => {
+  const region = resolveRegion(argv.region);
+  const profile = resolveProfile(argv.profile);
+  const bucketName = await resolveBucketName({
+    bucketName: argv["bucket-name"],
+    environment: argv.environment,
+    region,
+    profile,
+  });
+  return createRepositoryFromOptions({ bucketName, region, profile });
+};
+
+type BaseArgs = Record<string, never>;
+
+export type CliCommand<TArgs> = CommandModule<BaseArgs, TArgs>;
+
+export type AnyCliCommand = CliCommand<any>;
+
+const configureParser = (parser: Argv) =>
+  parser
+    .strict()
+    .recommendCommands()
+    .demandCommand(1)
+    .exitProcess(false)
+    .fail((message, error) => {
+      throw error ?? new Error(message);
+    })
+    .help();
+
+export const runCommand = async <TArgs>(
+  command: CliCommand<TArgs>,
+  args: string[] = process.argv,
+): Promise<void> => {
+  const commandArgs = [
+    args[0] ?? "node",
+    args[1] ?? "script",
+    String(command.command).split(/\s+/)[0],
+    ...args.slice(2),
   ];
-  return `${subscription.ChannelType}: ${statuses.join(", ")}`;
+
+  await configureParser(yargs(hideBin(commandArgs)))
+    .command(command)
+    .parseAsync();
 };
 
-export const formatSubscriptionFileResponse = (
-  subscriptions: ClientSubscriptionConfiguration,
-): string => {
-  const rows = subscriptions.flatMap((subscription) =>
-    subscription.Targets.map((target) => [
-      subscription.ClientId,
-      subscription.SubscriptionType,
-      subscriptionStatuses(subscription),
-      target.TargetId,
-      target.InvocationEndpoint,
-      target.InvocationMethod,
-      String(target.InvocationRateLimit),
-      target.APIKey.HeaderName,
-      target.APIKey.HeaderValue,
-    ]),
-  );
-  return table([SUBSCRIPTION_TABLE_HEADER, ...rows]);
-};
-
-export const normalizeClientName = (name: string): string =>
-  name.replaceAll(/\s+/g, "-").toLowerCase();
-
-export const resolveProfile = (
-  profileArg?: string,
-  env: NodeJS.ProcessEnv = process.env,
-): string | undefined => profileArg ?? env.AWS_PROFILE;
-
-export const resolveAccountId = async (
-  profile?: string,
-  region?: string,
-): Promise<string> => {
-  const credentials = profile ? fromIni({ profile }) : undefined;
-  const client = new STSClient({ region, credentials });
-  const { Account } = await client.send(new GetCallerIdentityCommand({}));
-  if (!Account) {
-    throw new Error("Unable to determine AWS account ID from STS");
+export const runCommands = async (
+  commands: AnyCliCommand[],
+  args: string[] = process.argv,
+): Promise<void> => {
+  let parser = configureParser(yargs(hideBin(args)));
+  for (const command of commands) {
+    parser = parser.command(command);
   }
-  return Account;
+  await parser.parseAsync();
 };
 
-export const deriveBucketName = (
-  accountId: string,
-  environment: string,
-  region: string,
-  project = "nhs",
-  component = "callbacks",
-): string =>
-  `${project}-${accountId}-${region}-${environment}-${component}-subscription-config`;
-
-export const resolveBucketName = async (
-  bucketArg?: string,
-  environment?: string,
-  region?: string,
-  profile?: string,
-  project?: string,
-): Promise<string> => {
-  if (bucketArg) {
-    return bucketArg;
-  }
-  if (!environment) {
-    throw new Error(
-      "Bucket name is required: use --bucket-name to specify directly, or --environment (with --region and optionally --profile) to determine this automatically",
-    );
-  }
-  const resolvedRegion = region ?? "eu-west-2";
-  const accountId = await resolveAccountId(profile, resolvedRegion);
-  return deriveBucketName(accountId, environment, resolvedRegion, project);
+export const commonOptions = {
+  "bucket-name": {
+    type: "string" as const,
+    demandOption: false as const,
+    description: "Explicit S3 bucket name (overrides derived name)",
+  },
+  environment: {
+    type: "string" as const,
+    demandOption: false as const,
+    description:
+      "Environment name, used to derive infrastructure resource names when not explicitly provided",
+  },
+  region: {
+    type: "string" as const,
+    demandOption: false as const,
+    description: "AWS region (defaults to AWS_REGION or eu-west-2)",
+  },
+  profile: {
+    type: "string" as const,
+    demandOption: false as const,
+    description: "AWS profile to use (overrides AWS_PROFILE)",
+  },
 };
 
-export const resolveRegion = (
-  regionArg?: string,
-  env: NodeJS.ProcessEnv = process.env,
-): string | undefined => regionArg ?? env.AWS_REGION ?? env.AWS_DEFAULT_REGION;
+export const clientIdOption = {
+  "client-id": {
+    type: "string" as const,
+    demandOption: true as const,
+    description: "Client identifier",
+  },
+};
+
+export const writeOptions = {
+  "dry-run": {
+    type: "boolean" as const,
+    default: false,
+    demandOption: false as const,
+    description: "Validate config without writing to S3",
+  },
+};

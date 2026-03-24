@@ -148,7 +148,7 @@ async function signBatch(
       }
 
       const clientConfig = configByClientId.get(clientId);
-      const apiKey = clientConfig?.[0]?.Targets?.[0]?.APIKey?.HeaderValue;
+      const apiKey = clientConfig?.targets?.[0]?.apiKey?.headerValue;
       if (!apiKey) {
         stats.recordFiltered();
         logger.warn(
@@ -215,25 +215,25 @@ async function filterBatch(
 
   for (const event of transformedEvents) {
     const { clientId } = event.data;
+    const correlationId = extractCorrelationId(event);
     const config = configByClientId.get(clientId);
     const filterResult = evaluateSubscriptionFilters(event, config);
 
     if (filterResult.matched) {
       filtered.push(event);
-      const targetIds = config?.flatMap((s) =>
-        s.Targets.map((t) => t.TargetId),
-      );
       observability.recordFilteringMatched({
+        correlationId,
         clientId,
         eventType: event.type,
         subscriptionType: filterResult.subscriptionType,
-        targetIds,
+        targetIds: filterResult.targetIds,
       });
     } else {
       stats.recordFiltered();
       observability
         .getLogger()
         .info("Event filtered out - no matching subscription", {
+          correlationId,
           clientId,
           eventType: event.type,
           subscriptionType: filterResult.subscriptionType,

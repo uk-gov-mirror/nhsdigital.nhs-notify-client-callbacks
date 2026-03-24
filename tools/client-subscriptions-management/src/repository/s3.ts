@@ -1,5 +1,6 @@
 import {
   GetObjectCommand,
+  ListObjectsV2Command,
   NoSuchKey,
   PutObjectCommand,
   PutObjectCommandInput,
@@ -45,5 +46,28 @@ export class S3Repository {
     };
 
     await this.s3Client.send(new PutObjectCommand(params));
+  }
+
+  async listObjectKeys(prefix: string): Promise<string[]> {
+    const keys: string[] = [];
+    let continuationToken: string | undefined;
+
+    do {
+      const { Contents, NextContinuationToken } = await this.s3Client.send(
+        new ListObjectsV2Command({
+          Bucket: this.bucketName,
+          Prefix: prefix,
+          ContinuationToken: continuationToken,
+        }),
+      );
+      for (const obj of Contents ?? []) {
+        if (obj.Key) {
+          keys.push(obj.Key);
+        }
+      }
+      continuationToken = NextContinuationToken;
+    } while (continuationToken);
+
+    return keys;
   }
 }

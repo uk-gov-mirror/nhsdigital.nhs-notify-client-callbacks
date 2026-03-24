@@ -1,51 +1,23 @@
 import type { ClientSubscriptionConfiguration } from "@nhs-notify-client-callbacks/models";
 import {
+  createChannelStatusSubscription,
+  createClientSubscriptionConfig,
+  createMessageStatusSubscription,
+  createTarget,
+} from "__tests__/helpers/client-subscription-fixtures";
+import {
   ConfigValidationError,
   validateClientConfig,
 } from "services/validators/config-validator";
 
-const createValidConfig = (): ClientSubscriptionConfiguration => [
-  {
-    SubscriptionId: "00000000-0000-0000-0000-000000000001",
-    ClientId: "client-1",
-    Targets: [
-      {
-        Type: "API",
-        TargetId: "target",
-        InvocationEndpoint: "https://example.com",
-        InvocationMethod: "POST",
-        InvocationRateLimit: 10,
-        APIKey: {
-          HeaderName: "x-api-key",
-          HeaderValue: "secret",
-        },
-      },
+const createValidConfig = (): ClientSubscriptionConfiguration =>
+  createClientSubscriptionConfig("client-1", {
+    subscriptions: [
+      createMessageStatusSubscription(["DELIVERED"]),
+      createChannelStatusSubscription(["DELIVERED"], ["read"]),
     ],
-    SubscriptionType: "MessageStatus",
-    MessageStatuses: ["DELIVERED"],
-  },
-  {
-    SubscriptionId: "00000000-0000-0000-0000-000000000002",
-    ClientId: "client-1",
-    Targets: [
-      {
-        Type: "API",
-        TargetId: "target",
-        InvocationEndpoint: "https://example.com",
-        InvocationMethod: "POST",
-        InvocationRateLimit: 10,
-        APIKey: {
-          HeaderName: "x-api-key",
-          HeaderValue: "secret",
-        },
-      },
-    ],
-    SubscriptionType: "ChannelStatus",
-    ChannelType: "EMAIL",
-    ChannelStatuses: ["DELIVERED"],
-    SupplierStatuses: ["read"],
-  },
-];
+    targets: [createTarget()],
+  });
 
 describe("validateClientConfig", () => {
   it("returns the config when valid", () => {
@@ -54,28 +26,43 @@ describe("validateClientConfig", () => {
     expect(validateClientConfig(config)).toEqual(config);
   });
 
-  it("throws when config is not an array", () => {
-    expect(() => validateClientConfig({})).toThrow(ConfigValidationError);
+  it("throws ConfigValidationError with formatted issues when schema parsing fails", () => {
+    const config = createValidConfig();
+    config.subscriptions[0].targetIds = ["unknown-target-id"];
+
+    expect(() => validateClientConfig(config)).toThrow(
+      new ConfigValidationError([
+        {
+          path: "subscriptions[0].targetIds[0]",
+          message: 'targetId "unknown-target-id" not found in targets',
+        },
+      ]),
+    );
   });
 
-  it("throws when invocation endpoint is not https", () => {
+  it("preserves all schema issues on the thrown error", () => {
     const config = createValidConfig();
-    config[0].Targets[0].InvocationEndpoint = "http://example.com";
+    config.targets[0].invocationEndpoint = "http://example.com";
+    config.subscriptions[0].targetIds = ["unknown-target-id"];
 
-    expect(() => validateClientConfig(config)).toThrow(ConfigValidationError);
-  });
+    let thrownError: unknown;
 
-  it("throws when subscription IDs are not unique", () => {
-    const config = createValidConfig();
-    config[1].SubscriptionId = config[0].SubscriptionId;
+    try {
+      validateClientConfig(config);
+    } catch (error) {
+      thrownError = error;
+    }
 
-    expect(() => validateClientConfig(config)).toThrow(ConfigValidationError);
-  });
-
-  it("throws when InvocationEndpoint is not a valid URL", () => {
-    const config = createValidConfig();
-    config[0].Targets[0].InvocationEndpoint = "not-a-url";
-
-    expect(() => validateClientConfig(config)).toThrow(ConfigValidationError);
+    expect(thrownError).toBeInstanceOf(ConfigValidationError);
+    expect((thrownError as ConfigValidationError).issues).toEqual([
+      {
+        path: "targets[0].invocationEndpoint",
+        message: "Expected HTTPS URL",
+      },
+      {
+        path: "subscriptions[0].targetIds[0]",
+        message: 'targetId "unknown-target-id" not found in targets',
+      },
+    ]);
   });
 });

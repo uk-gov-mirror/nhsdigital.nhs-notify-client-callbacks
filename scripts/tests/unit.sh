@@ -19,7 +19,7 @@ cd "$(git rev-parse --show-toplevel)"
 
 # run tests
 npm ci
-npm run test:unit --workspaces
+npm run test:unit:silent
 
 # merge coverage reports
 mkdir -p .reports

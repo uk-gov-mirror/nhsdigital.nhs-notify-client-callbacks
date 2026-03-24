@@ -2,13 +2,19 @@ import type {
   Channel,
   ChannelStatus,
   ChannelStatusData,
-  ClientSubscriptionConfiguration,
   MessageStatus,
   MessageStatusData,
   StatusPublishEvent,
   SupplierStatus,
 } from "@nhs-notify-client-callbacks/models";
 import { EventTypes } from "@nhs-notify-client-callbacks/models";
+import {
+  createChannelStatusConfig,
+  createChannelStatusSubscription,
+  createClientSubscriptionConfig,
+  createMessageStatusConfig,
+  createMessageStatusSubscription,
+} from "__tests__/helpers/client-subscription-fixtures";
 import { TransformationError } from "services/error-handler";
 import { evaluateSubscriptionFilters } from "services/subscription-filter";
 
@@ -83,60 +89,6 @@ const createChannelStatusEvent = (
   },
 });
 
-const createMessageStatusConfig = (
-  clientId: string,
-  statuses: MessageStatus[],
-): ClientSubscriptionConfiguration => [
-  {
-    SubscriptionId: "00000000-0000-0000-0000-000000000001",
-    ClientId: clientId,
-    Targets: [
-      {
-        Type: "API",
-        TargetId: "target",
-        InvocationEndpoint: "https://example.com",
-        InvocationMethod: "POST",
-        InvocationRateLimit: 10,
-        APIKey: {
-          HeaderName: "x-api-key",
-          HeaderValue: "secret",
-        },
-      },
-    ],
-    SubscriptionType: "MessageStatus",
-    MessageStatuses: statuses,
-  },
-];
-
-const createChannelStatusConfig = (
-  clientId: string,
-  channelType: Channel,
-  channelStatuses: ChannelStatus[],
-  supplierStatuses: SupplierStatus[],
-): ClientSubscriptionConfiguration => [
-  {
-    SubscriptionId: "00000000-0000-0000-0000-000000000002",
-    ClientId: clientId,
-    Targets: [
-      {
-        Type: "API",
-        TargetId: "target",
-        InvocationEndpoint: "https://example.com",
-        InvocationMethod: "POST",
-        InvocationRateLimit: 10,
-        APIKey: {
-          HeaderName: "x-api-key",
-          HeaderValue: "secret",
-        },
-      },
-    ],
-    SubscriptionType: "ChannelStatus",
-    ChannelType: channelType,
-    ChannelStatuses: channelStatuses,
-    SupplierStatuses: supplierStatuses,
-  },
-];
-
 describe("evaluateSubscriptionFilters", () => {
   describe("when config is undefined", () => {
     it("returns not matched with Unknown subscription type", () => {
@@ -153,25 +105,48 @@ describe("evaluateSubscriptionFilters", () => {
   describe("when event is MessageStatus", () => {
     it("returns matched true when status matches subscription", () => {
       const event = createMessageStatusEvent("client-1", "DELIVERED");
-      const config = createMessageStatusConfig("client-1", ["DELIVERED"]);
+      const config = createMessageStatusConfig(["DELIVERED"], "client-1");
 
       const result = evaluateSubscriptionFilters(event, config);
 
       expect(result).toEqual({
         matched: true,
         subscriptionType: "MessageStatus",
+        targetIds: ["00000000-0000-4000-8000-000000000001"],
       });
     });
 
     it("returns matched false when status does not match subscription", () => {
       const event = createMessageStatusEvent("client-1", "FAILED");
-      const config = createMessageStatusConfig("client-1", ["DELIVERED"]);
+      const config = createMessageStatusConfig(["DELIVERED"], "client-1");
 
       const result = evaluateSubscriptionFilters(event, config);
 
       expect(result).toEqual({
         matched: false,
         subscriptionType: "MessageStatus",
+      });
+    });
+
+    it("returns only matched subscription target IDs", () => {
+      const event = createMessageStatusEvent("client-1", "DELIVERED");
+      const config = createClientSubscriptionConfig("client-1", {
+        subscriptions: [
+          createMessageStatusSubscription(["DELIVERED"], {
+            targetIds: ["target-a"],
+          }),
+          createMessageStatusSubscription(["FAILED"], {
+            targetIds: ["target-b"],
+          }),
+        ],
+      });
+
+      const result = evaluateSubscriptionFilters(event, config);
+
+      expect(result).toEqual({
+        matched: true,
+        subscriptionType: "MessageStatus",
+        targetIds: ["target-a"],
       });
     });
   });
@@ -187,10 +162,10 @@ describe("evaluateSubscriptionFilters", () => {
         "notified",
       );
       const config = createChannelStatusConfig(
-        "client-1",
-        "EMAIL",
         ["DELIVERED"],
         ["delivered"],
+        "client-1",
+        "EMAIL",
       );
 
       const result = evaluateSubscriptionFilters(event, config);
@@ -198,6 +173,7 @@ describe("evaluateSubscriptionFilters", () => {
       expect(result).toEqual({
         matched: true,
         subscriptionType: "ChannelStatus",
+        targetIds: ["00000000-0000-4000-8000-000000000001"],
       });
     });
 
@@ -211,10 +187,10 @@ describe("evaluateSubscriptionFilters", () => {
         "delivered", // previousSupplierStatus (no change)
       );
       const config = createChannelStatusConfig(
-        "client-1",
-        "EMAIL",
         ["DELIVERED"],
         ["delivered"],
+        "client-1",
+        "EMAIL",
       );
 
       const result = evaluateSubscriptionFilters(event, config);
@@ -222,6 +198,45 @@ describe("evaluateSubscriptionFilters", () => {
       expect(result).toEqual({
         matched: false,
         subscriptionType: "ChannelStatus",
+      });
+    });
+
+    it("returns only matched channel subscription target IDs", () => {
+      const event = createChannelStatusEvent(
+        "client-1",
+        "SMS",
+        "FAILED",
+        "permanent_failure",
+        "DELIVERED",
+        "delivered",
+      );
+      const config = createClientSubscriptionConfig("client-1", {
+        subscriptions: [
+          createChannelStatusSubscription(
+            ["DELIVERED"],
+            ["delivered"],
+            "EMAIL",
+            {
+              targetIds: ["target-email"],
+            },
+          ),
+          createChannelStatusSubscription(
+            ["FAILED"],
+            ["permanent_failure"],
+            "SMS",
+            {
+              targetIds: ["target-sms"],
+            },
+          ),
+        ],
+      });
+
+      const result = evaluateSubscriptionFilters(event, config);
+
+      expect(result).toEqual({
+        matched: true,
+        subscriptionType: "ChannelStatus",
+        targetIds: ["target-sms"],
       });
     });
   });
@@ -232,7 +247,7 @@ describe("evaluateSubscriptionFilters", () => {
         ...createMessageStatusEvent("client-1", "DELIVERED"),
         type: "unknown-event-type",
       } as StatusPublishEvent;
-      const config = createMessageStatusConfig("client-1", ["DELIVERED"]);
+      const config = createMessageStatusConfig(["DELIVERED"], "client-1");
 
       expect(() => evaluateSubscriptionFilters(event, config)).toThrow(
         new TransformationError("Unsupported event type: unknown-event-type"),

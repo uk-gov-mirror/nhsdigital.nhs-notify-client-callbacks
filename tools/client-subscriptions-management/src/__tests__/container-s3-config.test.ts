@@ -1,4 +1,4 @@
-import { createS3Client } from "src/container";
+import { createS3Client } from "src/aws";
 
 const mockFromIni = jest.fn().mockReturnValue({ accessKeyId: "from-ini" });
 jest.mock("@aws-sdk/credential-providers", () => ({

@@ -1,97 +1,68 @@
-import { normalizeClientName } from "src/entrypoint/cli/helper";
 import type {
-  ChannelStatusSubscriptionArgs,
-  MessageStatusSubscriptionArgs,
-} from "src/repository/client-subscriptions";
-import type {
+  CallbackTarget,
+  Channel,
+  ChannelStatus,
   ChannelStatusSubscriptionConfiguration,
+  MessageStatus,
   MessageStatusSubscriptionConfiguration,
+  SupplierStatus,
 } from "@nhs-notify-client-callbacks/models";
 
-export type SubscriptionBuilder = {
-  messageStatus(
-    args: MessageStatusSubscriptionArgs,
-  ): MessageStatusSubscriptionConfiguration;
-  channelStatus(
-    args: ChannelStatusSubscriptionArgs,
-  ): ChannelStatusSubscriptionConfiguration;
+export type BuildTargetArgs = {
+  apiEndpoint: string;
+  apiKey: string;
+  apiKeyHeaderName?: string;
+  rateLimit: number;
 };
 
-export function buildMessageStatusSubscription(
-  args: MessageStatusSubscriptionArgs,
-): MessageStatusSubscriptionConfiguration {
-  const {
-    apiEndpoint,
-    apiKey,
-    apiKeyHeaderName = "x-api-key",
-    clientId,
-    clientName,
-    rateLimit,
-    statuses,
-  } = args;
-  const normalizedClientName = normalizeClientName(clientName);
-  const subscriptionId = normalizedClientName;
+export type BuildMessageStatusSubscriptionArgs = {
+  subscriptionId: string;
+  targetIds: string[];
+  messageStatuses: MessageStatus[];
+};
+
+export type BuildChannelStatusSubscriptionArgs = {
+  subscriptionId: string;
+  targetIds: string[];
+  channelType: Channel;
+  channelStatuses?: ChannelStatus[];
+  supplierStatuses?: SupplierStatus[];
+};
+
+export function buildTarget(args: BuildTargetArgs): CallbackTarget {
   return {
-    SubscriptionId: subscriptionId,
-    SubscriptionType: "MessageStatus",
-    ClientId: clientId,
-    MessageStatuses: statuses,
-    Targets: [
-      {
-        Type: "API",
-        TargetId: crypto.randomUUID(),
-        InvocationEndpoint: apiEndpoint,
-        InvocationMethod: "POST",
-        InvocationRateLimit: rateLimit,
-        APIKey: {
-          HeaderName: apiKeyHeaderName,
-          HeaderValue: apiKey,
-        },
-      },
-    ],
+    targetId: crypto.randomUUID(),
+    type: "API",
+    invocationEndpoint: args.apiEndpoint,
+    invocationMethod: "POST",
+    invocationRateLimit: args.rateLimit,
+    apiKey: {
+      headerName: args.apiKeyHeaderName ?? "x-api-key",
+      headerValue: args.apiKey,
+    },
+  };
+}
+
+export function buildMessageStatusSubscription(
+  args: BuildMessageStatusSubscriptionArgs,
+): MessageStatusSubscriptionConfiguration {
+  return {
+    subscriptionId: args.subscriptionId,
+    subscriptionType: "MessageStatus",
+    targetIds: args.targetIds,
+    messageStatuses: args.messageStatuses,
   };
 }
 
 export function buildChannelStatusSubscription(
-  args: ChannelStatusSubscriptionArgs,
+  args: BuildChannelStatusSubscriptionArgs,
 ): ChannelStatusSubscriptionConfiguration {
-  const {
-    apiEndpoint,
-    apiKey,
-    apiKeyHeaderName = "x-api-key",
-    channelStatuses,
-    channelType,
-    clientId,
-    clientName,
-    rateLimit,
-    supplierStatuses,
-  } = args;
-  const normalizedClientName = normalizeClientName(clientName);
-  const subscriptionId = `${normalizedClientName}-${channelType}`;
   return {
-    SubscriptionId: subscriptionId,
-    SubscriptionType: "ChannelStatus",
-    ClientId: clientId,
-    ChannelType: channelType,
-    ChannelStatuses: channelStatuses ?? [],
-    SupplierStatuses: supplierStatuses ?? [],
-    Targets: [
-      {
-        Type: "API",
-        TargetId: crypto.randomUUID(),
-        InvocationEndpoint: apiEndpoint,
-        InvocationMethod: "POST",
-        InvocationRateLimit: rateLimit,
-        APIKey: {
-          HeaderName: apiKeyHeaderName,
-          HeaderValue: apiKey,
-        },
-      },
-    ],
+    subscriptionId: args.subscriptionId,
+    subscriptionType: "ChannelStatus",
+    targetIds: args.targetIds,
+    channelType: args.channelType,
+    channelStatuses: args.channelStatuses ?? [],
+    supplierStatuses: args.supplierStatuses ?? [],
   };
 }
-
-export const clientSubscriptionBuilder: SubscriptionBuilder = {
-  messageStatus: buildMessageStatusSubscription,
-  channelStatus: buildChannelStatusSubscription,
-};

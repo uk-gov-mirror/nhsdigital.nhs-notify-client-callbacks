@@ -6,49 +6,44 @@ import type {
 } from "@nhs-notify-client-callbacks/models";
 import { logger } from "services/logger";
 
-type FilterContext = {
-  event: StatusPublishEvent;
-  notifyData: ChannelStatusData;
-};
-
 const isChannelStatusSubscription = (
-  subscription: ClientSubscriptionConfiguration[number],
+  subscription: ClientSubscriptionConfiguration["subscriptions"][number],
 ): subscription is ChannelStatusSubscriptionConfiguration =>
-  subscription.SubscriptionType === "ChannelStatus";
+  subscription.subscriptionType === "ChannelStatus";
 
 export const matchesChannelStatusSubscription = (
   config: ClientSubscriptionConfiguration,
-  context: FilterContext,
+  event: StatusPublishEvent<ChannelStatusData>,
 ): boolean => {
-  const { notifyData } = context;
+  const { data } = event;
 
-  const matched = config
-    .filter((sub) => isChannelStatusSubscription(sub))
+  if (config.clientId !== data.clientId) {
+    return false;
+  }
+
+  const matched = config.subscriptions
+    .filter((subscription) => isChannelStatusSubscription(subscription))
     .some((subscription) => {
-      if (subscription.ClientId !== notifyData.clientId) {
-        return false;
-      }
-
-      if (subscription.ChannelType !== notifyData.channel) {
+      if (subscription.channelType !== data.channel) {
         logger.debug("Channel status filter rejected: channel type mismatch", {
-          clientId: notifyData.clientId,
-          channel: notifyData.channel,
-          expectedChannel: subscription.ChannelType,
+          clientId: data.clientId,
+          channel: data.channel,
+          expectedChannel: subscription.channelType,
         });
         return false;
       }
 
       // Check if supplier status changed AND client is subscribed to it
       const supplierStatusChanged =
-        notifyData.previousSupplierStatus !== notifyData.supplierStatus;
+        data.previousSupplierStatus !== data.supplierStatus;
       const clientSubscribedSupplierStatus =
-        subscription.SupplierStatuses.includes(notifyData.supplierStatus);
+        subscription.supplierStatuses.includes(data.supplierStatus);
 
       // Check if channel status changed AND client is subscribed to it
       const channelStatusChanged =
-        notifyData.previousChannelStatus !== notifyData.channelStatus;
+        data.previousChannelStatus !== data.channelStatus;
       const clientSubscribedChannelStatus =
-        subscription.ChannelStatuses.includes(notifyData.channelStatus);
+        subscription.channelStatuses.includes(data.channelStatus);
 
       const statusMatch =
         (supplierStatusChanged && clientSubscribedSupplierStatus) ||
@@ -58,17 +53,17 @@ export const matchesChannelStatusSubscription = (
         logger.debug(
           "Channel status filter rejected: no matching status change for subscription",
           {
-            clientId: notifyData.clientId,
-            channelStatus: notifyData.channelStatus,
-            previousChannelStatus: notifyData.previousChannelStatus,
+            clientId: data.clientId,
+            channelStatus: data.channelStatus,
+            previousChannelStatus: data.previousChannelStatus,
             channelStatusChanged,
             clientSubscribedChannelStatus,
-            supplierStatus: notifyData.supplierStatus,
-            previousSupplierStatus: notifyData.previousSupplierStatus,
+            supplierStatus: data.supplierStatus,
+            previousSupplierStatus: data.previousSupplierStatus,
             supplierStatusChanged,
             clientSubscribedSupplierStatus,
-            subscribedChannelStatuses: subscription.ChannelStatuses,
-            subscribedSupplierStatuses: subscription.SupplierStatuses,
+            subscribedChannelStatuses: subscription.channelStatuses,
+            subscribedSupplierStatuses: subscription.supplierStatuses,
           },
         );
         return false;
@@ -79,12 +74,12 @@ export const matchesChannelStatusSubscription = (
 
   if (matched) {
     logger.debug("Channel status filter matched", {
-      clientId: notifyData.clientId,
-      channel: notifyData.channel,
-      channelStatus: notifyData.channelStatus,
-      previousChannelStatus: notifyData.previousChannelStatus,
-      supplierStatus: notifyData.supplierStatus,
-      previousSupplierStatus: notifyData.previousSupplierStatus,
+      clientId: data.clientId,
+      channel: data.channel,
+      channelStatus: data.channelStatus,
+      previousChannelStatus: data.previousChannelStatus,
+      supplierStatus: data.supplierStatus,
+      previousSupplierStatus: data.previousSupplierStatus,
     });
   }
 

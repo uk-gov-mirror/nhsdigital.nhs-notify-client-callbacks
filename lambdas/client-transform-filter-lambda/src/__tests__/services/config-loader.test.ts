@@ -1,4 +1,5 @@
 import { GetObjectCommand, NoSuchKey, S3Client } from "@aws-sdk/client-s3";
+import { createMessageStatusConfig } from "__tests__/helpers/client-subscription-fixtures";
 import { ConfigCache } from "services/config-cache";
 import { ConfigLoader } from "services/config-loader";
 import { ConfigValidationError } from "services/validators/config-validator";
@@ -16,27 +17,8 @@ const mockBody = (json: string) => ({
   transformToString: jest.fn().mockResolvedValue(json),
 });
 
-const createValidConfig = (clientId: string) => [
-  {
-    SubscriptionId: "00000000-0000-0000-0000-000000000001",
-    ClientId: clientId,
-    Targets: [
-      {
-        Type: "API",
-        TargetId: "00000000-0000-4000-8000-000000000001",
-        InvocationEndpoint: "https://example.com/webhook",
-        InvocationMethod: "POST",
-        InvocationRateLimit: 10,
-        APIKey: {
-          HeaderName: "x-api-key",
-          HeaderValue: "secret",
-        },
-      },
-    ],
-    SubscriptionType: "MessageStatus",
-    MessageStatuses: ["DELIVERED"],
-  },
-];
+const createValidConfig = (clientId: string) =>
+  createMessageStatusConfig(["DELIVERED"], clientId);
 
 const createLoader = (send: jest.Mock) =>
   new ConfigLoader({
@@ -89,7 +71,7 @@ describe("ConfigLoader", () => {
 
   it("throws when configuration fails validation", async () => {
     const send = jest.fn().mockResolvedValue({
-      Body: mockBody(JSON.stringify([{ SubscriptionType: "MessageStatus" }])),
+      Body: mockBody(JSON.stringify({ subscriptionType: "MessageStatus" })),
     });
     const loader = createLoader(send);
 

@@ -13,63 +13,57 @@ import type { ConfigLoader } from "services/config-loader";
 import type { ApplicationsMapService } from "services/ssm-applications-map";
 import { ObservabilityService } from "services/observability";
 import { ConfigLoaderService } from "services/config-loader-service";
+import {
+  DEFAULT_TARGET_ID,
+  createChannelStatusSubscription,
+  createClientSubscriptionConfig,
+  createMessageStatusSubscription,
+  createTarget,
+} from "__tests__/helpers/client-subscription-fixtures";
 import { createHandler } from "..";
 
 jest.mock("aws-embedded-metrics");
 
-const stubTarget = {
-  Type: "API",
-  TargetId: "00000000-0000-4000-8000-000000000001",
-  InvocationEndpoint: "https://example.com/webhook",
-  InvocationMethod: "POST",
-  InvocationRateLimit: 10,
-  APIKey: { HeaderName: "x-api-key", HeaderValue: "test-api-key" },
-};
-
 const createPassthroughConfigLoader = (): ConfigLoader =>
   ({
-    loadClientConfig: jest.fn().mockImplementation(async (clientId: string) => [
-      {
-        SubscriptionType: "MessageStatus",
-        SubscriptionId: "00000000-0000-0000-0000-000000000001",
-        ClientId: clientId,
-        Targets: [stubTarget],
-        MessageStatuses: [
-          "DELIVERED",
-          "FAILED",
-          "PENDING",
-          "SENDING",
-          "TECHNICAL_FAILURE",
-          "PERMANENT_FAILURE",
+    loadClientConfig: jest
+      .fn()
+      .mockImplementation(async (clientId: string) => ({
+        ...createClientSubscriptionConfig(clientId),
+        subscriptions: [
+          createMessageStatusSubscription(["DELIVERED"], {
+            subscriptionId: "00000000-0000-0000-0000-000000000001",
+            targetIds: [DEFAULT_TARGET_ID],
+          }),
+          createChannelStatusSubscription(
+            ["DELIVERED"],
+            ["delivered"],
+            "NHSAPP",
+            {
+              subscriptionId: "00000000-0000-0000-0000-000000000002",
+              targetIds: [DEFAULT_TARGET_ID],
+            },
+          ),
+          createChannelStatusSubscription(
+            ["FAILED"],
+            ["permanent_failure"],
+            "SMS",
+            {
+              subscriptionId: "00000000-0000-0000-0000-000000000003",
+              targetIds: [DEFAULT_TARGET_ID],
+            },
+          ),
         ],
-      },
-      {
-        SubscriptionType: "ChannelStatus",
-        SubscriptionId: "00000000-0000-0000-0000-000000000002",
-        ClientId: clientId,
-        Targets: [stubTarget],
-        ChannelType: "NHSAPP",
-        ChannelStatuses: ["DELIVERED", "FAILED", "TECHNICAL_FAILURE"],
-        SupplierStatuses: [
-          "delivered",
-          "permanent_failure",
-          "temporary_failure",
+        targets: [
+          createTarget({
+            invocationEndpoint: "https://example.com/webhook",
+            apiKey: {
+              headerName: "x-api-key",
+              headerValue: "test-api-key",
+            },
+          }),
         ],
-      },
-      {
-        SubscriptionType: "ChannelStatus",
-        SubscriptionId: "00000000-0000-0000-0000-000000000003",
-        ClientId: clientId,
-        Targets: [stubTarget],
-        ChannelType: "SMS",
-        ChannelStatuses: ["DELIVERED", "FAILED", "TECHNICAL_FAILURE"],
-        SupplierStatuses: [
-          "delivered",
-          "permanent_failure",
-          "temporary_failure",
-        ],
-      },
-    ]),
+      })),
   }) as unknown as ConfigLoader;
 
 const makeStubConfigLoaderService = (): ConfigLoaderService => {
@@ -182,6 +176,59 @@ describe("Lambda handler", () => {
     expect(dataItem.type).toBe("MessageStatus");
     expect((dataItem.attributes as MessageStatusAttributes).messageStatus).toBe(
       "delivered",
+    );
+  });
+
+  it("should record filtering-matched with matched subscription target IDs only", async () => {
+    const customConfigLoader = {
+      loadClientConfig: jest.fn().mockResolvedValue(
+        createClientSubscriptionConfig("client-abc-123", {
+          subscriptions: [
+            createMessageStatusSubscription(["DELIVERED"], {
+              targetIds: ["target-match"],
+            }),
+          ],
+          targets: [
+            createTarget({ targetId: "target-match" }),
+            createTarget({ targetId: "target-other" }),
+          ],
+        }),
+      ),
+    } as unknown as ConfigLoader;
+
+    const handlerWithMultipleTargets = createHandler({
+      createObservabilityService: () =>
+        new ObservabilityService(mockLogger, mockMetrics, mockMetricsLogger),
+      createConfigLoaderService: () =>
+        ({ getLoader: () => customConfigLoader }) as ConfigLoaderService,
+      createApplicationsMapService: makeStubApplicationsMapService,
+    });
+
+    const sqsMessage: SQSRecord = {
+      messageId: "sqs-msg-id-targets",
+      receiptHandle: "receipt-handle-targets",
+      body: JSON.stringify(validMessageStatusEvent),
+      attributes: {
+        ApproximateReceiveCount: "1",
+        SentTimestamp: "1519211230",
+        SenderId: "ABCDEFGHIJ",
+        ApproximateFirstReceiveTimestamp: "1519211230",
+      },
+      messageAttributes: {},
+      md5OfBody: "mock-md5",
+      eventSource: "aws:sqs",
+      eventSourceARN: "arn:aws:sqs:eu-west-2:123456789:mock-queue",
+      awsRegion: "eu-west-2",
+    };
+
+    await handlerWithMultipleTargets([sqsMessage]);
+
+    expect(mockLogger.info).toHaveBeenCalledWith(
+      "Callback lifecycle: filtering-matched",
+      expect.objectContaining({
+        subscriptionType: "MessageStatus",
+        targetIds: ["target-match"],
+      }),
     );
   });
 

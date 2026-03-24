@@ -13,25 +13,24 @@ export function transformChannelStatus(
   event: StatusPublishEvent<ChannelStatusData>,
   messageRootUri: string,
 ): ClientCallbackPayload {
-  const notifyData = event.data;
-  const { messageId } = notifyData;
-  const channel = notifyData.channel.toLowerCase() as ClientChannel;
-  const channelStatus =
-    notifyData.channelStatus.toLowerCase() as ClientChannelStatus;
+  const { data } = event;
+  const { messageId } = data;
+  const channel = data.channel.toLowerCase() as ClientChannel;
+  const channelStatus = data.channelStatus.toLowerCase() as ClientChannelStatus;
   const supplierStatus =
-    notifyData.supplierStatus.toLowerCase() as ClientSupplierStatus;
+    data.supplierStatus.toLowerCase() as ClientSupplierStatus;
 
   const idempotencyBody = {
     messageId,
-    messageReference: notifyData.messageReference,
-    cascadeType: notifyData.cascadeType,
-    cascadeOrder: notifyData.cascadeOrder,
+    messageReference: data.messageReference,
+    cascadeType: data.cascadeType,
+    cascadeOrder: data.cascadeOrder,
     channel,
     channelStatus,
-    channelStatusDescription: notifyData.channelStatusDescription,
-    channelFailureReasonCode: notifyData.channelFailureReasonCode,
+    channelStatusDescription: data.channelStatusDescription,
+    channelFailureReasonCode: data.channelFailureReasonCode,
     supplierStatus,
-    retryCount: notifyData.retryCount,
+    retryCount: data.retryCount,
   };
 
   const idempotencyKey = createHash("sha256")
@@ -40,22 +39,22 @@ export function transformChannelStatus(
 
   const attributes: ChannelStatusAttributes = {
     messageId,
-    messageReference: notifyData.messageReference,
+    messageReference: data.messageReference,
     channel,
     channelStatus,
     supplierStatus,
-    cascadeType: notifyData.cascadeType,
-    cascadeOrder: notifyData.cascadeOrder,
-    timestamp: notifyData.timestamp,
-    retryCount: notifyData.retryCount,
+    cascadeType: data.cascadeType,
+    cascadeOrder: data.cascadeOrder,
+    timestamp: data.timestamp,
+    retryCount: data.retryCount,
   };
 
-  if (notifyData.channelStatusDescription) {
-    attributes.channelStatusDescription = notifyData.channelStatusDescription;
+  if (data.channelStatusDescription) {
+    attributes.channelStatusDescription = data.channelStatusDescription;
   }
 
-  if (notifyData.channelFailureReasonCode) {
-    attributes.channelFailureReasonCode = notifyData.channelFailureReasonCode;
+  if (data.channelFailureReasonCode) {
+    attributes.channelFailureReasonCode = data.channelFailureReasonCode;
   }
 
   const payload: ClientCallbackPayload = {
