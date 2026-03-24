@@ -174,12 +174,6 @@ variable "message_root_uri" {
   description = "The root URI used for constructing message links in callback payloads"
 }
 
-variable "enable_debug_log_bucket" {
-  type        = bool
-  description = "Enable the debug log S3 bucket used for integration testing"
-  default     = false
-}
-
 variable "applications_map_parameter_name" {
   type        = string
   default     = null

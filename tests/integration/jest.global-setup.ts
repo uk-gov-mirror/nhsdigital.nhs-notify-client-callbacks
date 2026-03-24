@@ -1,9 +1,7 @@
 import { PutObjectCommand } from "@aws-sdk/client-s3";
 import {
-  buildDebugLogBucketName,
   buildSubscriptionConfigBucketName,
   createS3Client,
-  deleteDebugLogEntries,
   getDeploymentDetails,
 } from "./helpers";
 
@@ -45,12 +43,9 @@ const mockClientSubscriptionBody = JSON.stringify({
 export default async function globalSetup() {
   const deploymentDetails = getDeploymentDetails();
   const bucketName = buildSubscriptionConfigBucketName(deploymentDetails);
-  const debugLogBucketName = buildDebugLogBucketName(deploymentDetails);
   const client = createS3Client(deploymentDetails);
 
   try {
-    await deleteDebugLogEntries(client, debugLogBucketName);
-
     await client.send(
       new PutObjectCommand({
         Bucket: bucketName,

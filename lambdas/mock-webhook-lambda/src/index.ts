@@ -1,5 +1,5 @@
 import type { APIGatewayProxyEvent, APIGatewayProxyResult } from "aws-lambda";
-import { Logger, flushLogs } from "@nhs-notify-client-callbacks/logger";
+import { Logger } from "@nhs-notify-client-callbacks/logger";
 import type { ClientCallbackPayload } from "@nhs-notify-client-callbacks/models";
 
 const logger = new Logger();
@@ -41,22 +41,18 @@ async function buildResponse(
     method: event.httpMethod,
   });
 
+  const headers = Object.fromEntries(
+    Object.entries(event.headers).map(([k, v]) => [k.toLowerCase(), v]),
+  ) as Record<string, string | undefined>;
+
   const expectedApiKey = process.env.API_KEY;
-  const providedApiKey = event.headers["x-api-key"];
+  const providedApiKey = headers["x-api-key"];
 
   if (!expectedApiKey || providedApiKey !== expectedApiKey) {
     logger.error("Unauthorized: invalid or missing x-api-key");
     return {
       statusCode: 401,
       body: JSON.stringify({ message: "Unauthorized" }),
-    };
-  }
-
-  if (!event.headers["x-hmac-sha256-signature"]) {
-    logger.error("Bad request: missing x-hmac-sha256-signature header");
-    return {
-      statusCode: 400,
-      body: JSON.stringify({ message: "Missing x-hmac-sha256-signature" }),
     };
   }
 
@@ -115,9 +111,17 @@ async function buildResponse(
       `CALLBACK ${correlationId} ${item.type} : ${JSON.stringify(item)}`,
       {
         correlationId,
+        messageId,
         messageType: item.type,
       },
     );
+
+    logger.info("Callback received", {
+      messageId,
+      callbackType: item.type,
+      signature: headers["x-hmac-sha256-signature"] ?? "",
+      payload: JSON.stringify(item),
+    });
 
     return {
       statusCode: 200,
@@ -147,7 +151,5 @@ async function buildResponse(
 export async function handler(
   event: APIGatewayProxyEvent,
 ): Promise<APIGatewayProxyResult> {
-  const response = await buildResponse(event);
-  await flushLogs();
-  return response;
+  return buildResponse(event);
 }

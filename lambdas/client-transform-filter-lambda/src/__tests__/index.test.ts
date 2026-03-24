@@ -557,8 +557,6 @@ describe("createHandler default wiring", () => {
 
       jest.doMock("services/logger", () => ({
         Logger: state.LoggerCtor,
-
-        flushLogs: jest.fn().mockResolvedValue(undefined),
       }));
 
       jest.doMock("services/observability", () => ({

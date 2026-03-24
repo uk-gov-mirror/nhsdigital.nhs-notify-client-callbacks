@@ -18,4 +18,7 @@ export default {
   ],
   // Run integration tests serially to avoid queue contention
   maxWorkers: 1,
+  // Force exit after all tests complete — integration tests use real AWS SDK
+  // clients whose keep-alive HTTP connections would otherwise prevent Jest exiting
+  forceExit: true,
 };

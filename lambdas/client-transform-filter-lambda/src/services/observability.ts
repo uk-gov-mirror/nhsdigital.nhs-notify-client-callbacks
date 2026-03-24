@@ -1,6 +1,9 @@
 import type { MetricsLogger } from "aws-embedded-metrics";
 import type { ClientCallbackPayload } from "@nhs-notify-client-callbacks/models";
-import { logCallbackGenerated } from "services/callback-logger";
+import {
+  logCallbackGenerated,
+  logCallbackSigned,
+} from "services/callback-logger";
 import type { Logger } from "services/logger";
 import { logLifecycleEvent } from "services/logger";
 import type { CallbackMetrics } from "services/metrics";
@@ -90,6 +93,15 @@ export class ObservabilityService {
       clientId,
     );
     this.metrics.emitTransformationSuccess();
+  }
+
+  recordCallbackSigned(
+    payload: ClientCallbackPayload,
+    correlationId: string | undefined,
+    clientId: string,
+    signature: string,
+  ): void {
+    logCallbackSigned(this.logger, payload, correlationId, clientId, signature);
   }
 
   createChild(context: {

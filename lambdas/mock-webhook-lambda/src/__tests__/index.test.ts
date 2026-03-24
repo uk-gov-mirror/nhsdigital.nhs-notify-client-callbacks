@@ -13,7 +13,6 @@ jest.mock("@nhs-notify-client-callbacks/logger", () => {
   return {
     Logger: jest.fn().mockReturnValue(instance),
 
-    flushLogs: jest.fn().mockResolvedValue(undefined),
     instance,
   };
 });
@@ -24,7 +23,6 @@ const mockLogger = jest.requireMock(
 
 const DEFAULT_HEADERS = {
   "x-api-key": TEST_API_KEY,
-  "x-hmac-sha256-signature": "abc123",
 };
 
 const createMockEvent = (
@@ -63,18 +61,6 @@ describe("Mock Webhook Lambda", () => {
       expect(result.statusCode).toBe(401);
       const body = JSON.parse(result.body);
       expect(body.message).toBe("Unauthorized");
-    });
-
-    it("should return 400 when x-hmac-sha256-signature header is missing", async () => {
-      const callback = { data: [] };
-      const event = createMockEvent(JSON.stringify(callback), {
-        "x-api-key": TEST_API_KEY,
-      });
-      const result = await handler(event);
-
-      expect(result.statusCode).toBe(400);
-      const body = JSON.parse(result.body);
-      expect(body.message).toBe("Missing x-hmac-sha256-signature");
     });
   });
 
@@ -275,6 +261,22 @@ describe("Mock Webhook Lambda", () => {
 
       parseSpy.mockRestore();
     });
+
+    it("should return 500 when parsing throws a non-Error value", async () => {
+      const parseSpy = jest.spyOn(JSON, "parse").mockImplementationOnce(() => {
+        // eslint-disable-next-line @typescript-eslint/only-throw-error
+        throw "forced-string-error";
+      });
+
+      const event = createMockEvent('{"data":[]}');
+      const result = await handler(event);
+
+      expect(result.statusCode).toBe(500);
+      const body = JSON.parse(result.body);
+      expect(body.message).toBe("Internal server error");
+
+      parseSpy.mockRestore();
+    });
   });
 
   describe("Forced Status Codes", () => {
@@ -362,7 +364,22 @@ describe("Mock Webhook Lambda", () => {
       expect(message).toContain("MessageStatus");
       expect(context).toMatchObject({
         correlationId: "some-idempotency-key",
+        messageId: "test-msg-789",
         messageType: "MessageStatus",
+      });
+
+      const receivedCall = mockLogger.info.mock.calls.find(
+        ([msg]: [string]) => msg === "Callback received",
+      );
+      expect(receivedCall).toBeDefined();
+      const [, receivedContext] = receivedCall as [
+        string,
+        Record<string, unknown>,
+      ];
+      expect(receivedContext).toMatchObject({
+        messageId: "test-msg-789",
+        callbackType: "MessageStatus",
+        signature: "",
       });
     });
   });

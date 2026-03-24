@@ -1,25 +1,29 @@
-import { S3Client } from "@aws-sdk/client-s3";
+import { CloudWatchLogsClient } from "@aws-sdk/client-cloudwatch-logs";
 import { SQSClient } from "@aws-sdk/client-sqs";
 import type {
-  CallbackItem,
   ChannelStatusData,
   MessageStatusData,
   StatusPublishEvent,
 } from "@nhs-notify-client-callbacks/models";
 
-import { awaitCallbacksFromBucketByKey } from "./callbacks";
+import {
+  type SignedCallback,
+  awaitSignedCallbacksFromWebhookLogGroup,
+} from "./cloudwatch";
 import { ensureInboundQueueIsEmpty, sendSqsEvent } from "./sqs";
 
 async function processStatusEvent<
   T extends MessageStatusData | ChannelStatusData,
 >(
   sqsClient: SQSClient,
-  s3Client: S3Client,
+  cloudWatchClient: CloudWatchLogsClient,
   callbackEventQueueUrl: string,
-  debugLogBucketName: string,
+  webhookLogGroupName: string,
   event: StatusPublishEvent<T>,
-  callbackType: CallbackItem["type"],
-): Promise<CallbackItem[]> {
+  callbackType: SignedCallback["payload"]["type"],
+): Promise<SignedCallback[]> {
+  const startTime = Date.now();
+
   const sendMessageResponse = await sendSqsEvent(
     sqsClient,
     callbackEventQueueUrl,
@@ -32,28 +36,27 @@ async function processStatusEvent<
 
   await ensureInboundQueueIsEmpty(sqsClient, callbackEventQueueUrl);
 
-  const callbacks = await awaitCallbacksFromBucketByKey(
-    s3Client,
-    debugLogBucketName,
-    event.id,
+  return awaitSignedCallbacksFromWebhookLogGroup(
+    cloudWatchClient,
+    webhookLogGroupName,
+    event.data.messageId,
     callbackType,
+    startTime,
   );
-
-  return callbacks;
 }
 
 export async function processMessageStatusEvent(
   sqsClient: SQSClient,
-  s3Client: S3Client,
+  cloudWatchClient: CloudWatchLogsClient,
   callbackEventQueueUrl: string,
-  debugLogBucketName: string,
+  webhookLogGroupName: string,
   messageStatusEvent: StatusPublishEvent<MessageStatusData>,
-): Promise<CallbackItem[]> {
+): Promise<SignedCallback[]> {
   return processStatusEvent(
     sqsClient,
-    s3Client,
+    cloudWatchClient,
     callbackEventQueueUrl,
-    debugLogBucketName,
+    webhookLogGroupName,
     messageStatusEvent,
     "MessageStatus",
   );
@@ -61,16 +64,16 @@ export async function processMessageStatusEvent(
 
 export async function processChannelStatusEvent(
   sqsClient: SQSClient,
-  s3Client: S3Client,
+  cloudWatchClient: CloudWatchLogsClient,
   callbackEventQueueUrl: string,
-  debugLogBucketName: string,
+  webhookLogGroupName: string,
   channelStatusEvent: StatusPublishEvent<ChannelStatusData>,
-): Promise<CallbackItem[]> {
+): Promise<SignedCallback[]> {
   return processStatusEvent(
     sqsClient,
-    s3Client,
+    cloudWatchClient,
     callbackEventQueueUrl,
-    debugLogBucketName,
+    webhookLogGroupName,
     channelStatusEvent,
     "ChannelStatus",
   );

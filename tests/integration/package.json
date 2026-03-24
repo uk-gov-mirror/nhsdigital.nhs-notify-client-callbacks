@@ -13,9 +13,7 @@
     "@nhs-notify-client-callbacks/logger": "*",
     "@nhs-notify-client-callbacks/models": "*",
     "@aws-sdk/client-cloudwatch-logs": "^3.991.0",
-    "@aws-sdk/client-eventbridge": "^3.990.0",
     "@aws-sdk/client-s3": "^3.821.0",
-    "@aws-sdk/client-sts": "^3.821.0",
     "@aws-sdk/client-sqs": "^3.990.0",
     "async-wait-until": "^2.0.12"
   },

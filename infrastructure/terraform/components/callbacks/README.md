@@ -19,7 +19,6 @@
 | <a name="input_component"></a> [component](#input\_component) | The variable encapsulating the name of this component | `string` | `"callbacks"` | no |
 | <a name="input_default_tags"></a> [default\_tags](#input\_default\_tags) | A map of default tags to apply to all taggable resources within the component | `map(string)` | `{}` | no |
 | <a name="input_deploy_mock_webhook"></a> [deploy\_mock\_webhook](#input\_deploy\_mock\_webhook) | Flag to deploy mock webhook lambda for integration testing (test/dev environments only) | `bool` | `false` | no |
-| <a name="input_enable_debug_log_bucket"></a> [enable\_debug\_log\_bucket](#input\_enable\_debug\_log\_bucket) | Enable the debug log S3 bucket used for integration testing | `bool` | `false` | no |
 | <a name="input_enable_event_anomaly_detection"></a> [enable\_event\_anomaly\_detection](#input\_enable\_event\_anomaly\_detection) | Enable CloudWatch anomaly detection alarm for inbound event queue message reception | `bool` | `true` | no |
 | <a name="input_environment"></a> [environment](#input\_environment) | The name of the tfscaffold environment | `string` | n/a | yes |
 | <a name="input_event_anomaly_band_width"></a> [event\_anomaly\_band\_width](#input\_event\_anomaly\_band\_width) | The width of the anomaly detection band. Higher values (e.g. 4-6) reduce sensitivity and noise, lower values (e.g. 2-3) increase sensitivity. Recommended: 2-4. | `number` | `3` | no |
@@ -47,7 +46,6 @@
 | <a name="module_client_config_bucket"></a> [client\_config\_bucket](#module\_client\_config\_bucket) | https://github.com/NHSDigital/nhs-notify-shared-modules/releases/download/3.0.6/terraform-s3bucket.zip | n/a |
 | <a name="module_client_destination"></a> [client\_destination](#module\_client\_destination) | ../../modules/client-destination | n/a |
 | <a name="module_client_transform_filter_lambda"></a> [client\_transform\_filter\_lambda](#module\_client\_transform\_filter\_lambda) | https://github.com/NHSDigital/nhs-notify-shared-modules/releases/download/3.0.6/terraform-lambda.zip | n/a |
-| <a name="module_debug_log_bucket"></a> [debug\_log\_bucket](#module\_debug\_log\_bucket) | https://github.com/NHSDigital/nhs-notify-shared-modules/releases/download/3.0.6/terraform-s3bucket.zip | n/a |
 | <a name="module_kms"></a> [kms](#module\_kms) | https://github.com/NHSDigital/nhs-notify-shared-modules/releases/download/3.0.6/terraform-kms.zip | n/a |
 | <a name="module_mock_webhook_lambda"></a> [mock\_webhook\_lambda](#module\_mock\_webhook\_lambda) | https://github.com/NHSDigital/nhs-notify-shared-modules/releases/download/3.0.6/terraform-lambda.zip | n/a |
 | <a name="module_sqs_inbound_event"></a> [sqs\_inbound\_event](#module\_sqs\_inbound\_event) | https://github.com/NHSDigital/nhs-notify-shared-modules/releases/download/3.0.6/terraform-sqs.zip | n/a |
@@ -55,7 +53,6 @@
 
 | Name | Description |
 |------|-------------|
-| <a name="output_debug_log_bucket_name"></a> [debug\_log\_bucket\_name](#output\_debug\_log\_bucket\_name) | S3 bucket name for debug logs (integration testing only) |
 | <a name="output_deployment"></a> [deployment](#output\_deployment) | Deployment details used for post-deployment scripts |
 | <a name="output_mock_webhook_lambda_log_group_name"></a> [mock\_webhook\_lambda\_log\_group\_name](#output\_mock\_webhook\_lambda\_log\_group\_name) | CloudWatch log group name for mock webhook lambda (for integration test queries) |
 | <a name="output_mock_webhook_url"></a> [mock\_webhook\_url](#output\_mock\_webhook\_url) | URL endpoint for mock webhook (for TEST\_WEBHOOK\_URL environment variable) |

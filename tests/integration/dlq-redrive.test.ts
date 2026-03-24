@@ -4,12 +4,13 @@ import type {
   StatusPublishEvent,
 } from "@nhs-notify-client-callbacks/models";
 import {
-  awaitCallbacksFromBucketByKey,
-  buildDebugLogBucketName,
+  awaitSignedCallbacksFromWebhookLogGroup,
   buildInboundEventQueueUrl,
+  buildLambdaLogGroupName,
   buildMockClientDlqQueueUrl,
+  computeExpectedSignature,
+  createCloudWatchLogsClient,
   createMessageStatusPublishEvent,
-  createS3Client,
   createSqsClient,
   ensureInboundQueueIsEmpty,
   getDeploymentDetails,
@@ -17,24 +18,27 @@ import {
   sendEventToDlqAndRedrive,
   sendSqsEvent,
 } from "helpers";
-import { S3Client } from "@aws-sdk/client-s3";
+import { CloudWatchLogsClient } from "@aws-sdk/client-cloudwatch-logs";
 
 describe("DLQ Redrive", () => {
   let sqsClient: SQSClient;
-  let s3Client: S3Client;
+  let cloudWatchClient: CloudWatchLogsClient;
   let dlqQueueUrl!: string;
   let inboundQueueUrl: string;
-  let debugLogBucketName: string;
+  let webhookLogGroupName: string;
 
   beforeAll(async () => {
     const deploymentDetails = getDeploymentDetails();
 
     sqsClient = createSqsClient(deploymentDetails);
-    s3Client = createS3Client(deploymentDetails);
+    cloudWatchClient = createCloudWatchLogsClient(deploymentDetails);
 
     inboundQueueUrl = buildInboundEventQueueUrl(deploymentDetails);
     dlqQueueUrl = buildMockClientDlqQueueUrl(deploymentDetails);
-    debugLogBucketName = buildDebugLogBucketName(deploymentDetails);
+    webhookLogGroupName = buildLambdaLogGroupName(
+      deploymentDetails,
+      "mock-webhook",
+    );
 
     await purgeQueues(sqsClient, [inboundQueueUrl, dlqQueueUrl]);
   });
@@ -42,7 +46,7 @@ describe("DLQ Redrive", () => {
   afterAll(async () => {
     await purgeQueues(sqsClient, [inboundQueueUrl, dlqQueueUrl]);
     sqsClient.destroy();
-    s3Client.destroy();
+    cloudWatchClient.destroy();
   });
 
   describe("Infrastructure validation", () => {
@@ -71,6 +75,7 @@ describe("DLQ Redrive", () => {
 
   describe("Redrive workflow", () => {
     it("should successfully reprocess an event moved from the DLQ back to the inbound queue", async () => {
+      const startTime = Date.now();
       const event: StatusPublishEvent<MessageStatusData> =
         createMessageStatusPublishEvent();
       const { payload: redrivePayload } = await sendEventToDlqAndRedrive(
@@ -83,23 +88,28 @@ describe("DLQ Redrive", () => {
       expect(redrivePayload.id).toBe(event.id);
       await ensureInboundQueueIsEmpty(sqsClient, inboundQueueUrl);
 
-      const callbacks = await awaitCallbacksFromBucketByKey(
-        s3Client,
-        debugLogBucketName,
-        event.id,
+      const callbacks = await awaitSignedCallbacksFromWebhookLogGroup(
+        cloudWatchClient,
+        webhookLogGroupName,
+        event.data.messageId,
         "MessageStatus",
+        startTime,
       );
 
       expect(callbacks.length).toBeGreaterThan(0);
-      expect(callbacks[0]).toMatchObject({
+      expect(callbacks[0].payload).toMatchObject({
         type: "MessageStatus",
         attributes: expect.objectContaining({
           messageStatus: "delivered",
         }),
       });
+      expect(callbacks[0].headers["x-hmac-sha256-signature"]).toBe(
+        computeExpectedSignature(callbacks[0].payload),
+      );
     }, 120_000);
 
     it("should apply the same transformation logic to redriven events as original deliveries", async () => {
+      const startTime = Date.now();
       const directEventId = `direct-${crypto.randomUUID()}`;
       const redriveEventId = `redriven-${crypto.randomUUID()}`;
 
@@ -132,30 +142,35 @@ describe("DLQ Redrive", () => {
 
       expect(dlqPayload.data.messageId).toBe(redriveEvent.data.messageId);
 
-      const directCallbacks = await awaitCallbacksFromBucketByKey(
-        s3Client,
-        debugLogBucketName,
-        directEventId,
+      const directCallbacks = await awaitSignedCallbacksFromWebhookLogGroup(
+        cloudWatchClient,
+        webhookLogGroupName,
+        directEvent.data.messageId,
         "MessageStatus",
+        startTime,
       );
 
-      const redriveCallbacks = await awaitCallbacksFromBucketByKey(
-        s3Client,
-        debugLogBucketName,
-        redriveEventId,
+      const redriveCallbacks = await awaitSignedCallbacksFromWebhookLogGroup(
+        cloudWatchClient,
+        webhookLogGroupName,
+        redriveEvent.data.messageId,
         "MessageStatus",
+        startTime,
       );
 
       await ensureInboundQueueIsEmpty(sqsClient, inboundQueueUrl);
 
-      expect(redriveCallbacks[0]).toMatchObject({
-        type: directCallbacks[0].type,
+      expect(redriveCallbacks[0].payload).toMatchObject({
+        type: directCallbacks[0].payload.type,
         attributes: expect.objectContaining({
           messageStatus: (
-            directCallbacks[0].attributes as { messageStatus?: string }
+            directCallbacks[0].payload.attributes as { messageStatus?: string }
           ).messageStatus,
         }),
       });
+      expect(redriveCallbacks[0].headers["x-hmac-sha256-signature"]).toBe(
+        computeExpectedSignature(redriveCallbacks[0].payload),
+      );
     }, 120_000);
   });
 });

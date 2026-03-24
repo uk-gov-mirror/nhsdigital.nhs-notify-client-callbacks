@@ -36,9 +36,8 @@ module "mock_webhook_lambda" {
   log_subscription_role_arn = local.acct.log_subscription_role_arn
 
   lambda_env_vars = {
-    LOG_LEVEL         = var.log_level
-    API_KEY           = random_password.mock_webhook_api_key[0].result
-    DEBUG_BUCKET_NAME = module.debug_log_bucket[0].id
+    LOG_LEVEL = var.log_level
+    API_KEY   = random_password.mock_webhook_api_key[0].result
   }
 }
 
@@ -62,19 +61,6 @@ data "aws_iam_policy_document" "mock_webhook_lambda" {
 
     resources = [
       module.kms.key_arn,
-    ]
-  }
-
-  statement {
-    sid    = "DebugLogBucketWrite"
-    effect = "Allow"
-
-    actions = [
-      "s3:PutObject",
-    ]
-
-    resources = [
-      "${module.debug_log_bucket[0].arn}/*",
     ]
   }
 }

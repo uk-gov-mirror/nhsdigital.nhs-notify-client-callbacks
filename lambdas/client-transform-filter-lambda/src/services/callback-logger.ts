@@ -71,3 +71,19 @@ export function logCallbackGenerated(
     ...specificFields,
   });
 }
+
+export function logCallbackSigned(
+  eventLogger: Logger,
+  payload: ClientCallbackPayload,
+  correlationId: string | undefined,
+  clientId: string,
+  signature: string,
+): void {
+  eventLogger.info("Callback signed", {
+    correlationId,
+    callbackType: payload.data[0].type,
+    clientId,
+    signature,
+    payload: JSON.stringify(payload.data[0]),
+  });
+}

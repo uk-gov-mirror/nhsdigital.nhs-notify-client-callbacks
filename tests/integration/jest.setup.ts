@@ -1,5 +1,5 @@
 import { performance } from "node:perf_hooks";
-import { flushLogs, logger } from "@nhs-notify-client-callbacks/logger";
+import { logger } from "@nhs-notify-client-callbacks/logger";
 
 const testStartTimes = new Map<string, number>();
 
@@ -21,8 +21,4 @@ afterEach(() => {
 
   logger.info(`[TEST FINISH] ${testName}${durationSuffix}`);
   testStartTimes.delete(testName);
-});
-
-afterAll(async () => {
-  await flushLogs();
 });

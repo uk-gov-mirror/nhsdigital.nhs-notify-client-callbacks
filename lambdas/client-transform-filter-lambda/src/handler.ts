@@ -129,6 +129,7 @@ async function signBatch(
   applicationsMapService: ApplicationsMapService,
   configByClientId: ClientConfigMap,
   stats: BatchStats,
+  observability: ObservabilityService,
 ): Promise<TransformedEvent[]> {
   const results = await pMap(
     filteredEvents,
@@ -163,7 +164,17 @@ async function signBatch(
         applicationId,
         apiKey,
       );
-      return { ...event, headers: { "x-hmac-sha256-signature": signature } };
+      const signedEvent: TransformedEvent = {
+        ...event,
+        headers: { "x-hmac-sha256-signature": signature },
+      };
+      observability.recordCallbackSigned(
+        signedEvent.transformedPayload,
+        correlationId,
+        clientId,
+        signature,
+      );
+      return signedEvent;
     },
     { concurrency: BATCH_CONCURRENCY },
   );
@@ -299,6 +310,7 @@ export async function processEvents(
       applicationsMapService,
       configByClientId,
       stats,
+      observability,
     );
 
     const processingTime = Date.now() - startTime;

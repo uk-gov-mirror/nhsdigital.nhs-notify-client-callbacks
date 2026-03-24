@@ -3,7 +3,6 @@ import {
   LogContext,
   Logger,
   extractCorrelationId,
-  flushLogs,
   logLifecycleEvent,
   logger,
 } from "..";
@@ -28,13 +27,6 @@ jest.mock("pino", () => {
     child,
   };
 });
-
-const mockSend = jest.fn().mockResolvedValue({});
-
-jest.mock("@aws-sdk/client-s3", () => ({
-  S3Client: jest.fn(() => ({ send: mockSend })),
-  PutObjectCommand: jest.fn((input) => ({ ...input })),
-}));
 
 const mockLoggerMethods = pino() as jest.Mocked<ReturnType<typeof pino>>;
 
@@ -250,126 +242,6 @@ describe("Logger", () => {
     it("should export a singleton logger instance", () => {
       expect(logger).toBeInstanceOf(Logger);
     });
-  });
-});
-
-describe("S3 debug bucket writes", () => {
-  beforeAll(() => {
-    process.env.DEBUG_BUCKET_NAME = "test-debug-bucket";
-  });
-
-  afterAll(() => {
-    delete process.env.DEBUG_BUCKET_NAME;
-  });
-
-  beforeEach(() => {
-    jest.clearAllMocks();
-  });
-
-  it("should write to S3 when DEBUG_BUCKET_NAME is set", () => {
-    const { PutObjectCommand } = jest.requireMock("@aws-sdk/client-s3");
-
-    const testLogger = new Logger();
-    testLogger.info("Test message", { correlationId: "corr-123" });
-
-    expect(PutObjectCommand).toHaveBeenCalledWith(
-      expect.objectContaining({
-        Bucket: "test-debug-bucket",
-        Key: expect.stringMatching(/corr-123\/[0-9a-f-]+\.json$/),
-        ContentType: "application/json",
-        Body: expect.stringContaining('"message":"Test message"'),
-      }),
-    );
-    expect(mockSend).toHaveBeenCalled();
-  });
-
-  it("should include context fields in S3 entry body", () => {
-    const { PutObjectCommand } = jest.requireMock("@aws-sdk/client-s3");
-
-    const testLogger = new Logger();
-    testLogger.error("Something failed", {
-      correlationId: "corr-xyz",
-      statusCode: 500,
-    });
-
-    const call = PutObjectCommand.mock.calls[0][0] as { Body: string };
-    const entry = JSON.parse(call.Body) as Record<string, unknown>;
-
-    expect(entry).toMatchObject({
-      level: "ERROR",
-      message: "Something failed",
-      correlationId: "corr-xyz",
-      statusCode: 500,
-    });
-    expect(typeof entry.timestamp).toBe("string");
-  });
-
-  it("should write for warn and debug levels", () => {
-    const { PutObjectCommand } = jest.requireMock("@aws-sdk/client-s3");
-
-    const testLogger = new Logger({ correlationId: "corr-levels" });
-    testLogger.warn("A warning");
-    testLogger.debug("A debug");
-
-    expect(PutObjectCommand).toHaveBeenCalledTimes(2);
-
-    const levels = PutObjectCommand.mock.calls.map(
-      (call: [{ Body: string }]) => {
-        const entry = JSON.parse(call[0].Body) as {
-          level: string;
-        };
-        return entry.level;
-      },
-    );
-    expect(levels).toContain("WARN");
-    expect(levels).toContain("DEBUG");
-  });
-
-  it("should not write to S3 when DEBUG_BUCKET_NAME is absent", () => {
-    const { PutObjectCommand } = jest.requireMock("@aws-sdk/client-s3");
-    delete process.env.DEBUG_BUCKET_NAME;
-
-    const testLogger = new Logger();
-    testLogger.info("No bucket");
-
-    expect(PutObjectCommand).not.toHaveBeenCalled();
-
-    process.env.DEBUG_BUCKET_NAME = "test-debug-bucket";
-  });
-
-  it("should not write to S3 when correlationId is absent", () => {
-    const { PutObjectCommand } = jest.requireMock("@aws-sdk/client-s3");
-
-    const testLogger = new Logger();
-    testLogger.info("No correlationId");
-
-    expect(PutObjectCommand).not.toHaveBeenCalled();
-  });
-
-  it("should log an error when the S3 write fails", async () => {
-    mockSend.mockRejectedValueOnce(new Error("S3 unavailable"));
-
-    const testLogger = new Logger({ correlationId: "corr-fail" });
-    testLogger.info("write will fail");
-
-    await flushLogs();
-
-    const { default: pinoMock } = jest.requireMock<{
-      default: jest.Mock & { error: jest.Mock };
-    }>("pino");
-    expect(pinoMock().error).toHaveBeenCalledWith(
-      expect.objectContaining({ error: expect.any(Error) }),
-      "Failed to write debug log entry to S3",
-    );
-  });
-
-  it("flushLogs should resolve once all pending writes complete", async () => {
-    const testLogger = new Logger();
-    testLogger.info("flush test");
-    testLogger.warn("flush test 2");
-
-    // Should resolve without throwing even if writes are in-flight
-    await expect(flushLogs()).resolves.toBeUndefined();
   });
 });
 

@@ -34,12 +34,9 @@ export function buildSubscriptionConfigBucketName({
   return `${project}-${accountId}-${region}-${environment}-${component}-subscription-config`;
 }
 
-export function buildDebugLogBucketName({
-  accountId,
-  component,
-  environment,
-  project,
-  region,
-}: DeploymentDetails): string {
-  return `${project}-${accountId}-${region}-${environment}-${component}-debug-log`;
+export function buildLambdaLogGroupName(
+  { component, environment, project }: DeploymentDetails,
+  functionIdentifier: string,
+): string {
+  return `/aws/lambda/${project}-${environment}-${component}-${functionIdentifier}`;
 }

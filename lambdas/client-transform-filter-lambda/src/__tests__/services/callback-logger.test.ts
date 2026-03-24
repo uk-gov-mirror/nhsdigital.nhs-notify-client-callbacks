@@ -1,4 +1,7 @@
-import { logCallbackGenerated } from "services/callback-logger";
+import {
+  logCallbackGenerated,
+  logCallbackSigned,
+} from "services/callback-logger";
 import type { Logger } from "services/logger";
 import {
   type ClientCallbackPayload,
@@ -266,6 +269,128 @@ describe("callback-logger", () => {
           messageReference: "ref-456",
         });
       });
+    });
+  });
+
+  describe("logCallbackSigned", () => {
+    const messageStatusPayload: ClientCallbackPayload = {
+      data: [
+        {
+          type: "MessageStatus",
+          attributes: {
+            messageId: "msg-123",
+            messageReference: "ref-456",
+            messageStatus: "delivered",
+            messageStatusDescription: "Message successfully delivered",
+            messageFailureReasonCode: undefined,
+            channels: [],
+            timestamp: "2026-02-05T14:29:55Z",
+            routingPlan: {
+              id: "routing-plan-123",
+              name: "Test",
+              version: "v1",
+              createdDate: "2023-11-17T14:27:51.413Z",
+            },
+          },
+          links: { message: "/v1/message-batches/messages/msg-123" },
+          meta: { idempotencyKey: "661f9510-f39c-52e5-b827-557766551111" },
+        },
+      ],
+    };
+
+    const channelStatusPayload: ClientCallbackPayload = {
+      data: [
+        {
+          type: "ChannelStatus",
+          attributes: {
+            messageId: "msg-456",
+            messageReference: "ref-789",
+            cascadeType: "primary",
+            cascadeOrder: 1,
+            channel: "sms",
+            channelStatus: "delivered",
+            channelStatusDescription: "SMS delivered successfully",
+            channelFailureReasonCode: undefined,
+            supplierStatus: "delivered",
+            timestamp: "2026-02-05T14:30:00Z",
+            retryCount: 0,
+          },
+          links: { message: "/v1/message-batches/messages/msg-456" },
+          meta: { idempotencyKey: "762f9510-f39c-52e5-b827-557766552222" },
+        },
+      ],
+    };
+
+    it("should log Callback signed with signature for MessageStatus", () => {
+      logCallbackSigned(
+        mockLogger,
+        messageStatusPayload,
+        "corr-123",
+        "client-abc",
+        "abc123signature",
+      );
+
+      expect(mockLogger.info).toHaveBeenCalledWith("Callback signed", {
+        correlationId: "corr-123",
+        callbackType: "MessageStatus",
+        clientId: "client-abc",
+        signature: "abc123signature",
+        payload: JSON.stringify(messageStatusPayload.data[0]),
+      });
+    });
+
+    it("should log Callback signed with signature for ChannelStatus", () => {
+      logCallbackSigned(
+        mockLogger,
+        channelStatusPayload,
+        "corr-789",
+        "client-def",
+        "defsignature456",
+      );
+
+      expect(mockLogger.info).toHaveBeenCalledWith("Callback signed", {
+        correlationId: "corr-789",
+        callbackType: "ChannelStatus",
+        clientId: "client-def",
+        signature: "defsignature456",
+        payload: JSON.stringify(channelStatusPayload.data[0]),
+      });
+    });
+
+    it("should log only common fields and signature for unknown event type", () => {
+      logCallbackSigned(
+        mockLogger,
+        messageStatusPayload,
+        "corr-000",
+        "client-zzz",
+        "unknownsig",
+      );
+
+      expect(mockLogger.info).toHaveBeenCalledWith("Callback signed", {
+        correlationId: "corr-000",
+        callbackType: "MessageStatus",
+        clientId: "client-zzz",
+        signature: "unknownsig",
+        payload: JSON.stringify(messageStatusPayload.data[0]),
+      });
+    });
+
+    it("should handle undefined correlationId", () => {
+      logCallbackSigned(
+        mockLogger,
+        messageStatusPayload,
+        undefined,
+        "client-abc",
+        "somesig",
+      );
+
+      expect(mockLogger.info).toHaveBeenCalledWith(
+        "Callback signed",
+        expect.objectContaining({
+          correlationId: undefined,
+          signature: "somesig",
+        }),
+      );
     });
   });
 });

@@ -7,13 +7,14 @@ import {
 import {
   awaitQueueMessage,
   awaitQueueMessageByMessageId,
-  buildDebugLogBucketName,
   buildInboundEventDlqQueueUrl,
   buildInboundEventQueueUrl,
+  buildLambdaLogGroupName,
   buildMockClientDlqQueueUrl,
+  computeExpectedSignature,
   createChannelStatusPublishEvent,
+  createCloudWatchLogsClient,
   createMessageStatusPublishEvent,
-  createS3Client,
   createSqsClient,
   ensureInboundQueueIsEmpty,
   getDeploymentDetails,
@@ -22,25 +23,28 @@ import {
   purgeQueues,
   sendSqsEvent,
 } from "helpers";
-import { S3Client } from "@aws-sdk/client-s3";
+import { CloudWatchLogsClient } from "@aws-sdk/client-cloudwatch-logs";
 
 describe("SQS to Webhook Integration", () => {
   let sqsClient: SQSClient;
-  let s3Client: S3Client;
+  let cloudWatchClient: CloudWatchLogsClient;
   let callbackEventQueueUrl: string;
   let clientDlqQueueUrl: string;
   let inboundEventDlqQueueUrl: string;
-  let debugLogBucketName: string;
+  let webhookLogGroupName: string;
 
   beforeAll(async () => {
     const deploymentDetails = getDeploymentDetails();
 
     sqsClient = createSqsClient(deploymentDetails);
-    s3Client = createS3Client(deploymentDetails);
+    cloudWatchClient = createCloudWatchLogsClient(deploymentDetails);
     callbackEventQueueUrl = buildInboundEventQueueUrl(deploymentDetails);
     clientDlqQueueUrl = buildMockClientDlqQueueUrl(deploymentDetails);
-    debugLogBucketName = buildDebugLogBucketName(deploymentDetails);
     inboundEventDlqQueueUrl = buildInboundEventDlqQueueUrl(deploymentDetails);
+    webhookLogGroupName = buildLambdaLogGroupName(
+      deploymentDetails,
+      "mock-webhook",
+    );
 
     await purgeQueues(sqsClient, [
       inboundEventDlqQueueUrl,
@@ -57,7 +61,7 @@ describe("SQS to Webhook Integration", () => {
     ]);
 
     sqsClient.destroy();
-    s3Client.destroy();
+    cloudWatchClient.destroy();
   });
 
   describe("Message Status Event Flow", () => {
@@ -67,21 +71,25 @@ describe("SQS to Webhook Integration", () => {
 
       const callbacks = await processMessageStatusEvent(
         sqsClient,
-        s3Client,
+        cloudWatchClient,
         callbackEventQueueUrl,
-        debugLogBucketName,
+        webhookLogGroupName,
         messageStatusEvent,
       );
 
       expect(callbacks).toHaveLength(1);
 
-      expect(callbacks[0]).toMatchObject({
+      expect(callbacks[0].payload).toMatchObject({
         type: "MessageStatus",
 
         attributes: expect.objectContaining({
           messageStatus: "delivered",
         }),
       });
+
+      expect(callbacks[0].headers["x-hmac-sha256-signature"]).toBe(
+        computeExpectedSignature(callbacks[0].payload),
+      );
     }, 120_000);
   });
 
@@ -92,15 +100,15 @@ describe("SQS to Webhook Integration", () => {
 
       const callbacks = await processChannelStatusEvent(
         sqsClient,
-        s3Client,
+        cloudWatchClient,
         callbackEventQueueUrl,
-        debugLogBucketName,
+        webhookLogGroupName,
         channelStatusEvent,
       );
 
       expect(callbacks).toHaveLength(1);
 
-      expect(callbacks[0]).toMatchObject({
+      expect(callbacks[0].payload).toMatchObject({
         type: "ChannelStatus",
         attributes: expect.objectContaining({
           channel: "nhsapp",
@@ -109,6 +117,10 @@ describe("SQS to Webhook Integration", () => {
           messageId: channelStatusEvent.data.messageId,
         }),
       });
+
+      expect(callbacks[0].headers["x-hmac-sha256-signature"]).toBe(
+        computeExpectedSignature(callbacks[0].payload),
+      );
     }, 120_000);
   });
 
