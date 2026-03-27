@@ -63,6 +63,44 @@ describe("Mock Webhook Lambda", () => {
       const body = JSON.parse(result.body);
       expect(body.message).toBe("Unauthorized");
     });
+
+    it("should authenticate successfully with mixed-case headers", async () => {
+      const callback = {
+        data: [
+          {
+            type: "MessageStatus",
+            attributes: {
+              messageId: "msg-mixed-case",
+              messageStatus: "delivered",
+            },
+            links: { message: "some-message-link" },
+            meta: { idempotencyKey: "some-idempotency-key" },
+          },
+        ],
+      };
+
+      const event = createMockEvent(JSON.stringify(callback), {
+        "X-Api-Key": TEST_API_KEY,
+        "X-Hmac-Sha256-Signature": "test-sig-mixed",
+      });
+      const result = await handler(event);
+
+      expect(result.statusCode).toBe(200);
+
+      const receivedCall = mockLogger.info.mock.calls.find(
+        ([msg, context]: [string, Record<string, unknown>]) =>
+          msg === "Callback received" && context.messageId === "msg-mixed-case",
+      );
+      expect(receivedCall).toBeDefined();
+
+      const [, receivedContext] = receivedCall as [
+        string,
+        Record<string, unknown>,
+      ];
+      expect(receivedContext).toMatchObject({
+        signature: "test-sig-mixed",
+      });
+    });
   });
 
   describe("Happy Path", () => {
@@ -378,6 +416,50 @@ describe("Mock Webhook Lambda", () => {
         signature: "test-sig",
       });
       expect(context).toHaveProperty("payload");
+    });
+
+    it("should log Callback received context for ChannelStatus", async () => {
+      const callback = {
+        data: [
+          {
+            type: "ChannelStatus",
+            attributes: {
+              messageId: "test-channel-msg-321",
+              messageReference: "test-ref-321",
+              channel: "nhsapp",
+              channelStatus: "delivered",
+              supplierStatus: "delivered",
+            },
+            links: {
+              message: "some-message-link",
+            },
+            meta: {
+              idempotencyKey: "channel-idempotency-key",
+            },
+          },
+        ],
+      };
+
+      const event = createMockEvent(JSON.stringify(callback));
+      await handler(event);
+
+      const receivedCall = mockLogger.info.mock.calls.find(
+        ([msg, context]: [string, Record<string, unknown>]) =>
+          msg === "Callback received" &&
+          context.callbackType === "ChannelStatus" &&
+          context.messageId === "test-channel-msg-321",
+      );
+      expect(receivedCall).toBeDefined();
+
+      const [, receivedContext] = receivedCall as [
+        string,
+        Record<string, unknown>,
+      ];
+      expect(receivedContext).toMatchObject({
+        messageId: "test-channel-msg-321",
+        callbackType: "ChannelStatus",
+        signature: "",
+      });
     });
   });
 });

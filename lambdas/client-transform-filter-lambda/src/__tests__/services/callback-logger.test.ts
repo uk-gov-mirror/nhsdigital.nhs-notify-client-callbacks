@@ -357,7 +357,7 @@ describe("callback-logger", () => {
       });
     });
 
-    it("should log only common fields and signature for unknown event type", () => {
+    it("should log standard fields for any event type", () => {
       logCallbackSigned(
         mockLogger,
         messageStatusPayload,
