@@ -155,12 +155,6 @@ variable "deploy_mock_clients" {
   default     = false
 }
 
-variable "client_config_bucket_force_destroy" {
-  type        = bool
-  description = "Force-delete all objects and versions from the client config bucket during destroy"
-  default     = false
-}
-
 variable "message_root_uri" {
   type        = string
   description = "The root URI used for constructing message links in callback payloads"
