@@ -15,7 +15,6 @@
 |------|-------------|------|---------|:--------:|
 | <a name="input_applications_map_parameter_name"></a> [applications\_map\_parameter\_name](#input\_applications\_map\_parameter\_name) | SSM Parameter Store path for the clientId-to-applicationData map, where applicationData is currently only the applicationId | `string` | `null` | no |
 | <a name="input_aws_account_id"></a> [aws\_account\_id](#input\_aws\_account\_id) | The AWS Account ID (numeric) | `string` | n/a | yes |
-| <a name="input_client_config_bucket_force_destroy"></a> [client\_config\_bucket\_force\_destroy](#input\_client\_config\_bucket\_force\_destroy) | Force-delete all objects and versions from the client config bucket during destroy | `bool` | `false` | no |
 | <a name="input_component"></a> [component](#input\_component) | The variable encapsulating the name of this component | `string` | `"callbacks"` | no |
 | <a name="input_default_tags"></a> [default\_tags](#input\_default\_tags) | A map of default tags to apply to all taggable resources within the component | `map(string)` | `{}` | no |
 | <a name="input_deploy_mock_clients"></a> [deploy\_mock\_clients](#input\_deploy\_mock\_clients) | Flag to deploy mock webhook lambda for integration testing (test/dev environments only) | `bool` | `false` | no |
@@ -38,6 +37,7 @@
 | <a name="input_pipe_sqs_max_batch_window"></a> [pipe\_sqs\_max\_batch\_window](#input\_pipe\_sqs\_max\_batch\_window) | n/a | `number` | `2` | no |
 | <a name="input_project"></a> [project](#input\_project) | The name of the tfscaffold project | `string` | n/a | yes |
 | <a name="input_region"></a> [region](#input\_region) | The AWS Region | `string` | n/a | yes |
+| <a name="input_s3_enable_force_destroy"></a> [s3\_enable\_force\_destroy](#input\_s3\_enable\_force\_destroy) | Whether to enable force destroy for the S3 buckets created in this module | `bool` | `false` | no |
 | <a name="input_sqs_inbound_event_max_receive_count"></a> [sqs\_inbound\_event\_max\_receive\_count](#input\_sqs\_inbound\_event\_max\_receive\_count) | n/a | `number` | `3` | no |
 | <a name="input_sqs_inbound_event_visibility_timeout_seconds"></a> [sqs\_inbound\_event\_visibility\_timeout\_seconds](#input\_sqs\_inbound\_event\_visibility\_timeout\_seconds) | n/a | `number` | `60` | no |
 ## Modules

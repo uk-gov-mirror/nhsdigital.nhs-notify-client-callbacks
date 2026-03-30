@@ -30,7 +30,7 @@ module "client_config_bucket" {
   )
 
   kms_key_arn        = module.kms.key_arn
-  force_destroy      = var.client_config_bucket_force_destroy
+  force_destroy      = var.s3_enable_force_destroy
   versioning         = true
   object_ownership   = "BucketOwnerPreferred"
   bucket_key_enabled = true

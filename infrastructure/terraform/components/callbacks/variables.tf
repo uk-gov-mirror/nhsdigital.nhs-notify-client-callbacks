@@ -155,12 +155,6 @@ variable "deploy_mock_clients" {
   default     = false
 }
 
-variable "client_config_bucket_force_destroy" {
-  type        = bool
-  description = "Force-delete all objects and versions from the client config bucket during destroy"
-  default     = false
-}
-
 variable "enable_xray_tracing" {
   type        = bool
   description = "Enable AWS X-Ray active tracing for Lambda functions"
@@ -176,4 +170,10 @@ variable "applications_map_parameter_name" {
   type        = string
   default     = null
   description = "SSM Parameter Store path for the clientId-to-applicationData map, where applicationData is currently only the applicationId"
+}
+
+variable "s3_enable_force_destroy" {
+  type        = bool
+  description = "Whether to enable force destroy for the S3 buckets created in this module"
+  default     = false
 }
