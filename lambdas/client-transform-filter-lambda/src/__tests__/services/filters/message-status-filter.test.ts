@@ -131,4 +131,19 @@ describe("matchesMessageStatusSubscription", () => {
       ),
     ).toBe(true);
   });
+
+  it("rejects when messageStatuses is empty", () => {
+    const data = createMessageStatusData({
+      messageStatus: "DELIVERED",
+      previousMessageStatus: "PENDING_ENRICHMENT",
+    });
+    const event = createBaseEvent(
+      EventTypes.MESSAGE_STATUS_PUBLISHED,
+      "source-a",
+      data,
+    );
+    expect(
+      matchesMessageStatusSubscription(createMessageStatusConfig([]), event),
+    ).toBe(false);
+  });
 });

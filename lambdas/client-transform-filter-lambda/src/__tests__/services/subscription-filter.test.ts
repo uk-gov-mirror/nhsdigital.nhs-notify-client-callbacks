@@ -153,6 +153,30 @@ describe("evaluateSubscriptionFilters", () => {
         subscriptionIds: ["sub-a"],
       });
     });
+
+    it("returns deduplicated targetIds when multiple subscriptions match", () => {
+      const event = createMessageStatusEvent("client-1", "DELIVERED");
+      const config = createClientSubscriptionConfig("client-1", {
+        subscriptions: [
+          createMessageStatusSubscription(["DELIVERED"], {
+            subscriptionId: "sub-1",
+            targetIds: ["target-a", "target-b"],
+          }),
+          createMessageStatusSubscription(["DELIVERED"], {
+            subscriptionId: "sub-2",
+            targetIds: ["target-b", "target-c"],
+          }),
+        ],
+      });
+
+      const result = evaluateSubscriptionFilters(event, config);
+
+      expect(result).toEqual({
+        matched: true,
+        subscriptionType: "MessageStatus",
+        targetIds: ["target-a", "target-b", "target-c"],
+      });
+    });
   });
 
   describe("when event is ChannelStatus", () => {
