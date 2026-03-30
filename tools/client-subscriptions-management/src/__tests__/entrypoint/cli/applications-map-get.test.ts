@@ -67,6 +67,7 @@ describe("applications-map-get CLI", () => {
   });
 
   it("throws when no mapping exists for the client", async () => {
+    expect.hasAssertions();
     mockGetApplication.mockResolvedValue(undefined);
 
     await expectWrappedCliError(
@@ -77,6 +78,7 @@ describe("applications-map-get CLI", () => {
   });
 
   it("handles repository errors", async () => {
+    expect.hasAssertions();
     mockGetApplication.mockRejectedValue(new Error("Boom"));
 
     await expectWrappedCliError(cli.main, baseArgs);

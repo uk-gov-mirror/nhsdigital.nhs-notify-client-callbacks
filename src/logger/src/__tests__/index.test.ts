@@ -2,6 +2,7 @@ import pino from "pino";
 import {
   LogContext,
   Logger,
+  REDACT_PATHS,
   extractCorrelationId,
   logLifecycleEvent,
   logger,
@@ -33,6 +34,7 @@ const mockLoggerMethods = pino() as jest.Mocked<ReturnType<typeof pino>>;
 type PinoConfig = {
   formatters: { level: (label: string) => { level: string } };
   timestamp: () => string;
+  redact: string[];
 };
 const capturedPinoConfig = (pino as unknown as jest.Mock).mock
   .calls[0][0] as PinoConfig;
@@ -296,6 +298,10 @@ describe("pino configuration", () => {
   it("timestamp should return a JSON-fragment with an ISO timestamp", () => {
     const result = capturedPinoConfig.timestamp();
     expect(result).toMatch(/^,"timestamp":"\d{4}-\d{2}-\d{2}T/);
+  });
+
+  it("should configure pino with redact paths", () => {
+    expect(capturedPinoConfig.redact).toEqual(REDACT_PATHS);
   });
 });
 

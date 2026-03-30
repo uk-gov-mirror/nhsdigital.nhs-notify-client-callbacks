@@ -9,9 +9,9 @@ import {
   SendMessageCommand,
 } from "@aws-sdk/client-sqs";
 import { logger } from "@nhs-notify-client-callbacks/logger";
+import type { DeploymentDetails } from "@nhs-notify-client-callbacks/test-support/helpers/deployment";
 import { waitUntil } from "async-wait-until";
 
-import type { DeploymentDetails } from "./deployment";
 import { getMockItClientConfig } from "./mock-client-config";
 
 const QUEUE_WAIT_TIMEOUT_MS = 60_000;
@@ -44,20 +44,6 @@ function buildQueueUrl(
     ? `${project}-${environment}-${component}-${name}-queue`
     : `${project}-${environment}-${component}-${name}`;
   return `https://sqs.${region}.amazonaws.com/${accountId}/${queueName}`;
-}
-
-export function buildInboundEventQueueUrl(
-  deploymentDetails: DeploymentDetails,
-): string {
-  return buildQueueUrl(deploymentDetails, "inbound-event");
-}
-
-export function buildInboundEventDlqQueueUrl(
-  deploymentDetails: DeploymentDetails,
-): string {
-  return buildQueueUrl(deploymentDetails, "inbound-event-dlq", {
-    appendQueueSuffix: false,
-  });
 }
 
 export function buildMockClientDlqQueueUrl(

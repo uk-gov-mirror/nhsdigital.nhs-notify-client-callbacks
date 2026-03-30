@@ -1,6 +1,6 @@
 module "mock_webhook_lambda" {
   count  = var.deploy_mock_clients ? 1 : 0
-  source = "https://github.com/NHSDigital/nhs-notify-shared-modules/releases/download/3.0.6/terraform-lambda.zip"
+  source = "https://github.com/NHSDigital/nhs-notify-shared-modules/releases/download/3.0.7/terraform-lambda.zip"
 
   function_name = "mock-webhook"
   description   = "Mock webhook endpoint for integration testing - logs received callbacks to CloudWatch"

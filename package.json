@@ -71,6 +71,8 @@
     "src/models",
     "lambdas/mock-webhook-lambda",
     "tests/integration",
+    "tests/performance",
+    "tests/test-support",
     "tools/client-subscriptions-management"
   ]
 }

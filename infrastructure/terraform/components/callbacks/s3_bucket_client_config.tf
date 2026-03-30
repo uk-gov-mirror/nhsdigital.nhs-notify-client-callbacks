@@ -12,7 +12,7 @@ resource "aws_s3_object" "mock_client_config" {
 }
 
 module "client_config_bucket" {
-  source = "https://github.com/NHSDigital/nhs-notify-shared-modules/releases/download/3.0.6/terraform-s3bucket.zip"
+  source = "https://github.com/NHSDigital/nhs-notify-shared-modules/releases/download/3.0.7/terraform-s3bucket.zip"
 
   name = "subscription-config"
 

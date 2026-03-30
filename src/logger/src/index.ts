@@ -1,5 +1,17 @@
 import pino from "pino";
 
+export const REDACT_PATHS = [
+  "messageReference",
+  "channelStatusDescription",
+  "messageStatusDescription",
+  "error.config",
+  "error.request",
+  "error.response",
+  "err.config",
+  "err.request",
+  "err.response",
+];
+
 export interface LogContext {
   correlationId?: string;
   clientId?: string;
@@ -22,6 +34,7 @@ const basePinoLogger = pino(
       },
     },
     timestamp: () => `,"timestamp":"${new Date().toISOString()}"`,
+    redact: REDACT_PATHS,
   },
   pino.destination({ sync: true }),
 );

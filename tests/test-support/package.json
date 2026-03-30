@@ -1,0 +1,24 @@
+{
+  "name": "@nhs-notify-client-callbacks/test-support",
+  "version": "0.0.1",
+  "private": true,
+  "exports": {
+    "./helpers": "./helpers/index.ts",
+    "./helpers/*": "./helpers/*.ts"
+  },
+  "scripts": {
+    "test:unit": "echo 'No unit tests in test-support workspace - skipping'",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@aws-sdk/client-cloudwatch-logs": "^3.991.0",
+    "@aws-sdk/client-s3": "^3.821.0",
+    "@aws-sdk/client-sqs": "^3.990.0"
+  },
+  "devDependencies": {
+    "@tsconfig/node22": "^22.0.2",
+    "typescript": "^5.8.2"
+  }
+}

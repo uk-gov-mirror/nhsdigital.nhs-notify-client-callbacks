@@ -1,25 +1,27 @@
 import { GetQueueAttributesCommand, SQSClient } from "@aws-sdk/client-sqs";
+import { CloudWatchLogsClient } from "@aws-sdk/client-cloudwatch-logs";
 import type {
   MessageStatusData,
   StatusPublishEvent,
 } from "@nhs-notify-client-callbacks/models";
 import {
-  assertCallbackHeaders,
-  awaitSignedCallbacksFromWebhookLogGroup,
   buildInboundEventQueueUrl,
   buildLambdaLogGroupName,
-  buildMockClientDlqQueueUrl,
-  buildMockWebhookTargetPath,
   createCloudWatchLogsClient,
-  createMessageStatusPublishEvent,
   createSqsClient,
-  ensureInboundQueueIsEmpty,
   getDeploymentDetails,
+} from "@nhs-notify-client-callbacks/test-support/helpers";
+import { assertCallbackHeaders } from "./helpers/signature";
+import {
+  buildMockClientDlqQueueUrl,
+  ensureInboundQueueIsEmpty,
   purgeQueues,
-  sendEventToDlqAndRedrive,
   sendSqsEvent,
-} from "helpers";
-import { CloudWatchLogsClient } from "@aws-sdk/client-cloudwatch-logs";
+} from "./helpers/sqs";
+import { buildMockWebhookTargetPath } from "./helpers/mock-client-config";
+import { awaitSignedCallbacksFromWebhookLogGroup } from "./helpers/cloudwatch";
+import { createMessageStatusPublishEvent } from "./helpers/event-factories";
+import sendEventToDlqAndRedrive from "./helpers/redrive";
 
 describe("DLQ Redrive", () => {
   let sqsClient: SQSClient;
