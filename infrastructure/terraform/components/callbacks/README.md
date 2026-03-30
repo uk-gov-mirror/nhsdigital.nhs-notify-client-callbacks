@@ -37,6 +37,7 @@
 | <a name="input_pipe_sqs_max_batch_window"></a> [pipe\_sqs\_max\_batch\_window](#input\_pipe\_sqs\_max\_batch\_window) | n/a | `number` | `2` | no |
 | <a name="input_project"></a> [project](#input\_project) | The name of the tfscaffold project | `string` | n/a | yes |
 | <a name="input_region"></a> [region](#input\_region) | The AWS Region | `string` | n/a | yes |
+| <a name="input_s3_enable_force_destroy"></a> [s3\_enable\_force\_destroy](#input\_s3\_enable\_force\_destroy) | Whether to enable force destroy for the S3 buckets created in this module | `bool` | `false` | no |
 | <a name="input_sqs_inbound_event_max_receive_count"></a> [sqs\_inbound\_event\_max\_receive\_count](#input\_sqs\_inbound\_event\_max\_receive\_count) | n/a | `number` | `3` | no |
 | <a name="input_sqs_inbound_event_visibility_timeout_seconds"></a> [sqs\_inbound\_event\_visibility\_timeout\_seconds](#input\_sqs\_inbound\_event\_visibility\_timeout\_seconds) | n/a | `number` | `60` | no |
 ## Modules
@@ -46,6 +47,7 @@
 | <a name="module_client_config_bucket"></a> [client\_config\_bucket](#module\_client\_config\_bucket) | https://github.com/NHSDigital/nhs-notify-shared-modules/releases/download/3.0.6/terraform-s3bucket.zip | n/a |
 | <a name="module_client_destination"></a> [client\_destination](#module\_client\_destination) | ../../modules/client-destination | n/a |
 | <a name="module_client_transform_filter_lambda"></a> [client\_transform\_filter\_lambda](#module\_client\_transform\_filter\_lambda) | https://github.com/NHSDigital/nhs-notify-shared-modules/releases/download/3.0.6/terraform-lambda.zip | n/a |
+| <a name="module_debug_log_bucket"></a> [debug\_log\_bucket](#module\_debug\_log\_bucket) | https://github.com/NHSDigital/nhs-notify-shared-modules/releases/download/3.0.6/terraform-s3bucket.zip | n/a |
 | <a name="module_kms"></a> [kms](#module\_kms) | https://github.com/NHSDigital/nhs-notify-shared-modules/releases/download/3.0.6/terraform-kms.zip | n/a |
 | <a name="module_mock_webhook_lambda"></a> [mock\_webhook\_lambda](#module\_mock\_webhook\_lambda) | https://github.com/NHSDigital/nhs-notify-shared-modules/releases/download/3.0.6/terraform-lambda.zip | n/a |
 | <a name="module_sqs_inbound_event"></a> [sqs\_inbound\_event](#module\_sqs\_inbound\_event) | https://github.com/NHSDigital/nhs-notify-shared-modules/releases/download/3.0.6/terraform-sqs.zip | n/a |

@@ -171,3 +171,9 @@ variable "applications_map_parameter_name" {
   default     = null
   description = "SSM Parameter Store path for the clientId-to-applicationData map, where applicationData is currently only the applicationId"
 }
+
+variable "s3_enable_force_destroy" {
+  type        = bool
+  description = "Whether to enable force destroy for the S3 buckets created in this module"
+  default     = false
+}
