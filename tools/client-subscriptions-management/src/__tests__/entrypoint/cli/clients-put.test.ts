@@ -99,7 +99,7 @@ describe("clients-put CLI", () => {
     expect(mockPutClientConfig).not.toHaveBeenCalled();
   });
 
-  it("rejects when clientId in config does not match --client-id", async () => {
+  it("rejects when JSON is valid but does not match config schema", async () => {
     await cli.main([
       "node",
       "script",
@@ -108,7 +108,29 @@ describe("clients-put CLI", () => {
       "--bucket-name",
       "bucket-1",
       "--json",
-      JSON.stringify({ clientId: "different-client" }),
+      JSON.stringify({ not: "a valid config" }),
+    ]);
+
+    expect(console.error).toHaveBeenCalledWith(
+      "Error: JSON does not match expected config schema",
+    );
+    expect(process.exitCode).toBe(1);
+    expect(mockPutClientConfig).not.toHaveBeenCalled();
+  });
+
+  it("rejects when clientId in config does not match --client-id", async () => {
+    const mismatchedConfig = createClientSubscriptionConfig({
+      clientId: "different-client",
+    });
+    await cli.main([
+      "node",
+      "script",
+      "--client-id",
+      "client-1",
+      "--bucket-name",
+      "bucket-1",
+      "--json",
+      JSON.stringify(mismatchedConfig),
     ]);
 
     expect(console.error).toHaveBeenCalledWith(

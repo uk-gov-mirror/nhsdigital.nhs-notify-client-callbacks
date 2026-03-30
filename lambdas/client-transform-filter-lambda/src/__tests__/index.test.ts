@@ -402,10 +402,13 @@ describe("Lambda handler", () => {
       addContext: jest.fn(),
       clearContext: jest.fn(),
     };
+    class NonStandardError {
+      message = "non-error-thrown";
+    }
     const faultyObservability = {
       recordProcessingStarted: jest.fn(() => {
         // eslint-disable-next-line @typescript-eslint/only-throw-error
-        throw "non-error-thrown";
+        throw new NonStandardError();
       }),
       getLogger: jest.fn().mockReturnValue(faultyLogger),
       getMetrics: jest.fn().mockReturnValue(faultyMetrics),
@@ -572,9 +575,12 @@ describe("createHandler default wiring", () => {
     });
 
     expect(state.testHandler).toBeDefined();
+    if (!state.testHandler) {
+      throw new Error("Expected testHandler to be defined");
+    }
     const originalBucket = process.env.CLIENT_SUBSCRIPTION_CONFIG_BUCKET;
     process.env.CLIENT_SUBSCRIPTION_CONFIG_BUCKET = "test-bucket";
-    const result = await state.testHandler!([]);
+    const result = await state.testHandler([]);
     if (originalBucket === undefined) {
       delete process.env.CLIENT_SUBSCRIPTION_CONFIG_BUCKET;
     } else {

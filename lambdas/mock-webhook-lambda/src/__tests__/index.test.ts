@@ -263,9 +263,12 @@ describe("Mock Webhook Lambda", () => {
     });
 
     it("should return 500 when parsing throws a non-Error value", async () => {
+      class NonStandardError {
+        message = "forced-string-error";
+      }
       const parseSpy = jest.spyOn(JSON, "parse").mockImplementationOnce(() => {
         // eslint-disable-next-line @typescript-eslint/only-throw-error
-        throw "forced-string-error";
+        throw new NonStandardError();
       });
 
       const event = createMockEvent('{"data":[]}');

@@ -114,4 +114,17 @@ describe("ConfigLoader", () => {
       { path: "config", message: "unexpected string error" },
     ]);
   });
+
+  it("wraps non-Error non-string values thrown by S3 as ConfigValidationError", async () => {
+    const send = jest.fn().mockRejectedValue({ code: 42 });
+    const loader = createLoader(send);
+
+    const error = await loader
+      .loadClientConfig("client-1")
+      .catch((error_) => error_);
+    expect(error).toBeInstanceOf(ConfigValidationError);
+    expect(error.issues).toEqual([
+      { path: "config", message: JSON.stringify({ code: 42 }) },
+    ]);
+  });
 });

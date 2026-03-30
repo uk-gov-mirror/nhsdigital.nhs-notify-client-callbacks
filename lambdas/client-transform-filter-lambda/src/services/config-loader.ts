@@ -2,6 +2,7 @@ import { GetObjectCommand, NoSuchKey, S3Client } from "@aws-sdk/client-s3";
 import type { ClientSubscriptionConfiguration } from "@nhs-notify-client-callbacks/models";
 import { ConfigCache } from "services/config-cache";
 import { logger } from "services/logger";
+import { wrapUnknownError } from "services/error-handler";
 import {
   ConfigValidationError,
   validateClientConfig,
@@ -23,7 +24,7 @@ function throwAsConfigError(error: unknown, clientId: string): never {
     throw error;
   }
 
-  const message = error instanceof Error ? error.message : String(error);
+  const { message } = wrapUnknownError(error);
   logger.error("Failed to load config from S3", { clientId });
   throw new ConfigValidationError([{ path: "config", message }]);
 }

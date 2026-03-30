@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import type { Argv } from "yargs";
-import type { ClientSubscriptionConfiguration } from "@nhs-notify-client-callbacks/models";
+import { parseClientSubscriptionConfiguration } from "@nhs-notify-client-callbacks/models";
 import {
   type CliCommand,
   type ClientCliArgs,
@@ -60,14 +60,23 @@ export const handler: CliCommand<ClientsPutArgs>["handler"] = async (argv) => {
   // eslint-disable-next-line security/detect-non-literal-fs-filename
   const rawJson = argv.json ?? readFileSync(argv.file!, "utf8");
 
-  let config: ClientSubscriptionConfiguration;
+  let parsed: unknown;
   try {
-    config = JSON.parse(rawJson) as ClientSubscriptionConfiguration;
+    parsed = JSON.parse(rawJson);
   } catch {
     console.error("Error: failed to parse JSON input");
     process.exitCode = 1;
     return;
   }
+
+  const parseResult = parseClientSubscriptionConfiguration(parsed);
+  if (!parseResult.success) {
+    console.error("Error: JSON does not match expected config schema");
+    process.exitCode = 1;
+    return;
+  }
+
+  const config = parseResult.data;
 
   if (config.clientId !== argv["client-id"]) {
     console.error(

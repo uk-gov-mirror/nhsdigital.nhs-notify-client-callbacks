@@ -248,8 +248,10 @@ describe("ClientSubscriptionRepository", () => {
       );
 
       const updated = result.subscriptions.find(
-        (s) => s.subscriptionId === "sub-001",
-      ) as MessageStatusSubscriptionConfiguration | undefined;
+        (s): s is MessageStatusSubscriptionConfiguration =>
+          s.subscriptionId === "sub-001" &&
+          s.subscriptionType === "MessageStatus",
+      );
       expect(updated?.messageStatuses).toEqual(["FAILED"]);
     });
 
