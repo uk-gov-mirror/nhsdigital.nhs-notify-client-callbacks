@@ -1,6 +1,5 @@
 ajv
 auditability
-[A-Z]+s
 Bitwarden
 bot
 [Cc]onfig
@@ -33,6 +32,7 @@ repo
 [Rr]unbook
 sed
 Syft
+teardown
 Terraform
 toolchain
 Trufflehog

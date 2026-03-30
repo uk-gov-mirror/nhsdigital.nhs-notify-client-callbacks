@@ -4,7 +4,7 @@ import {
   buildSubscriptionConfigBucketName,
   createS3Client,
   getDeploymentDetails,
-} from "helpers";
+} from "@nhs-notify-client-callbacks/test-support/helpers";
 
 describe("Infrastructure exists", () => {
   let s3Client: S3Client;

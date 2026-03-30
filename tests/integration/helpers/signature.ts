@@ -3,6 +3,7 @@ import type { CallbackItem } from "@nhs-notify-client-callbacks/models";
 import type { SignedCallback } from "./cloudwatch";
 
 function resolveEnvVar(name: string): string {
+  // eslint-disable-next-line security/detect-object-injection
   const result = process.env[name];
   if (result) {
     return result;

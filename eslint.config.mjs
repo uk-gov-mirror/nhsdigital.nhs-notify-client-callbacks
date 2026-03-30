@@ -67,6 +67,9 @@ export default defineConfig([
           project: [
             "frontend/tsconfig.json",
             "lambdas/*/tsconfig.json",
+            "tests/integration/tsconfig.json",
+            "tests/performance/tsconfig.json",
+            "tests/test-support/tsconfig.json",
             "tests/test-team/tsconfig.json",
             "utils/*/tsconfig.json",
           ],
@@ -197,7 +200,7 @@ export default defineConfig([
     },
   },
   {
-    files: ["**/utils/**", "tests/test-team/**", "lambdas/**/src/**"],
+    files: ["**/utils/**", "tests/test-team/**", "tests/performance/helpers/**", "lambdas/**/src/**"],
     rules: {
       "import-x/prefer-default-export": 0,
     },
@@ -211,19 +214,14 @@ export default defineConfig([
     },
   },
   {
-    // Files inside helpers/ are loaded transitively by globalSetup/globalTeardown which run
-    // outside Jest's module system, so moduleNameMapper does not apply — relative imports only
-    files: ["tests/integration/helpers/**"],
-    rules: {
-      "no-relative-import-paths/no-relative-import-paths": 0,
-    },
-  },
-  {
-    // globalSetup/globalTeardown run outside Jest's module system so moduleNameMapper
-    // does not apply — relative imports are the only way to reach local helpers
+    // helpers/ files use relative imports between each other; test files import
+    // directly from local helpers using relative paths
     files: [
-      "tests/integration/jest.global-setup.ts",
-      "tests/integration/jest.global-teardown.ts",
+      "tests/integration/helpers/**",
+      "tests/integration/*.test.ts",
+      "tests/performance/helpers/**",
+      "tests/performance/*.test.ts",
+      "tests/test-support/helpers/**",
     ],
     rules: {
       "no-relative-import-paths/no-relative-import-paths": 0,
@@ -271,6 +269,12 @@ export default defineConfig([
     rules: {
       "no-console": "off",
       "import-x/first": "off",
+    },
+  },
+  {
+    files: ["tests/performance/**/*.ts"],
+    rules: {
+      "no-console": "off",
     },
   },
 

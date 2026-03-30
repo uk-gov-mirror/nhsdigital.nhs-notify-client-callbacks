@@ -1,5 +1,5 @@
 module "client_transform_filter_lambda" {
-  source = "https://github.com/NHSDigital/nhs-notify-shared-modules/releases/download/3.0.6/terraform-lambda.zip"
+  source = "https://github.com/NHSDigital/nhs-notify-shared-modules/releases/download/3.0.7/terraform-lambda.zip"
 
   function_name = "client-transform-filter"
   description   = "Lambda function that transforms and filters events coming to through the eventpipe"
@@ -30,6 +30,7 @@ module "client_transform_filter_lambda" {
 
   force_lambda_code_deploy = var.force_lambda_code_deploy
   enable_lambda_insights   = false
+  enable_xray_tracing      = var.enable_xray_tracing
 
   log_destination_arn       = local.log_destination_arn
   log_subscription_role_arn = local.acct.log_subscription_role_arn

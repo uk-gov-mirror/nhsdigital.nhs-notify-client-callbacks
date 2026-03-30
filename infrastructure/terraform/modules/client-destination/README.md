@@ -23,7 +23,7 @@ No requirements.
 
 | Name | Source | Version |
 |------|--------|---------|
-| <a name="module_target_dlq"></a> [target\_dlq](#module\_target\_dlq) | https://github.com/NHSDigital/nhs-notify-shared-modules/releases/download/3.0.6/terraform-sqs.zip | n/a |
+| <a name="module_target_dlq"></a> [target\_dlq](#module\_target\_dlq) | https://github.com/NHSDigital/nhs-notify-shared-modules/releases/download/3.0.7/terraform-sqs.zip | n/a |
 ## Outputs
 
 No outputs.

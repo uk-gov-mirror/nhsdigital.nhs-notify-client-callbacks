@@ -161,6 +161,12 @@ variable "client_config_bucket_force_destroy" {
   default     = false
 }
 
+variable "enable_xray_tracing" {
+  type        = bool
+  description = "Enable AWS X-Ray active tracing for Lambda functions"
+  default     = false
+}
+
 variable "message_root_uri" {
   type        = string
   description = "The root URI used for constructing message links in callback payloads"

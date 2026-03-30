@@ -1,30 +1,36 @@
 import { DeleteMessageCommand, SQSClient } from "@aws-sdk/client-sqs";
+import { CloudWatchLogsClient } from "@aws-sdk/client-cloudwatch-logs";
 import {
   type ChannelStatusData,
   type MessageStatusData,
   type StatusPublishEvent,
 } from "@nhs-notify-client-callbacks/models";
 import {
-  assertCallbackHeaders,
-  awaitQueueMessage,
-  awaitQueueMessageByMessageId,
   buildInboundEventDlqQueueUrl,
   buildInboundEventQueueUrl,
   buildLambdaLogGroupName,
-  buildMockClientDlqQueueUrl,
-  buildMockWebhookTargetPath,
-  createChannelStatusPublishEvent,
   createCloudWatchLogsClient,
-  createMessageStatusPublishEvent,
   createSqsClient,
-  ensureInboundQueueIsEmpty,
   getDeploymentDetails,
-  processChannelStatusEvent,
-  processMessageStatusEvent,
+} from "@nhs-notify-client-callbacks/test-support/helpers";
+import { assertCallbackHeaders } from "./helpers/signature";
+import { buildMockWebhookTargetPath } from "./helpers/mock-client-config";
+import {
+  awaitQueueMessage,
+  awaitQueueMessageByMessageId,
+  buildMockClientDlqQueueUrl,
+  ensureInboundQueueIsEmpty,
   purgeQueues,
   sendSqsEvent,
-} from "helpers";
-import { CloudWatchLogsClient } from "@aws-sdk/client-cloudwatch-logs";
+} from "./helpers/sqs";
+import {
+  createChannelStatusPublishEvent,
+  createMessageStatusPublishEvent,
+} from "./helpers/event-factories";
+import {
+  processChannelStatusEvent,
+  processMessageStatusEvent,
+} from "./helpers/status-events";
 
 describe("SQS to Webhook Integration", () => {
   let sqsClient: SQSClient;

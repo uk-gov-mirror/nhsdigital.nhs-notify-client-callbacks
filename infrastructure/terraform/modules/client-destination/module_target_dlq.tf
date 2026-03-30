@@ -1,5 +1,5 @@
 module "target_dlq" {
-  source   = "https://github.com/NHSDigital/nhs-notify-shared-modules/releases/download/3.0.6/terraform-sqs.zip"
+  source   = "https://github.com/NHSDigital/nhs-notify-shared-modules/releases/download/3.0.7/terraform-sqs.zip"
   for_each = var.targets
 
   aws_account_id = var.aws_account_id
