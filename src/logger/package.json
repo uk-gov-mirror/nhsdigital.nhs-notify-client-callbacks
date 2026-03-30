@@ -9,15 +9,15 @@
     }
   },
   "dependencies": {
-    "@aws-sdk/client-s3": "^3.821.0",
-    "pino": "^9.6.0"
+    "@aws-sdk/client-s3": "^3.1017.0",
+    "pino": "^10.3.1"
   },
   "devDependencies": {
-    "@tsconfig/node22": "^22.0.2",
+    "@tsconfig/node22": "^22.0.5",
     "@types/jest": "^29.5.14",
     "jest": "^29.7.0",
     "ts-jest": "^29.4.6",
-    "typescript": "^5.8.2"
+    "typescript": "^5.9.3"
   },
   "scripts": {
     "lint": "eslint .",

@@ -24,11 +24,6 @@ export class LambdaError extends Error {
     this.errorType = errorType;
     this.correlationId = correlationId;
     this.retryable = retryable;
-
-    // Maintains proper stack trace for where our error was thrown (only available on V8)
-    if (Error.captureStackTrace) {
-      Error.captureStackTrace(this, this.constructor);
-    }
   }
 }
 

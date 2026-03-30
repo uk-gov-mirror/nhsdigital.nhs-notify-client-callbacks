@@ -32,7 +32,7 @@ runs:
       run: zip lines-of-code-report.json.zip lines-of-code-report.json
     - name: "Upload CLOC report as an artefact"
       if: ${{ !env.ACT }}
-      uses: actions/upload-artifact@v6
+      uses: actions/upload-artifact@v7
       with:
         name: lines-of-code-report.json.zip
         path: ./lines-of-code-report.json.zip

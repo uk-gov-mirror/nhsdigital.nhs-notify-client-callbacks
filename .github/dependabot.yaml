@@ -16,11 +16,15 @@ updates:
     directory: "/"
     schedule:
       interval: "daily"
+    exclude-paths:
+      - "docs/adr/assets/ADR-003/examples/**"
 
   - package-ecosystem: "pip"
     directory: "/"
     schedule:
       interval: "daily"
+    exclude-paths:
+      - "docs/adr/assets/ADR-003/examples/**"
 
   - package-ecosystem: "terraform"
     directory: "/"
