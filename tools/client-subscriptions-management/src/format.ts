@@ -74,3 +74,16 @@ export const formatClientConfig = (
 
 export const normalizeClientName = (name: string): string =>
   name.replaceAll(/\s+/g, "-").toLowerCase();
+
+const maskValue = (value: string): string => "*".repeat(value.length || 8);
+
+export const formatApplicationsMap = (map: Map<string, string>): string =>
+  map.size === 0
+    ? "Applications map: (empty)"
+    : table([
+        ["Client ID", "Application ID"],
+        ...[...map.entries()].map(([clientId, applicationId]) => [
+          clientId,
+          maskValue(applicationId),
+        ]),
+      ]);

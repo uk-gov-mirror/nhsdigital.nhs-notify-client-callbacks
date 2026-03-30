@@ -150,7 +150,10 @@ describe("Lambda handler with S3 subscription filtering", () => {
     expect(mockSend.mock.calls[0][0]).toBeInstanceOf(GetObjectCommand);
     expect(mockSsmSend).toHaveBeenCalledTimes(1);
     expect(mockSsmSend.mock.calls[0][0]).toBeInstanceOf(GetParameterCommand);
-    expect(result[0].headers["x-hmac-sha256-signature"]).toMatch(/^[0-9a-f]+$/);
+    expect(result[0]).toHaveProperty("payload");
+    expect(result[0]).toHaveProperty("subscriptions");
+    expect(result[0]).toHaveProperty("signatures");
+    expect(Object.values(result[0].signatures)[0]).toMatch(/^[0-9a-f]+$/);
   });
 
   it("filters out event when status is not in subscription", async () => {
@@ -200,8 +203,10 @@ describe("Lambda handler with S3 subscription filtering", () => {
 
     // Only the DELIVERED event passes the filter
     expect(result).toHaveLength(1);
-    expect((result[0].data as { messageStatus: string }).messageStatus).toBe(
-      "DELIVERED",
+    expect(result[0].payload.data[0].attributes).toEqual(
+      expect.objectContaining({
+        messageStatus: "delivered",
+      }),
     );
   });
 

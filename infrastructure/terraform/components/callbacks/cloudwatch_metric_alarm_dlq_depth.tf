@@ -1,5 +1,5 @@
 resource "aws_cloudwatch_metric_alarm" "client_dlq_depth" {
-  for_each = toset(keys(local.all_clients))
+  for_each = toset(keys(local.config_targets))
 
   alarm_name = "${local.csi}-${each.key}-dlq-depth"
   alarm_description = join(" ", [
@@ -25,7 +25,7 @@ resource "aws_cloudwatch_metric_alarm" "client_dlq_depth" {
     local.default_tags,
     {
       Name   = "${local.csi}-${each.key}-dlq-depth"
-      Client = each.key
+      Client = local.config_targets[each.key].client_id
     },
   )
 }

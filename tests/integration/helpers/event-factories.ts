@@ -5,6 +5,8 @@ import type {
 } from "@nhs-notify-client-callbacks/models";
 import { EventTypes } from "@nhs-notify-client-callbacks/models";
 
+import { getMockItClientConfig } from "./mock-client-config";
+
 type MessageEventOverrides = {
   event?: Partial<StatusPublishEvent<MessageStatusData>>;
   data?: Partial<MessageStatusData>;
@@ -23,7 +25,7 @@ export function createMessageStatusPublishEvent(
     overrides?.data?.messageReference ?? `ref-${crypto.randomUUID()}`;
 
   const baseData: MessageStatusData = {
-    clientId: "mock-client",
+    clientId: getMockItClientConfig().clientId,
     messageId,
     messageReference,
     messageStatus: "DELIVERED",
@@ -78,7 +80,7 @@ export function createChannelStatusPublishEvent(
     overrides?.data?.messageReference ?? `ref-${crypto.randomUUID()}`;
 
   const baseData: ChannelStatusData = {
-    clientId: "mock-client",
+    clientId: getMockItClientConfig().clientId,
     messageId,
     messageReference,
     channel: "NHSAPP",

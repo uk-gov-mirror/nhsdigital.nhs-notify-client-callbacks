@@ -1,4 +1,5 @@
 import {
+  formatApplicationsMap,
   formatClientConfig,
   formatSubscriptionsTable,
   formatTargetsTable,
@@ -72,5 +73,24 @@ describe("format", () => {
 
   it("normalizes client name", () => {
     expect(normalizeClientName("My  Client Name")).toBe("my-client-name");
+  });
+
+  it("formats empty applications map", () => {
+    expect(formatApplicationsMap(new Map())).toBe("Applications map: (empty)");
+  });
+
+  it("masks application IDs in applications map output", () => {
+    const result = formatApplicationsMap(
+      new Map([
+        ["client-a", "app-12345"],
+        ["client-b", "a"],
+      ]),
+    );
+
+    expect(result).toContain("client-a");
+    expect(result).toContain("client-b");
+    expect(result).toContain("*********");
+    expect(result).toContain("*");
+    expect(result).not.toContain("app-12345");
   });
 });

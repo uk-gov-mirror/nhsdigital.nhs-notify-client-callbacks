@@ -11,6 +11,7 @@ import {
   buildInboundEventQueueUrl,
   buildLambdaLogGroupName,
   buildMockClientDlqQueueUrl,
+  buildMockWebhookTargetPath,
   createCloudWatchLogsClient,
   createMessageStatusPublishEvent,
   createSqsClient,
@@ -79,7 +80,7 @@ describe("Metrics", () => {
         webhookLogGroupName,
         event.data.messageId,
         "MessageStatus",
-        startTime,
+        buildMockWebhookTargetPath(),
       );
 
       expect(callbacks.length).toBeGreaterThan(0);

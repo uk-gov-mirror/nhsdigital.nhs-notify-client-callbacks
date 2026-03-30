@@ -113,6 +113,7 @@ describe("evaluateSubscriptionFilters", () => {
         matched: true,
         subscriptionType: "MessageStatus",
         targetIds: ["00000000-0000-4000-8000-000000000001"],
+        subscriptionIds: ["00000000-0000-0000-0000-000000000001"],
       });
     });
 
@@ -128,14 +129,16 @@ describe("evaluateSubscriptionFilters", () => {
       });
     });
 
-    it("returns only matched subscription target IDs", () => {
+    it("returns only matched subscription target IDs and subscription IDs", () => {
       const event = createMessageStatusEvent("client-1", "DELIVERED");
       const config = createClientSubscriptionConfig("client-1", {
         subscriptions: [
           createMessageStatusSubscription(["DELIVERED"], {
+            subscriptionId: "sub-a",
             targetIds: ["target-a"],
           }),
           createMessageStatusSubscription(["FAILED"], {
+            subscriptionId: "sub-b",
             targetIds: ["target-b"],
           }),
         ],
@@ -147,6 +150,7 @@ describe("evaluateSubscriptionFilters", () => {
         matched: true,
         subscriptionType: "MessageStatus",
         targetIds: ["target-a"],
+        subscriptionIds: ["sub-a"],
       });
     });
   });
@@ -174,6 +178,7 @@ describe("evaluateSubscriptionFilters", () => {
         matched: true,
         subscriptionType: "ChannelStatus",
         targetIds: ["00000000-0000-4000-8000-000000000001"],
+        subscriptionIds: ["00000000-0000-0000-0000-000000000002"],
       });
     });
 
@@ -201,7 +206,7 @@ describe("evaluateSubscriptionFilters", () => {
       });
     });
 
-    it("returns only matched channel subscription target IDs", () => {
+    it("returns only matched channel subscription target IDs and subscription IDs", () => {
       const event = createChannelStatusEvent(
         "client-1",
         "SMS",
@@ -217,6 +222,7 @@ describe("evaluateSubscriptionFilters", () => {
             ["delivered"],
             "EMAIL",
             {
+              subscriptionId: "sub-email",
               targetIds: ["target-email"],
             },
           ),
@@ -225,6 +231,7 @@ describe("evaluateSubscriptionFilters", () => {
             ["permanent_failure"],
             "SMS",
             {
+              subscriptionId: "sub-sms",
               targetIds: ["target-sms"],
             },
           ),
@@ -237,6 +244,7 @@ describe("evaluateSubscriptionFilters", () => {
         matched: true,
         subscriptionType: "ChannelStatus",
         targetIds: ["target-sms"],
+        subscriptionIds: ["sub-sms"],
       });
     });
   });

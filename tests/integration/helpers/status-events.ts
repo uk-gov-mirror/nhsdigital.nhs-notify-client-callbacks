@@ -21,9 +21,8 @@ async function processStatusEvent<
   webhookLogGroupName: string,
   event: StatusPublishEvent<T>,
   callbackType: SignedCallback["payload"]["type"],
+  webhookPath: string,
 ): Promise<SignedCallback[]> {
-  const startTime = Date.now();
-
   const sendMessageResponse = await sendSqsEvent(
     sqsClient,
     callbackEventQueueUrl,
@@ -41,7 +40,7 @@ async function processStatusEvent<
     webhookLogGroupName,
     event.data.messageId,
     callbackType,
-    startTime,
+    webhookPath,
   );
 }
 
@@ -51,6 +50,7 @@ export async function processMessageStatusEvent(
   callbackEventQueueUrl: string,
   webhookLogGroupName: string,
   messageStatusEvent: StatusPublishEvent<MessageStatusData>,
+  webhookPath: string,
 ): Promise<SignedCallback[]> {
   return processStatusEvent(
     sqsClient,
@@ -59,6 +59,7 @@ export async function processMessageStatusEvent(
     webhookLogGroupName,
     messageStatusEvent,
     "MessageStatus",
+    webhookPath,
   );
 }
 
@@ -68,6 +69,7 @@ export async function processChannelStatusEvent(
   callbackEventQueueUrl: string,
   webhookLogGroupName: string,
   channelStatusEvent: StatusPublishEvent<ChannelStatusData>,
+  webhookPath: string,
 ): Promise<SignedCallback[]> {
   return processStatusEvent(
     sqsClient,
@@ -76,5 +78,6 @@ export async function processChannelStatusEvent(
     webhookLogGroupName,
     channelStatusEvent,
     "ChannelStatus",
+    webhookPath,
   );
 }

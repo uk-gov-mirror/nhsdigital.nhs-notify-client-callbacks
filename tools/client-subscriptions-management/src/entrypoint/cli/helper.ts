@@ -1,6 +1,8 @@
 import {
   createRepository as createRepositoryFromOptions,
+  createSsmApplicationsMapRepository as createSsmApplicationsMapRepositoryFromOptions,
   resolveBucketName,
+  resolveParameterName as resolveParameterNameFromAws,
   resolveProfile,
   resolveRegion,
 } from "src/aws";
@@ -129,4 +131,31 @@ export const writeOptions = {
     demandOption: false as const,
     description: "Validate config without writing to S3",
   },
+};
+
+export type SsmCliArgs = CommonCliArgs & {
+  "parameter-name"?: string;
+};
+
+export const parameterNameOption = {
+  "parameter-name": {
+    type: "string" as const,
+    demandOption: false as const,
+    description:
+      "Explicit SSM parameter name for the applications map (overrides derived name)",
+  },
+};
+
+export const createSsmApplicationsMapRepository = (argv: SsmCliArgs) => {
+  const region = resolveRegion(argv.region);
+  const profile = resolveProfile(argv.profile);
+  const parameterName = resolveParameterNameFromAws({
+    parameterName: argv["parameter-name"],
+    environment: argv.environment,
+  });
+  return createSsmApplicationsMapRepositoryFromOptions({
+    parameterName,
+    region,
+    profile,
+  });
 };

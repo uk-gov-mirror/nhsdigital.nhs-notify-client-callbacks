@@ -3,8 +3,6 @@ import { nodeJestConfig } from "../../jest.config.base";
 export default {
   ...nodeJestConfig,
   modulePaths: ["<rootDir>"],
-  globalSetup: "<rootDir>/jest.global-setup.ts",
-  globalTeardown: "<rootDir>/jest.global-teardown.ts",
   coveragePathIgnorePatterns: [
     ...(nodeJestConfig.coveragePathIgnorePatterns ?? []),
     "/helpers/",

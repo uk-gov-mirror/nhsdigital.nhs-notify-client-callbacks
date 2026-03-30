@@ -6,7 +6,8 @@
       "helpers": [
         "./helpers/index"
       ]
-    }
+    },
+    "resolveJsonModule": true
   },
   "extends": "../../tsconfig.base.json",
   "include": [

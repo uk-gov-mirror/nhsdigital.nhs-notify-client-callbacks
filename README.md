@@ -43,7 +43,7 @@ The Client Callbacks infrastructure processes message and channel status events,
 - **Callbacks Event Bus**: Domain-specific EventBridge bus for webhook orchestration
 - **API Destination Target Rules**: Per-client rules invoking HTTPS endpoints with client-specific authentication
 - **Client Config Storage**: S3 bucket storing client subscription configurations (status filters, webhook endpoints)
-- **Per-Client DLQs**: SQS Dead Letter Queues for failed webhook deliveries (one per client)
+- **Per-Client Target DLQs**: SQS Dead Letter Queues for failed webhook deliveries (one per client target)
 
 ### Event Flow
 

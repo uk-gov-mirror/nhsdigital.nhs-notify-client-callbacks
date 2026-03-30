@@ -1,5 +1,5 @@
 module "mock_webhook_lambda" {
-  count  = var.deploy_mock_webhook ? 1 : 0
+  count  = var.deploy_mock_clients ? 1 : 0
   source = "https://github.com/NHSDigital/nhs-notify-shared-modules/releases/download/3.0.6/terraform-lambda.zip"
 
   function_name = "mock-webhook"
@@ -42,13 +42,13 @@ module "mock_webhook_lambda" {
 }
 
 resource "random_password" "mock_webhook_api_key" {
-  count   = var.deploy_mock_webhook ? 1 : 0
+  count   = var.deploy_mock_clients ? 1 : 0
   length  = 32
   special = false
 }
 
 data "aws_iam_policy_document" "mock_webhook_lambda" {
-  count = var.deploy_mock_webhook ? 1 : 0
+  count = var.deploy_mock_clients ? 1 : 0
 
   statement {
     sid    = "KMSPermissions"
@@ -67,7 +67,7 @@ data "aws_iam_policy_document" "mock_webhook_lambda" {
 
 # Lambda Function URL for mock webhook (test/dev only)
 resource "aws_lambda_function_url" "mock_webhook" {
-  count              = var.deploy_mock_webhook ? 1 : 0
+  count              = var.deploy_mock_clients ? 1 : 0
   function_name      = module.mock_webhook_lambda[0].function_name
   authorization_type = "NONE" # Public endpoint for testing
 
@@ -80,7 +80,7 @@ resource "aws_lambda_function_url" "mock_webhook" {
 }
 
 resource "aws_lambda_permission" "mock_webhook_function_url" {
-  count                  = var.deploy_mock_webhook ? 1 : 0
+  count                  = var.deploy_mock_clients ? 1 : 0
   statement_id_prefix    = "FunctionURLAllowPublicAccess"
   action                 = "lambda:InvokeFunctionUrl"
   function_name          = module.mock_webhook_lambda[0].function_name
@@ -89,7 +89,7 @@ resource "aws_lambda_permission" "mock_webhook_function_url" {
 }
 
 resource "aws_lambda_permission" "mock_webhook_function_invoke" {
-  count               = var.deploy_mock_webhook ? 1 : 0
+  count               = var.deploy_mock_clients ? 1 : 0
   statement_id_prefix = "FunctionURLAllowInvokeAction"
   action              = "lambda:InvokeFunction"
   function_name       = module.mock_webhook_lambda[0].function_name

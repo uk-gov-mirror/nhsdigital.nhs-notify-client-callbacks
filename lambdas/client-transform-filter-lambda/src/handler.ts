@@ -22,9 +22,25 @@ type UnsignedEvent = StatusPublishEvent & {
   transformedPayload: ClientCallbackPayload;
 };
 
-export interface TransformedEvent extends StatusPublishEvent {
-  transformedPayload: ClientCallbackPayload;
-  headers: { "x-hmac-sha256-signature": string };
+type FilteredEvent = UnsignedEvent & {
+  subscriptionIds: string[];
+  targetIds: string[];
+};
+
+type SignedEvent = {
+  transformedEvent: TransformedEvent;
+  deliveryContext: {
+    correlationId: string;
+    eventType: string;
+    clientId: string;
+    messageId: string;
+  };
+};
+
+export interface TransformedEvent {
+  payload: ClientCallbackPayload;
+  subscriptions: string[];
+  signatures: Record<string, string>;
 }
 
 class BatchStats {
@@ -125,17 +141,17 @@ function processSingleEvent(
 type ClientConfigMap = Map<string, ClientSubscriptionConfiguration | undefined>;
 
 async function signBatch(
-  filteredEvents: UnsignedEvent[],
+  filteredEvents: FilteredEvent[],
   applicationsMapService: ApplicationsMapService,
   configByClientId: ClientConfigMap,
   stats: BatchStats,
   observability: ObservabilityService,
-): Promise<TransformedEvent[]> {
+): Promise<SignedEvent[]> {
   const results = await pMap(
     filteredEvents,
-    async (event): Promise<TransformedEvent | undefined> => {
+    async (event): Promise<SignedEvent | undefined> => {
       const { clientId } = event.data;
-      const correlationId = extractCorrelationId(event);
+      const correlationId = extractCorrelationId(event) ?? event.id;
 
       const applicationId =
         await applicationsMapService.getApplicationId(clientId);
@@ -149,53 +165,52 @@ async function signBatch(
       }
 
       const clientConfig = configByClientId.get(clientId);
-      const apiKey = clientConfig?.targets?.[0]?.apiKey?.headerValue;
-      if (!apiKey) {
-        stats.recordFiltered();
-        logger.warn(
-          "No apiKey in client config - event will not be delivered",
-          { clientId, correlationId },
+      const targetsById = new Map(
+        (clientConfig?.targets ?? []).map((t) => [t.targetId, t]),
+      );
+
+      const signaturesByTarget = new Map<string, string>();
+
+      for (const targetId of event.targetIds) {
+        const target = targetsById.get(targetId);
+        const apiKey = target?.apiKey?.headerValue;
+        if (!apiKey) {
+          throw new ValidationError(
+            `Missing apiKey for target ${targetId}`,
+            correlationId,
+          );
+        }
+        const signature = signPayload(
+          event.transformedPayload,
+          applicationId,
+          apiKey,
         );
-        return undefined;
+        signaturesByTarget.set(targetId.replaceAll("-", "_"), signature);
+        observability.recordCallbackSigned(
+          event.transformedPayload,
+          correlationId,
+          clientId,
+          signature,
+        );
       }
 
-      const signature = signPayload(
-        event.transformedPayload,
-        applicationId,
-        apiKey,
-      );
-      const signedEvent: TransformedEvent = {
-        ...event,
-        headers: { "x-hmac-sha256-signature": signature },
+      return {
+        transformedEvent: {
+          payload: event.transformedPayload,
+          subscriptions: event.subscriptionIds,
+          signatures: Object.fromEntries(signaturesByTarget),
+        },
+        deliveryContext: {
+          correlationId,
+          eventType: event.type,
+          clientId,
+          messageId: event.data.messageId,
+        },
       };
-      observability.recordCallbackSigned(
-        signedEvent.transformedPayload,
-        correlationId,
-        clientId,
-        signature,
-      );
-      return signedEvent;
     },
     { concurrency: BATCH_CONCURRENCY },
   );
-  return results.filter((e): e is TransformedEvent => e !== undefined);
-}
-
-function recordDeliveryInitiated(
-  transformedEvents: TransformedEvent[],
-  observability: ObservabilityService,
-): void {
-  for (const transformedEvent of transformedEvents) {
-    const { clientId, messageId } = transformedEvent.data;
-    const correlationId = extractCorrelationId(transformedEvent);
-
-    observability.recordDeliveryInitiated({
-      correlationId,
-      eventType: transformedEvent.type,
-      clientId,
-      messageId,
-    });
-  }
+  return results.filter((e): e is SignedEvent => e !== undefined);
 }
 
 async function loadClientConfigs(
@@ -219,10 +234,10 @@ async function filterBatch(
   configByClientId: ClientConfigMap,
   observability: ObservabilityService,
   stats: BatchStats,
-): Promise<UnsignedEvent[]> {
+): Promise<FilteredEvent[]> {
   observability.recordFilteringStarted({ batchSize: transformedEvents.length });
 
-  const filtered: UnsignedEvent[] = [];
+  const filtered: FilteredEvent[] = [];
 
   for (const event of transformedEvents) {
     const { clientId } = event.data;
@@ -231,7 +246,11 @@ async function filterBatch(
     const filterResult = evaluateSubscriptionFilters(event, config);
 
     if (filterResult.matched) {
-      filtered.push(event);
+      filtered.push({
+        ...event,
+        subscriptionIds: filterResult.subscriptionIds ?? [],
+        targetIds: filterResult.targetIds ?? [],
+      });
       observability.recordFilteringMatched({
         correlationId,
         clientId,
@@ -313,6 +332,14 @@ export async function processEvents(
       observability,
     );
 
+    for (const signedEvent of signedEvents) {
+      observability.recordDeliveryInitiated(signedEvent.deliveryContext);
+    }
+
+    const deliverableEvents = signedEvents.map(
+      (signedEvent) => signedEvent.transformedEvent,
+    );
+
     const processingTime = Date.now() - startTime;
     observability.logBatchProcessingCompleted({
       ...stats.toObject(),
@@ -320,10 +347,8 @@ export async function processEvents(
       processingTimeMs: processingTime,
     });
 
-    recordDeliveryInitiated(signedEvents, observability);
-
     await observability.flush();
-    return signedEvents;
+    return deliverableEvents;
   } catch (error) {
     stats.recordFailure();
 

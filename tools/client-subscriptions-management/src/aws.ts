@@ -1,7 +1,9 @@
 import { S3Client } from "@aws-sdk/client-s3";
+import { SSMClient } from "@aws-sdk/client-ssm";
 import { GetCallerIdentityCommand, STSClient } from "@aws-sdk/client-sts";
 import { fromIni } from "@aws-sdk/credential-providers";
 import { ClientSubscriptionRepository } from "src/repository/client-subscriptions";
+import SsmApplicationsMapRepository from "src/repository/ssm-applications-map";
 import { S3Repository } from "src/repository/s3";
 
 export const resolveProfile = (
@@ -87,3 +89,49 @@ export const createRepository = (options: {
   );
   return new ClientSubscriptionRepository(s3Repository);
 };
+
+export const createSsmClient = (
+  region?: string,
+  profile?: string,
+  env: NodeJS.ProcessEnv = process.env,
+): SSMClient => {
+  const endpoint = env.AWS_ENDPOINT_URL;
+  const credentials = profile ? fromIni({ profile }) : undefined;
+  return new SSMClient({ region, endpoint, credentials });
+};
+
+export const deriveParameterName = (environment: string): string =>
+  `/nhs/${environment}/callbacks/applications-map`;
+
+export const resolveParameterName = (args: {
+  parameterName?: string;
+  environment?: string;
+  env?: NodeJS.ProcessEnv;
+}): string => {
+  const { env = process.env, environment, parameterName } = args;
+
+  if (parameterName) {
+    return parameterName;
+  }
+
+  const resolvedEnvironment = environment ?? env.ENVIRONMENT;
+  if (!resolvedEnvironment) {
+    throw new Error(
+      "Environment is required to derive parameter name. Please provide via --environment or ENVIRONMENT env var.",
+    );
+  }
+
+  return deriveParameterName(resolvedEnvironment);
+};
+
+export const createSsmApplicationsMapRepository = (options: {
+  parameterName: string;
+  region?: string;
+  profile?: string;
+}): SsmApplicationsMapRepository =>
+  new SsmApplicationsMapRepository(
+    createSsmClient(options.region, options.profile),
+    options.parameterName,
+  );
+
+export { default as SsmApplicationsMapRepository } from "src/repository/ssm-applications-map";

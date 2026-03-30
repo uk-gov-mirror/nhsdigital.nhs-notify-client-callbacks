@@ -15,10 +15,10 @@
 |------|-------------|------|---------|:--------:|
 | <a name="input_applications_map_parameter_name"></a> [applications\_map\_parameter\_name](#input\_applications\_map\_parameter\_name) | SSM Parameter Store path for the clientId-to-applicationData map, where applicationData is currently only the applicationId | `string` | `null` | no |
 | <a name="input_aws_account_id"></a> [aws\_account\_id](#input\_aws\_account\_id) | The AWS Account ID (numeric) | `string` | n/a | yes |
-| <a name="input_clients"></a> [clients](#input\_clients) | n/a | <pre>list(object({<br/>    connection_name                  = string<br/>    destination_name                 = string<br/>    invocation_endpoint              = string<br/>    invocation_rate_limit_per_second = optional(number, 10)<br/>    http_method                      = optional(string, "POST")<br/>    header_name                      = optional(string, "x-api-key")<br/>    header_value                     = string<br/>    client_detail                    = list(string)<br/>  }))</pre> | `[]` | no |
+| <a name="input_client_config_bucket_force_destroy"></a> [client\_config\_bucket\_force\_destroy](#input\_client\_config\_bucket\_force\_destroy) | Force-delete all objects and versions from the client config bucket during destroy | `bool` | `false` | no |
 | <a name="input_component"></a> [component](#input\_component) | The variable encapsulating the name of this component | `string` | `"callbacks"` | no |
 | <a name="input_default_tags"></a> [default\_tags](#input\_default\_tags) | A map of default tags to apply to all taggable resources within the component | `map(string)` | `{}` | no |
-| <a name="input_deploy_mock_webhook"></a> [deploy\_mock\_webhook](#input\_deploy\_mock\_webhook) | Flag to deploy mock webhook lambda for integration testing (test/dev environments only) | `bool` | `false` | no |
+| <a name="input_deploy_mock_clients"></a> [deploy\_mock\_clients](#input\_deploy\_mock\_clients) | Flag to deploy mock webhook lambda for integration testing (test/dev environments only) | `bool` | `false` | no |
 | <a name="input_enable_event_anomaly_detection"></a> [enable\_event\_anomaly\_detection](#input\_enable\_event\_anomaly\_detection) | Enable CloudWatch anomaly detection alarm for inbound event queue message reception | `bool` | `true` | no |
 | <a name="input_environment"></a> [environment](#input\_environment) | The name of the tfscaffold environment | `string` | n/a | yes |
 | <a name="input_event_anomaly_band_width"></a> [event\_anomaly\_band\_width](#input\_event\_anomaly\_band\_width) | The width of the anomaly detection band. Higher values (e.g. 4-6) reduce sensitivity and noise, lower values (e.g. 2-3) increase sensitivity. Recommended: 2-4. | `number` | `3` | no |
@@ -55,7 +55,6 @@
 |------|-------------|
 | <a name="output_deployment"></a> [deployment](#output\_deployment) | Deployment details used for post-deployment scripts |
 | <a name="output_mock_webhook_lambda_log_group_name"></a> [mock\_webhook\_lambda\_log\_group\_name](#output\_mock\_webhook\_lambda\_log\_group\_name) | CloudWatch log group name for mock webhook lambda (for integration test queries) |
-| <a name="output_mock_webhook_url"></a> [mock\_webhook\_url](#output\_mock\_webhook\_url) | URL endpoint for mock webhook (for TEST\_WEBHOOK\_URL environment variable) |
 <!-- vale on -->
 <!-- markdownlint-enable -->
 <!-- END_TF_DOCS -->

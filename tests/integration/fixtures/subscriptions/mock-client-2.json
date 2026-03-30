@@ -1,0 +1,41 @@
+{
+  "clientId": "mock-client-2",
+  "subscriptions": [
+    {
+      "messageStatuses": [
+        "DELIVERED",
+        "FAILED"
+      ],
+      "subscriptionId": "sub-8afc2d3f-0645-4d35-9f3a-508699602f4b",
+      "subscriptionType": "MessageStatus",
+      "targetIds": [
+        "target-1f3aa57d-c0b6-4a0a-a8e9-c7f97f1e27e7",
+        "target-c23f4ad8-2b6f-4510-b5b6-40f2b7fbbec5"
+      ]
+    }
+  ],
+  "targets": [
+    {
+      "apiKey": {
+        "headerName": "x-api-key",
+        "headerValue": "REPLACED_BY_TERRAFORM"
+      },
+      "invocationEndpoint": "https://REPLACED_BY_TERRAFORM",
+      "invocationMethod": "POST",
+      "invocationRateLimit": 10,
+      "targetId": "target-1f3aa57d-c0b6-4a0a-a8e9-c7f97f1e27e7",
+      "type": "API"
+    },
+    {
+      "apiKey": {
+        "headerName": "x-api-key",
+        "headerValue": "REPLACED_BY_TERRAFORM"
+      },
+      "invocationEndpoint": "https://REPLACED_BY_TERRAFORM",
+      "invocationMethod": "POST",
+      "invocationRateLimit": 10,
+      "targetId": "target-c23f4ad8-2b6f-4510-b5b6-40f2b7fbbec5",
+      "type": "API"
+    }
+  ]
+}

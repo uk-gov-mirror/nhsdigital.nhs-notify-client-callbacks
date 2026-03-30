@@ -4,11 +4,12 @@ import type {
   StatusPublishEvent,
 } from "@nhs-notify-client-callbacks/models";
 import {
+  assertCallbackHeaders,
   awaitSignedCallbacksFromWebhookLogGroup,
   buildInboundEventQueueUrl,
   buildLambdaLogGroupName,
   buildMockClientDlqQueueUrl,
-  computeExpectedSignature,
+  buildMockWebhookTargetPath,
   createCloudWatchLogsClient,
   createMessageStatusPublishEvent,
   createSqsClient,
@@ -50,7 +51,7 @@ describe("DLQ Redrive", () => {
   });
 
   describe("Infrastructure validation", () => {
-    it("should confirm the mock-client DLQ is accessible", async () => {
+    it("should confirm the target DLQ is accessible", async () => {
       const response = await sqsClient.send(
         new GetQueueAttributesCommand({
           QueueUrl: dlqQueueUrl,
@@ -75,7 +76,6 @@ describe("DLQ Redrive", () => {
 
   describe("Redrive workflow", () => {
     it("should successfully reprocess an event moved from the DLQ back to the inbound queue", async () => {
-      const startTime = Date.now();
       const event: StatusPublishEvent<MessageStatusData> =
         createMessageStatusPublishEvent();
       const { payload: redrivePayload } = await sendEventToDlqAndRedrive(
@@ -93,7 +93,7 @@ describe("DLQ Redrive", () => {
         webhookLogGroupName,
         event.data.messageId,
         "MessageStatus",
-        startTime,
+        buildMockWebhookTargetPath(),
       );
 
       expect(callbacks.length).toBeGreaterThan(0);
@@ -103,13 +103,10 @@ describe("DLQ Redrive", () => {
           messageStatus: "delivered",
         }),
       });
-      expect(callbacks[0].headers["x-hmac-sha256-signature"]).toBe(
-        computeExpectedSignature(callbacks[0].payload),
-      );
+      assertCallbackHeaders(callbacks[0]);
     }, 120_000);
 
     it("should apply the same transformation logic to redriven events as original deliveries", async () => {
-      const startTime = Date.now();
       const directEventId = `direct-${crypto.randomUUID()}`;
       const redriveEventId = `redriven-${crypto.randomUUID()}`;
 
@@ -142,21 +139,22 @@ describe("DLQ Redrive", () => {
 
       expect(dlqPayload.data.messageId).toBe(redriveEvent.data.messageId);
 
-      const directCallbacks = await awaitSignedCallbacksFromWebhookLogGroup(
-        cloudWatchClient,
-        webhookLogGroupName,
-        directEvent.data.messageId,
-        "MessageStatus",
-        startTime,
-      );
-
-      const redriveCallbacks = await awaitSignedCallbacksFromWebhookLogGroup(
-        cloudWatchClient,
-        webhookLogGroupName,
-        redriveEvent.data.messageId,
-        "MessageStatus",
-        startTime,
-      );
+      const [directCallbacks, redriveCallbacks] = await Promise.all([
+        awaitSignedCallbacksFromWebhookLogGroup(
+          cloudWatchClient,
+          webhookLogGroupName,
+          directEvent.data.messageId,
+          "MessageStatus",
+          buildMockWebhookTargetPath(),
+        ),
+        awaitSignedCallbacksFromWebhookLogGroup(
+          cloudWatchClient,
+          webhookLogGroupName,
+          redriveEvent.data.messageId,
+          "MessageStatus",
+          buildMockWebhookTargetPath(),
+        ),
+      ]);
 
       await ensureInboundQueueIsEmpty(sqsClient, inboundQueueUrl);
 
@@ -168,9 +166,7 @@ describe("DLQ Redrive", () => {
           ).messageStatus,
         }),
       });
-      expect(redriveCallbacks[0].headers["x-hmac-sha256-signature"]).toBe(
-        computeExpectedSignature(redriveCallbacks[0].payload),
-      );
+      assertCallbackHeaders(redriveCallbacks[0]);
     }, 120_000);
   });
 });

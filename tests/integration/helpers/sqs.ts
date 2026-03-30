@@ -12,6 +12,7 @@ import { logger } from "@nhs-notify-client-callbacks/logger";
 import { waitUntil } from "async-wait-until";
 
 import type { DeploymentDetails } from "./deployment";
+import { getMockItClientConfig } from "./mock-client-config";
 
 const QUEUE_WAIT_TIMEOUT_MS = 60_000;
 const POLL_INTERVAL_MS = 500;
@@ -62,7 +63,8 @@ export function buildInboundEventDlqQueueUrl(
 export function buildMockClientDlqQueueUrl(
   deploymentDetails: DeploymentDetails,
 ): string {
-  return buildQueueUrl(deploymentDetails, "mock-client-dlq");
+  const { targets } = getMockItClientConfig();
+  return buildQueueUrl(deploymentDetails, `${targets[0].targetId}-dlq`);
 }
 
 export async function sendSqsEvent<T>(

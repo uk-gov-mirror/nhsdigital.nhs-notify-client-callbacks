@@ -171,8 +171,10 @@ describe("Lambda handler", () => {
     const result = await handler([sqsMessage]);
 
     expect(result).toHaveLength(1);
-    expect(result[0]).toHaveProperty("transformedPayload");
-    const dataItem = result[0].transformedPayload.data[0];
+    expect(result[0]).toHaveProperty("payload");
+    expect(result[0]).toHaveProperty("subscriptions");
+    expect(result[0]).toHaveProperty("signatures");
+    const dataItem = result[0].payload.data[0];
     expect(dataItem.type).toBe("MessageStatus");
     expect((dataItem.attributes as MessageStatusAttributes).messageStatus).toBe(
       "delivered",
@@ -232,6 +234,65 @@ describe("Lambda handler", () => {
     );
   });
 
+  it("should throw when any target is missing an apiKey", async () => {
+    const customConfigLoader = {
+      loadClientConfig: jest.fn().mockResolvedValue(
+        createClientSubscriptionConfig("client-abc-123", {
+          subscriptions: [
+            createMessageStatusSubscription(["DELIVERED"], {
+              targetIds: ["target-no-key", DEFAULT_TARGET_ID],
+            }),
+          ],
+          targets: [
+            createTarget({
+              targetId: "target-no-key",
+              apiKey: undefined as unknown as {
+                headerName: string;
+                headerValue: string;
+              },
+            }),
+            createTarget({
+              targetId: DEFAULT_TARGET_ID,
+              apiKey: {
+                headerName: "x-api-key",
+                headerValue: "valid-key",
+              },
+            }),
+          ],
+        }),
+      ),
+    } as unknown as ConfigLoader;
+
+    const handlerWithMixedTargets = createHandler({
+      createObservabilityService: () =>
+        new ObservabilityService(mockLogger, mockMetrics, mockMetricsLogger),
+      createConfigLoaderService: () =>
+        ({ getLoader: () => customConfigLoader }) as ConfigLoaderService,
+      createApplicationsMapService: makeStubApplicationsMapService,
+    });
+
+    const sqsMessage: SQSRecord = {
+      messageId: "sqs-msg-id-mixed",
+      receiptHandle: "receipt-handle-mixed",
+      body: JSON.stringify(validMessageStatusEvent),
+      attributes: {
+        ApproximateReceiveCount: "1",
+        SentTimestamp: "1519211230",
+        SenderId: "ABCDEFGHIJ",
+        ApproximateFirstReceiveTimestamp: "1519211230",
+      },
+      messageAttributes: {},
+      md5OfBody: "mock-md5",
+      eventSource: "aws:sqs",
+      eventSourceARN: "arn:aws:sqs:eu-west-2:123456789:mock-queue",
+      awsRegion: "eu-west-2",
+    };
+
+    await expect(handlerWithMixedTargets([sqsMessage])).rejects.toThrow(
+      "Missing apiKey for target target-no-key",
+    );
+  });
+
   it("should handle batch of SQS messages from EventBridge Pipes", async () => {
     const sqsMessages: SQSRecord[] = [
       {
@@ -271,8 +332,8 @@ describe("Lambda handler", () => {
     const result = await handler(sqsMessages);
 
     expect(result).toHaveLength(2);
-    expect(result[0]).toHaveProperty("transformedPayload");
-    expect(result[1]).toHaveProperty("transformedPayload");
+    expect(result[0]).toHaveProperty("payload");
+    expect(result[1]).toHaveProperty("payload");
   });
 
   it("should reject event with unsupported type before reaching transformer", async () => {
@@ -351,8 +412,10 @@ describe("Lambda handler", () => {
     const result = await handler([sqsMessage]);
 
     expect(result).toHaveLength(1);
-    expect(result[0]).toHaveProperty("transformedPayload");
-    const dataItem = result[0].transformedPayload.data[0];
+    expect(result[0]).toHaveProperty("payload");
+    expect(result[0]).toHaveProperty("subscriptions");
+    expect(result[0]).toHaveProperty("signatures");
+    const dataItem = result[0].payload.data[0];
     expect(dataItem.type).toBe("ChannelStatus");
     expect((dataItem.attributes as ChannelStatusAttributes).channelStatus).toBe(
       "delivered",
@@ -516,8 +579,8 @@ describe("Lambda handler", () => {
     const result = await handler(sqsMessages);
 
     expect(result).toHaveLength(2);
-    expect(result[0].transformedPayload.data[0].type).toBe("MessageStatus");
-    expect(result[1].transformedPayload.data[0].type).toBe("ChannelStatus");
+    expect(result[0].payload.data[0].type).toBe("MessageStatus");
+    expect(result[1].payload.data[0].type).toBe("ChannelStatus");
   });
 });
 

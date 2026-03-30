@@ -28,8 +28,9 @@ const DEFAULT_HEADERS = {
 const createMockEvent = (
   body: string | null,
   headers: Record<string, string> = DEFAULT_HEADERS,
+  rawPath?: string,
 ): APIGatewayProxyEvent =>
-  ({ body, headers }) as unknown as APIGatewayProxyEvent;
+  ({ body, headers, rawPath }) as unknown as APIGatewayProxyEvent;
 
 describe("Mock Webhook Lambda", () => {
   beforeAll(() => {
@@ -86,12 +87,20 @@ describe("Mock Webhook Lambda", () => {
         ],
       };
 
-      const event = createMockEvent(JSON.stringify(callback));
+      const event = createMockEvent(
+        JSON.stringify(callback),
+        DEFAULT_HEADERS,
+        "/target-abc-123",
+      );
       const result = await handler(event);
 
       expect(result.statusCode).toBe(200);
       const body = JSON.parse(result.body);
       expect(body.message).toBe("Callback received");
+      expect(mockLogger.info).toHaveBeenCalledWith(
+        "Callback received",
+        expect.objectContaining({ path: "/target-abc-123" }),
+      );
     });
 
     it("should accept and log ChannelStatus callback", async () => {
@@ -331,7 +340,7 @@ describe("Mock Webhook Lambda", () => {
   });
 
   describe("Logging", () => {
-    it("should log callback with structured format including messageId", async () => {
+    it("should log Callback received with structured context", async () => {
       const callback = {
         data: [
           {
@@ -350,40 +359,25 @@ describe("Mock Webhook Lambda", () => {
         ],
       };
 
-      const event = createMockEvent(JSON.stringify(callback));
-      await handler(event);
-
-      const callbackCall = mockLogger.info.mock.calls.find(
-        ([message]: [string]) =>
-          typeof message === "string" && message.startsWith("CALLBACK"),
-      );
-
-      expect(callbackCall).toBeDefined();
-      const [message, context] = callbackCall as [
-        string,
-        Record<string, unknown>,
-      ];
-      expect(message).toContain("some-idempotency-key");
-      expect(message).toContain("MessageStatus");
-      expect(context).toMatchObject({
-        correlationId: "some-idempotency-key",
-        messageId: "test-msg-789",
-        messageType: "MessageStatus",
+      const event = createMockEvent(JSON.stringify(callback), {
+        ...DEFAULT_HEADERS,
+        "x-hmac-sha256-signature": "test-sig",
       });
+      await handler(event);
 
       const receivedCall = mockLogger.info.mock.calls.find(
         ([msg]: [string]) => msg === "Callback received",
       );
+
       expect(receivedCall).toBeDefined();
-      const [, receivedContext] = receivedCall as [
-        string,
-        Record<string, unknown>,
-      ];
-      expect(receivedContext).toMatchObject({
+      const [, context] = receivedCall as [string, Record<string, unknown>];
+      expect(context).toMatchObject({
+        correlationId: "some-idempotency-key",
         messageId: "test-msg-789",
         callbackType: "MessageStatus",
-        signature: "",
+        signature: "test-sig",
       });
+      expect(context).toHaveProperty("payload");
     });
   });
 });

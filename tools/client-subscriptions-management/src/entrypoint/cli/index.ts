@@ -1,3 +1,5 @@
+import { command as applicationsMapAddCommand } from "src/entrypoint/cli/applications-map-add";
+import { command as applicationsMapGetCommand } from "src/entrypoint/cli/applications-map-get";
 import { command as clientsGetCommand } from "src/entrypoint/cli/clients-get";
 import { command as clientsListCommand } from "src/entrypoint/cli/clients-list";
 import { command as clientsPutCommand } from "src/entrypoint/cli/clients-put";
@@ -12,6 +14,8 @@ import { command as targetsDelCommand } from "src/entrypoint/cli/targets-del";
 import { command as targetsListCommand } from "src/entrypoint/cli/targets-list";
 
 export const commands: AnyCliCommand[] = [
+  applicationsMapAddCommand,
+  applicationsMapGetCommand,
   clientsListCommand,
   clientsGetCommand,
   clientsPutCommand,

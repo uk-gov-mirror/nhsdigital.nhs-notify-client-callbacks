@@ -14,6 +14,7 @@ type FilterResult = {
   matched: boolean;
   subscriptionType: "MessageStatus" | "ChannelStatus" | "Unknown";
   targetIds?: string[];
+  subscriptionIds?: string[];
 };
 
 const unique = (values: string[]): string[] => [...new Set(values)];
@@ -30,48 +31,60 @@ export const evaluateSubscriptionFilters = (
   }
 
   if (event.type === EventTypes.MESSAGE_STATUS_PUBLISHED) {
-    const typedEvent = event as StatusPublishEvent<MessageStatusData>;
+    const matchingSubscriptions = config.subscriptions.filter((subscription) =>
+      matchesMessageStatusSubscription(
+        {
+          ...config,
+          subscriptions: [subscription],
+        },
+        event as StatusPublishEvent<MessageStatusData>,
+      ),
+    );
     const matchingTargetIds = unique(
-      config.subscriptions
-        .filter((subscription) =>
-          matchesMessageStatusSubscription(
-            {
-              ...config,
-              subscriptions: [subscription],
-            },
-            typedEvent,
-          ),
-        )
-        .flatMap((subscription) => subscription.targetIds),
+      matchingSubscriptions.flatMap((subscription) => subscription.targetIds),
+    );
+    const matchingSubscriptionIds = unique(
+      matchingSubscriptions.map((subscription) => subscription.subscriptionId),
     );
 
     return {
       matched: matchingTargetIds.length > 0,
       subscriptionType: "MessageStatus",
-      ...(matchingTargetIds.length > 0 ? { targetIds: matchingTargetIds } : {}),
+      ...(matchingTargetIds.length > 0
+        ? {
+            targetIds: matchingTargetIds,
+            subscriptionIds: matchingSubscriptionIds,
+          }
+        : {}),
     };
   }
 
   if (event.type === EventTypes.CHANNEL_STATUS_PUBLISHED) {
-    const typedEvent = event as StatusPublishEvent<ChannelStatusData>;
+    const matchingSubscriptions = config.subscriptions.filter((subscription) =>
+      matchesChannelStatusSubscription(
+        {
+          ...config,
+          subscriptions: [subscription],
+        },
+        event as StatusPublishEvent<ChannelStatusData>,
+      ),
+    );
     const matchingTargetIds = unique(
-      config.subscriptions
-        .filter((subscription) =>
-          matchesChannelStatusSubscription(
-            {
-              ...config,
-              subscriptions: [subscription],
-            },
-            typedEvent,
-          ),
-        )
-        .flatMap((subscription) => subscription.targetIds),
+      matchingSubscriptions.flatMap((subscription) => subscription.targetIds),
+    );
+    const matchingSubscriptionIds = unique(
+      matchingSubscriptions.map((subscription) => subscription.subscriptionId),
     );
 
     return {
       matched: matchingTargetIds.length > 0,
       subscriptionType: "ChannelStatus",
-      ...(matchingTargetIds.length > 0 ? { targetIds: matchingTargetIds } : {}),
+      ...(matchingTargetIds.length > 0
+        ? {
+            targetIds: matchingTargetIds,
+            subscriptionIds: matchingSubscriptionIds,
+          }
+        : {}),
     };
   }
 

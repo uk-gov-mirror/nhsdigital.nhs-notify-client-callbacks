@@ -1,3 +1,16 @@
+resource "aws_s3_object" "mock_client_config" {
+  for_each = var.deploy_mock_clients ? toset(keys(local.config_clients)) : toset([])
+
+  bucket  = module.client_config_bucket.id
+  key     = "client_subscriptions/${local.config_clients[each.key].clientId}.json"
+  content = jsonencode(local.enriched_mock_config_clients[each.key])
+
+  kms_key_id             = module.kms.key_arn
+  server_side_encryption = "aws:kms"
+
+  content_type = "application/json"
+}
+
 module "client_config_bucket" {
   source = "https://github.com/NHSDigital/nhs-notify-shared-modules/releases/download/3.0.6/terraform-s3bucket.zip"
 
@@ -17,7 +30,7 @@ module "client_config_bucket" {
   )
 
   kms_key_arn        = module.kms.key_arn
-  force_destroy      = false
+  force_destroy      = var.client_config_bucket_force_destroy
   versioning         = true
   object_ownership   = "BucketOwnerPreferred"
   bucket_key_enabled = true

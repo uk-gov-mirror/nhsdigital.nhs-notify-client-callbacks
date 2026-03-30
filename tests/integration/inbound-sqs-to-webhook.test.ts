@@ -5,13 +5,14 @@ import {
   type StatusPublishEvent,
 } from "@nhs-notify-client-callbacks/models";
 import {
+  assertCallbackHeaders,
   awaitQueueMessage,
   awaitQueueMessageByMessageId,
   buildInboundEventDlqQueueUrl,
   buildInboundEventQueueUrl,
   buildLambdaLogGroupName,
   buildMockClientDlqQueueUrl,
-  computeExpectedSignature,
+  buildMockWebhookTargetPath,
   createChannelStatusPublishEvent,
   createCloudWatchLogsClient,
   createMessageStatusPublishEvent,
@@ -32,6 +33,7 @@ describe("SQS to Webhook Integration", () => {
   let clientDlqQueueUrl: string;
   let inboundEventDlqQueueUrl: string;
   let webhookLogGroupName: string;
+  let webhookTargetPath: string;
 
   beforeAll(async () => {
     const deploymentDetails = getDeploymentDetails();
@@ -45,6 +47,7 @@ describe("SQS to Webhook Integration", () => {
       deploymentDetails,
       "mock-webhook",
     );
+    webhookTargetPath = buildMockWebhookTargetPath();
 
     await purgeQueues(sqsClient, [
       inboundEventDlqQueueUrl,
@@ -75,6 +78,7 @@ describe("SQS to Webhook Integration", () => {
         callbackEventQueueUrl,
         webhookLogGroupName,
         messageStatusEvent,
+        webhookTargetPath,
       );
 
       expect(callbacks).toHaveLength(1);
@@ -87,9 +91,7 @@ describe("SQS to Webhook Integration", () => {
         }),
       });
 
-      expect(callbacks[0].headers["x-hmac-sha256-signature"]).toBe(
-        computeExpectedSignature(callbacks[0].payload),
-      );
+      assertCallbackHeaders(callbacks[0]);
     }, 120_000);
   });
 
@@ -104,6 +106,7 @@ describe("SQS to Webhook Integration", () => {
         callbackEventQueueUrl,
         webhookLogGroupName,
         channelStatusEvent,
+        webhookTargetPath,
       );
 
       expect(callbacks).toHaveLength(1);
@@ -118,14 +121,12 @@ describe("SQS to Webhook Integration", () => {
         }),
       });
 
-      expect(callbacks[0].headers["x-hmac-sha256-signature"]).toBe(
-        computeExpectedSignature(callbacks[0].payload),
-      );
+      assertCallbackHeaders(callbacks[0]);
     }, 120_000);
   });
 
   describe("Client Webhook DLQ", () => {
-    it("should route a non-retriable (4xx) webhook response to the per-client DLQ", async () => {
+    it("should route a non-retriable (4xx) webhook response to the per-target DLQ", async () => {
       const event: StatusPublishEvent<MessageStatusData> =
         createMessageStatusPublishEvent({
           data: {

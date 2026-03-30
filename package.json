@@ -52,6 +52,8 @@
     "test:unit:silent": "LOG_LEVEL=silent npm run test:unit --workspaces",
     "typecheck": "npm run typecheck --workspaces",
     "verify": "npm run lint && npm run typecheck && npm run test:unit",
+    "applications-map:add": "npm run --silent applications-map-add --workspace tools/client-subscriptions-management --",
+    "applications-map:get": "npm run --silent applications-map-get --workspace tools/client-subscriptions-management --",
     "clients:list": "npm run --silent clients-list --workspace tools/client-subscriptions-management --",
     "clients:get": "npm run --silent clients-get --workspace tools/client-subscriptions-management --",
     "clients:put": "npm run --silent clients-put --workspace tools/client-subscriptions-management --",

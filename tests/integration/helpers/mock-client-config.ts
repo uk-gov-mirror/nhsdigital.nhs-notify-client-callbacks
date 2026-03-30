@@ -1,0 +1,55 @@
+import { readFileSync } from "node:fs";
+import path from "node:path";
+import type seedConfigJson from "../fixtures/subscriptions/mock-client-1.json";
+
+type ClientFixtureShape = typeof seedConfigJson;
+
+export type MockItClientConfig = ClientFixtureShape & {
+  apiKeyVar: string;
+  applicationIdVar: string;
+};
+
+export const CLIENT_FIXTURES = {
+  client1: {
+    fixture: "mock-client-1.json",
+    apiKeyVar: "MOCK_CLIENT_API_KEY",
+    applicationIdVar: "MOCK_CLIENT_APPLICATION_ID",
+  },
+  client2: {
+    fixture: "mock-client-2.json",
+    apiKeyVar: "MOCK_CLIENT_2_API_KEY",
+    applicationIdVar: "MOCK_CLIENT_2_APPLICATION_ID",
+  },
+} as const;
+
+export type ClientFixtureKey = keyof typeof CLIENT_FIXTURES;
+
+export function getClientConfig(key: ClientFixtureKey): MockItClientConfig {
+  // eslint-disable-next-line security/detect-object-injection -- key is constrained to ClientFixtureKey, a keyof the hardcoded as-const CLIENT_FIXTURES object
+  const { apiKeyVar, applicationIdVar, fixture } = CLIENT_FIXTURES[key];
+  const resolved = path.resolve(
+    __dirname,
+    "..",
+    "fixtures",
+    "subscriptions",
+    fixture,
+  );
+  // eslint-disable-next-line security/detect-non-literal-fs-filename -- path is constructed from __dirname and a basename sourced from the hardcoded as-const CLIENT_FIXTURES registry
+  const data = JSON.parse(readFileSync(resolved, "utf8")) as ClientFixtureShape;
+  return { ...data, apiKeyVar, applicationIdVar };
+}
+
+export function getMockItClientConfig(): MockItClientConfig {
+  return getClientConfig("client1");
+}
+
+export function getMockItClient2Config(): MockItClientConfig {
+  return getClientConfig("client2");
+}
+
+export function buildMockWebhookTargetPath(
+  key: ClientFixtureKey = "client1",
+): string {
+  const config = getClientConfig(key);
+  return `/${config.targets[0].targetId}`;
+}

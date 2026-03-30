@@ -9,19 +9,28 @@ import { TimeoutError, waitUntil } from "async-wait-until";
 const CALLBACK_WAIT_TIMEOUT_MS = 60_000;
 const METRICS_WAIT_TIMEOUT_MS = 60_000;
 const POLL_INTERVAL_MS = 2000;
+const CLOUDWATCH_QUERY_LOOKBACK_MS = Number(
+  process.env.CLOUDWATCH_QUERY_LOOKBACK_MS ?? 5000,
+);
 
 type LogEntry = {
   msg: string;
   correlationId?: string;
   callbackType?: string;
   clientId?: string;
+  apiKey?: string;
   signature?: string;
   payload?: string;
+  path?: string;
 };
 
 export type SignedCallback = {
   payload: CallbackItem;
-  headers: { "x-hmac-sha256-signature": string };
+  path: string;
+  headers: {
+    "x-api-key": string;
+    "x-hmac-sha256-signature": string;
+  };
 };
 
 async function querySignedCallbacksFromWebhookLogGroup(
@@ -29,14 +38,12 @@ async function querySignedCallbacksFromWebhookLogGroup(
   logGroupName: string,
   messageId: string,
   callbackType: CallbackItem["type"],
-  startTime: number,
 ): Promise<SignedCallback[]> {
   const filterPattern = `{ $.msg = "Callback received" && $.messageId = "${messageId}" && $.callbackType = "${callbackType}" }`;
 
   const response = await client.send(
     new FilterLogEventsCommand({
       logGroupName,
-      startTime,
       filterPattern,
     }),
   );
@@ -51,7 +58,11 @@ async function querySignedCallbacksFromWebhookLogGroup(
         if (entry.signature !== undefined && entry.payload) {
           callbacks.push({
             payload: JSON.parse(entry.payload) as CallbackItem,
-            headers: { "x-hmac-sha256-signature": entry.signature },
+            path: entry.path ?? "",
+            headers: {
+              "x-api-key": entry.apiKey ?? "",
+              "x-hmac-sha256-signature": entry.signature,
+            },
           });
         }
       } catch {
@@ -94,24 +105,37 @@ export async function awaitSignedCallbacksFromWebhookLogGroup(
   logGroupName: string,
   messageId: string,
   callbackType: CallbackItem["type"],
-  startTime: number,
+  path: string,
 ): Promise<SignedCallback[]> {
   logger.debug(
-    `Waiting for callback in webhook CloudWatch log group (messageId=${messageId}, logGroup=${logGroupName})`,
+    `Waiting for callback in webhook CloudWatch log group (messageId=${messageId}, path=${path}, logGroup=${logGroupName})`,
   );
 
-  return pollUntilFound(
+  const callbacks = await pollUntilFound(
     () =>
       querySignedCallbacksFromWebhookLogGroup(
         client,
         logGroupName,
         messageId,
         callbackType,
-        startTime,
       ),
     CALLBACK_WAIT_TIMEOUT_MS,
-    `Timed out waiting for callback in webhook CloudWatch log group (messageId=${messageId}, callbackType=${callbackType}, timeoutMs=${CALLBACK_WAIT_TIMEOUT_MS})`,
+    `Timed out waiting for callback in webhook CloudWatch log group (messageId=${messageId}, callbackType=${callbackType}, path=${path}, timeoutMs=${CALLBACK_WAIT_TIMEOUT_MS})`,
   );
+
+  if (callbacks.length !== 1) {
+    throw new Error(
+      `Expected exactly 1 callback for messageId="${messageId}" callbackType="${callbackType}", but found ${callbacks.length}`,
+    );
+  }
+
+  if (callbacks[0].path !== path) {
+    throw new Error(
+      `Expected callback path "${path}" for messageId="${messageId}", but got "${callbacks[0].path}"`,
+    );
+  }
+
+  return callbacks;
 }
 
 type EmfEntry = Record<string, unknown>;
@@ -139,13 +163,14 @@ async function queryEmfMetricsFromLogGroup(
   metricNames: string[],
   startTime: number,
 ): Promise<Set<string>> {
+  const queryStartTime = Math.max(0, startTime - CLOUDWATCH_QUERY_LOOKBACK_MS);
   const conditions = metricNames.map((name) => `$.${name} > 0`).join(" || ");
   const filterPattern = `{ ${conditions} }`;
 
   const response = await client.send(
     new FilterLogEventsCommand({
       logGroupName,
-      startTime,
+      startTime: queryStartTime,
       filterPattern,
     }),
   );
@@ -165,8 +190,11 @@ export async function awaitAllEmfMetricsInLogGroup(
   metricNames: string[],
   startTime: number,
 ): Promise<void> {
+  const queryStartTime = Math.max(0, startTime - CLOUDWATCH_QUERY_LOOKBACK_MS);
+  const queryStartTimeIso = new Date(queryStartTime).toISOString();
+  const startTimeIso = new Date(startTime).toISOString();
   logger.debug(
-    `Waiting for EMF metrics in CloudWatch log group (metrics=${metricNames.join(",")}, logGroup=${logGroupName})`,
+    `Waiting for EMF metrics in CloudWatch log group (metrics=${metricNames.join(",")}, logGroup=${logGroupName}, startTimeIso=${startTimeIso}, queryStartTimeIso=${queryStartTimeIso}, lookbackMs=${CLOUDWATCH_QUERY_LOOKBACK_MS})`,
   );
 
   await waitUntil(

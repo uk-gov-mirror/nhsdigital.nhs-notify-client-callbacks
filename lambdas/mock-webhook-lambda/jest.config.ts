@@ -5,6 +5,7 @@ export default {
   coverageThreshold: {
     global: {
       ...nodeJestConfig.coverageThreshold?.global,
+      branches: 100,
       lines: 100,
       statements: 100,
     },

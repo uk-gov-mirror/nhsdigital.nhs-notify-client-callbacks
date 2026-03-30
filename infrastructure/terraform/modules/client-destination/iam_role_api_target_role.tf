@@ -31,7 +31,7 @@ resource "aws_iam_policy" "api_target_role" {
 
 data "aws_iam_policy_document" "api_target_role" {
   statement {
-    sid    = replace("AllowAPIDestinationAccessFor${var.connection_name}", "-", "")
+    sid    = "AllowAPIDestinationAccess"
     effect = "Allow"
 
     actions = [
@@ -39,12 +39,13 @@ data "aws_iam_policy_document" "api_target_role" {
     ]
 
     resources = [
-      aws_cloudwatch_event_api_destination.main.arn
+      for destination in aws_cloudwatch_event_api_destination.per_target :
+      destination.arn
     ]
   }
 
   statement {
-    sid    = replace("AllowSQSSendMessageForDLQFor${var.connection_name}", "-", "")
+    sid    = "AllowSQSSendMessageForDLQ"
     effect = "Allow"
 
     actions = [
@@ -52,12 +53,13 @@ data "aws_iam_policy_document" "api_target_role" {
     ]
 
     resources = [
-      module.target_dlq.sqs_queue_arn,
+      for dlq in module.target_dlq :
+      dlq.sqs_queue_arn
     ]
   }
 
   statement {
-    sid    = replace("AllowKMSForDLQFor${var.connection_name}", "-", "")
+    sid    = "AllowKMSForDLQ"
     effect = "Allow"
 
     actions = [

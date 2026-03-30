@@ -36,14 +36,24 @@ function isClientCallbackPayload(
 async function buildResponse(
   event: APIGatewayProxyEvent,
 ): Promise<APIGatewayProxyResult> {
-  logger.info("Mock webhook invoked", {
-    path: event.path,
-    method: event.httpMethod,
-  });
-
+  const eventWithFunctionUrlFields = event as APIGatewayProxyEvent & {
+    rawPath?: string;
+    requestContext?: { http?: { method?: string } };
+  };
   const headers = Object.fromEntries(
     Object.entries(event.headers).map(([k, v]) => [k.toLowerCase(), v]),
   ) as Record<string, string | undefined>;
+
+  const path = event.path ?? eventWithFunctionUrlFields.rawPath;
+
+  logger.info("Mock webhook invoked", {
+    path,
+    method: event.httpMethod,
+    hasBody: Boolean(event.body),
+    "x-api-key": headers["x-api-key"],
+    "x-hmac-sha256-signature": headers["x-hmac-sha256-signature"],
+    payload: event.body,
+  });
 
   const expectedApiKey = process.env.API_KEY;
   const providedApiKey = headers["x-api-key"];
@@ -67,6 +77,8 @@ async function buildResponse(
 
   try {
     const parsed = JSON.parse(event.body) as unknown;
+
+    logger.info("Mock webhook parsed payload", { parsedPayload: parsed });
 
     if (!isClientCallbackPayload(parsed)) {
       logger.error("Invalid message structure - missing or invalid data array");
@@ -107,18 +119,12 @@ async function buildResponse(
       };
     }
 
-    logger.info(
-      `CALLBACK ${correlationId} ${item.type} : ${JSON.stringify(item)}`,
-      {
-        correlationId,
-        messageId,
-        messageType: item.type,
-      },
-    );
-
     logger.info("Callback received", {
+      correlationId,
       messageId,
       callbackType: item.type,
+      path,
+      apiKey: providedApiKey,
       signature: headers["x-hmac-sha256-signature"] ?? "",
       payload: JSON.stringify(item),
     });

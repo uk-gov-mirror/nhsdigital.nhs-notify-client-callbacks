@@ -23,44 +23,37 @@ variable "region" {
   description = "AWS Region"
 }
 
-variable "connection_name" {
-  type        = string
-  description = "Connection name"
+variable "targets" {
+  type = map(object({
+    client_id                        = string
+    target_id                        = string
+    invocation_endpoint              = string
+    invocation_rate_limit_per_second = number
+    http_method                      = string
+    header_name                      = string
+    header_value                     = string
+  }))
+
+  description = "Flattened target definitions keyed by target_id"
 }
 
-variable "header_name" {
-  type        = string
-  description = "Header name"
+variable "subscriptions" {
+  type = map(object({
+    client_id       = string
+    subscription_id = string
+    target_ids      = list(string)
+  }))
+
+  description = "Flattened subscription definitions keyed by subscription_id"
 }
 
-variable "header_value" {
-  type        = string
-  description = "Header value"
-}
+variable "subscription_targets" {
+  type = map(object({
+    subscription_id = string
+    target_id       = string
+  }))
 
-variable "destination_name" {
-  type        = string
-  description = "Destination Name"
-}
-
-variable "invocation_endpoint" {
-  type        = string
-  description = "Invocation Endpoint"
-}
-
-variable "invocation_rate_limit_per_second" {
-  type        = string
-  description = "Invocation Rate Limit Per Second"
-}
-
-variable "http_method" {
-  type        = string
-  description = "HTTP Method"
-}
-
-variable "client_detail" {
-  type        = list(string)
-  description = "Client Event Detail"
+  description = "Flattened subscription-target fanout map keyed by subscription-target composite key"
 }
 
 variable "client_bus_name" {

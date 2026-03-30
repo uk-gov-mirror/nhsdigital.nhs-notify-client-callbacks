@@ -13,6 +13,8 @@
     "targets-list": "tsx ./src/entrypoint/cli/index.ts targets-list",
     "targets-add": "tsx ./src/entrypoint/cli/index.ts targets-add",
     "targets-del": "tsx ./src/entrypoint/cli/index.ts targets-del",
+    "applications-map-add": "tsx ./src/entrypoint/cli/index.ts applications-map-add",
+    "applications-map-get": "tsx ./src/entrypoint/cli/index.ts applications-map-get",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "test:unit": "jest",
@@ -20,6 +22,7 @@
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1019.0",
+    "@aws-sdk/client-ssm": "^3.1019.0",
     "@aws-sdk/client-sts": "^3.1019.0",
     "@aws-sdk/credential-providers": "^3.1019.0",
     "@nhs-notify-client-callbacks/models": "*",

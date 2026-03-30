@@ -87,21 +87,7 @@ variable "pipe_event_patterns" {
   default     = []
 }
 
-variable "clients" {
-  type = list(object({
-    connection_name                  = string
-    destination_name                 = string
-    invocation_endpoint              = string
-    invocation_rate_limit_per_second = optional(number, 10)
-    http_method                      = optional(string, "POST")
-    header_name                      = optional(string, "x-api-key")
-    header_value                     = string
-    client_detail                    = list(string)
-  }))
 
-  default = []
-
-}
 
 variable "pipe_log_level" {
   type        = string
@@ -163,9 +149,15 @@ variable "event_anomaly_band_width" {
   }
 }
 
-variable "deploy_mock_webhook" {
+variable "deploy_mock_clients" {
   type        = bool
   description = "Flag to deploy mock webhook lambda for integration testing (test/dev environments only)"
+  default     = false
+}
+
+variable "client_config_bucket_force_destroy" {
+  type        = bool
+  description = "Force-delete all objects and versions from the client config bucket during destroy"
   default     = false
 }
 

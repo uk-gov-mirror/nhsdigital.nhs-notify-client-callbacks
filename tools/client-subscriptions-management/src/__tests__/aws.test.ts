@@ -1,6 +1,8 @@
 import {
   deriveBucketName,
+  deriveParameterName,
   resolveBucketName,
+  resolveParameterName,
   resolveProfile,
   resolveRegion,
 } from "src/aws";
@@ -77,5 +79,39 @@ describe("aws", () => {
 
   it("returns undefined when region is not set", () => {
     expect(resolveRegion(undefined, {} as NodeJS.ProcessEnv)).toBeUndefined();
+  });
+
+  it("derives parameter name from environment", () => {
+    expect(deriveParameterName("dev")).toBe(
+      "/nhs/dev/callbacks/applications-map",
+    );
+  });
+
+  it("resolves parameter name from explicit argument", () => {
+    expect(resolveParameterName({ parameterName: "/custom/path" })).toBe(
+      "/custom/path",
+    );
+  });
+
+  it("derives parameter name from environment argument", () => {
+    expect(resolveParameterName({ environment: "dev" })).toBe(
+      "/nhs/dev/callbacks/applications-map",
+    );
+  });
+
+  it("derives parameter name from ENVIRONMENT env var", () => {
+    expect(
+      resolveParameterName({
+        env: { ENVIRONMENT: "staging" } as NodeJS.ProcessEnv,
+      }),
+    ).toBe("/nhs/staging/callbacks/applications-map");
+  });
+
+  it("throws when no parameter name can be resolved", () => {
+    expect(() =>
+      resolveParameterName({ env: {} as NodeJS.ProcessEnv }),
+    ).toThrow(
+      "Environment is required to derive parameter name. Please provide via --environment or ENVIRONMENT env var.",
+    );
   });
 });
