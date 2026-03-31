@@ -18,8 +18,7 @@ jobs:
     - name: Check out the repository
       uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
     - name: Check out external repository
-      uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-      with:
+      uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2      with:
         repository: NHSDigital/nhs-notify-repository-template
         path: nhs-notify-repository-template
         token: ${{ github.token }}
@@ -31,8 +30,7 @@ jobs:
 
     - name: Create Pull Request
       if: ${{ !env.ACT }}
-      uses: peter-evans/create-pull-request@c0f553fe549906ede9cf27b5156039d195d2ece0 # v8
-      with:
+      uses: peter-evans/create-pull-request@c0f553fe549906ede9cf27b5156039d195d2ece0 # v8      with:
         token: ${{ secrets.GITHUB_TOKEN }}
         commit-message: Drift from template
         branch: scheduledTemplateRepositorySync
