@@ -47,7 +47,8 @@ jobs:
     timeout-minutes: 5
     steps:
       - name: "Checkout code"
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2      - name: "Repo setup"
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - name: "Repo setup"
         run: |
           npm ci
       - name: "Generate dependencies"
@@ -60,7 +61,8 @@ jobs:
     timeout-minutes: 5
     steps:
       - name: "Checkout code"
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2      - name: "Repo setup"
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - name: "Repo setup"
         run: |
           npm ci
       - name: "Generate dependencies"
@@ -87,7 +89,8 @@ jobs:
     timeout-minutes: 5
     steps:
       - name: "Checkout code"
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2      - name: "Repo setup"
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - name: "Repo setup"
         run: |
           npm ci
       - name: "Generate dependencies"
@@ -102,7 +105,8 @@ jobs:
     timeout-minutes: 5
     steps:
       - name: "Checkout code"
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2      - name: "Repo setup"
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - name: "Repo setup"
         run: |
           npm ci
       - name: "Generate dependencies"
@@ -118,7 +122,8 @@ jobs:
     timeout-minutes: 5
     steps:
       - name: "Checkout code"
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2      - name: "Run test coverage check"
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - name: "Run test coverage check"
         run: |
           make test-coverage
       - name: "Save the coverage check result"
@@ -134,7 +139,8 @@ jobs:
     timeout-minutes: 5
     steps:
       - name: "Checkout code"
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2        with:
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
           fetch-depth: 0 # Full history is needed to improving relevancy of reporting
       - name: "Download coverage report for SONAR"
         uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7
