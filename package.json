@@ -1,7 +1,7 @@
 {
   "devDependencies": {
     "@stylistic/eslint-plugin": "^5.10.0",
-    "@aws-sdk/client-s3": "^3.1019.0",
+    "@aws-sdk/client-s3": "^3.1020.0",
     "@tsconfig/node22": "^22.0.5",
     "@types/jest": "^29.5.14",
     "@typescript-eslint/parser": "^8.57.2",
@@ -40,7 +40,10 @@
     "minimatch@^3.0.0": "^3.1.5",
     "minimatch": "^10.2.4",
     "flatted": "^3.4.0",
-    "fast-xml-parser": "^5.5.6"
+    "fast-xml-parser": "^5.5.6",
+    "ts-jest": {
+      "handlebars": "^4.7.9"
+    }
   },
   "scripts": {
     "generate-dependencies": "npm run generate-dependencies --workspaces --if-present",

@@ -84,6 +84,7 @@ describe("Metrics", () => {
         webhookLogGroupName,
         event.data.messageId,
         "MessageStatus",
+        startTime,
         buildMockWebhookTargetPath(),
       );
 

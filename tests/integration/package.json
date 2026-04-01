@@ -12,9 +12,9 @@
   "dependencies": {
     "@nhs-notify-client-callbacks/logger": "*",
     "@nhs-notify-client-callbacks/models": "*",
-    "@aws-sdk/client-cloudwatch-logs": "^3.1019.0",
-    "@aws-sdk/client-s3": "^3.1019.0",
-    "@aws-sdk/client-sqs": "^3.1019.0",
+    "@aws-sdk/client-cloudwatch-logs": "^3.1020.0",
+    "@aws-sdk/client-s3": "^3.1020.0",
+    "@aws-sdk/client-sqs": "^3.1020.0",
     "async-wait-until": "^2.0.31",
     "@nhs-notify-client-callbacks/test-support": "*"
   },

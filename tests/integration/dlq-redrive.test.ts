@@ -78,6 +78,7 @@ describe("DLQ Redrive", () => {
 
   describe("Redrive workflow", () => {
     it("should successfully reprocess an event moved from the DLQ back to the inbound queue", async () => {
+      const startTime = Date.now();
       const event: StatusPublishEvent<MessageStatusData> =
         createMessageStatusPublishEvent();
       const { payload: redrivePayload } = await sendEventToDlqAndRedrive(
@@ -95,6 +96,7 @@ describe("DLQ Redrive", () => {
         webhookLogGroupName,
         event.data.messageId,
         "MessageStatus",
+        startTime,
         buildMockWebhookTargetPath(),
       );
 
@@ -109,6 +111,7 @@ describe("DLQ Redrive", () => {
     }, 120_000);
 
     it("should apply the same transformation logic to redriven events as original deliveries", async () => {
+      const startTime = Date.now();
       const directEventId = `direct-${crypto.randomUUID()}`;
       const redriveEventId = `redriven-${crypto.randomUUID()}`;
 
@@ -147,6 +150,7 @@ describe("DLQ Redrive", () => {
           webhookLogGroupName,
           directEvent.data.messageId,
           "MessageStatus",
+          startTime,
           buildMockWebhookTargetPath(),
         ),
         awaitSignedCallbacksFromWebhookLogGroup(
@@ -154,6 +158,7 @@ describe("DLQ Redrive", () => {
           webhookLogGroupName,
           redriveEvent.data.messageId,
           "MessageStatus",
+          startTime,
           buildMockWebhookTargetPath(),
         ),
       ]);

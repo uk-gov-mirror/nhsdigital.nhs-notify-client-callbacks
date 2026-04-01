@@ -23,6 +23,7 @@ async function processStatusEvent<
   callbackType: SignedCallback["payload"]["type"],
   webhookPath: string,
 ): Promise<SignedCallback[]> {
+  const startTime = Date.now();
   const sendMessageResponse = await sendSqsEvent(
     sqsClient,
     callbackEventQueueUrl,
@@ -40,6 +41,7 @@ async function processStatusEvent<
     webhookLogGroupName,
     event.data.messageId,
     callbackType,
+    startTime,
     webhookPath,
   );
 }

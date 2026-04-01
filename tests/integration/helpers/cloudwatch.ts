@@ -38,12 +38,15 @@ async function querySignedCallbacksFromWebhookLogGroup(
   logGroupName: string,
   messageId: string,
   callbackType: CallbackItem["type"],
+  startTime: number,
 ): Promise<SignedCallback[]> {
   const filterPattern = `{ $.msg = "Callback received" && $.messageId = "${messageId}" && $.callbackType = "${callbackType}" }`;
+  const queryStartTime = Math.max(0, startTime - CLOUDWATCH_QUERY_LOOKBACK_MS);
 
   const response = await client.send(
     new FilterLogEventsCommand({
       logGroupName,
+      startTime: queryStartTime,
       filterPattern,
     }),
   );
@@ -105,10 +108,12 @@ export async function awaitSignedCallbacksFromWebhookLogGroup(
   logGroupName: string,
   messageId: string,
   callbackType: CallbackItem["type"],
+  startTime: number,
   path: string,
 ): Promise<SignedCallback[]> {
+  const queryStartTime = Math.max(0, startTime - CLOUDWATCH_QUERY_LOOKBACK_MS);
   logger.debug(
-    `Waiting for callback in webhook CloudWatch log group (messageId=${messageId}, path=${path}, logGroup=${logGroupName})`,
+    `Waiting for callback in webhook CloudWatch log group (messageId=${messageId}, path=${path}, logGroup=${logGroupName}, startTimeIso=${new Date(startTime).toISOString()}, queryStartTimeIso=${new Date(queryStartTime).toISOString()}, lookbackMs=${CLOUDWATCH_QUERY_LOOKBACK_MS})`,
   );
 
   const callbacks = await pollUntilFound(
@@ -118,6 +123,7 @@ export async function awaitSignedCallbacksFromWebhookLogGroup(
         logGroupName,
         messageId,
         callbackType,
+        startTime,
       ),
     CALLBACK_WAIT_TIMEOUT_MS,
     `Timed out waiting for callback in webhook CloudWatch log group (messageId=${messageId}, callbackType=${callbackType}, path=${path}, timeoutMs=${CALLBACK_WAIT_TIMEOUT_MS})`,
