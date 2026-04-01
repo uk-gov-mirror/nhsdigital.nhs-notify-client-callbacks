@@ -158,7 +158,7 @@ jobs:
       APP_CLIENT_ID: ${{ secrets.APP_CLIENT_ID }}
       APP_PEM_FILE: ${{ secrets.APP_PEM_FILE }}
     steps:
-      - uses: actions/checkout@v6.0.2
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
       - name: Trigger dynamic environment creation
         shell: bash
         run: |
