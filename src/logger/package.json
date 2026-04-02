@@ -12,15 +12,16 @@
     }
   },
   "dependencies": {
-    "@aws-sdk/client-s3": "^3.1020.0",
-    "pino": "^10.3.1"
+    "@aws-sdk/client-s3": "catalog:aws",
+    "pino": "catalog:app"
   },
   "devDependencies": {
-    "@tsconfig/node22": "^22.0.5",
-    "@types/jest": "^29.5.14",
-    "jest": "^29.7.0",
-    "ts-jest": "^29.4.6",
-    "typescript": "^5.9.3"
+    "@tsconfig/node22": "catalog:tools",
+    "@types/jest": "catalog:test",
+    "eslint": "catalog:lint",
+    "jest": "catalog:test",
+    "ts-jest": "catalog:test",
+    "typescript": "catalog:tools"
   },
   "scripts": {
     "lint": "eslint .",

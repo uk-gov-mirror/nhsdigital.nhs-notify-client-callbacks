@@ -1,5 +1,5 @@
-name: 'npm install and setup'
-description: 'Setup node, authenticate github package repository and perform clean npm install'
+name: 'pnpm install and setup'
+description: 'Setup node, authenticate github package repository and perform clean pnpm install'
 
 inputs:
   GITHUB_TOKEN:
@@ -9,16 +9,22 @@ inputs:
 runs:
   using: 'composite'
   steps:
+    - name: 'Setup pnpm'
+      uses: pnpm/action-setup@v4
+      with:
+        version: 10.33.0
+
     - name: 'Use Node.js'
       uses: actions/setup-node@v4
       with:
         node-version-file: '.tool-versions'
         registry-url: 'https://npm.pkg.github.com'
         scope: '@nhsdigital'
+        cache: 'pnpm'
 
     - name: 'Install dependencies'
       shell: bash
       env:
         NODE_AUTH_TOKEN: ${{ inputs.GITHUB_TOKEN }}
       run: |
-        npm ci --min-release-age 3
+        pnpm install --frozen-lockfile

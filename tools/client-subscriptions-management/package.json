@@ -24,20 +24,23 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@aws-sdk/client-s3": "^3.1020.0",
-    "@aws-sdk/client-ssm": "^3.1020.0",
-    "@aws-sdk/client-sts": "^3.1020.0",
-    "@aws-sdk/credential-providers": "^3.1020.0",
-    "@nhs-notify-client-callbacks/models": "*",
-    "table": "^6.9.0",
-    "yargs": "^17.7.2",
-    "zod": "^4.3.6"
+    "@aws-sdk/client-s3": "catalog:aws",
+    "@aws-sdk/client-ssm": "catalog:aws",
+    "@aws-sdk/client-sts": "catalog:aws",
+    "@aws-sdk/credential-providers": "catalog:aws",
+    "@nhs-notify-client-callbacks/models": "workspace:*",
+    "table": "catalog:app",
+    "yargs": "catalog:app",
+    "zod": "catalog:tools"
   },
   "devDependencies": {
-    "@types/node": "^22.10.10",
-    "@types/yargs": "^17.0.24",
-    "eslint": "^9.27.0",
-    "tsx": "^4.21.0",
-    "typescript": "^5.9.3"
+    "@types/jest": "catalog:test",
+    "@types/node": "catalog:tools",
+    "@types/yargs": "catalog:tools",
+    "eslint": "catalog:lint",
+    "jest": "catalog:test",
+    "ts-jest": "catalog:test",
+    "tsx": "catalog:tools",
+    "typescript": "catalog:tools"
   }
 }

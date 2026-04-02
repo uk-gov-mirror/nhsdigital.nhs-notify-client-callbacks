@@ -9,12 +9,17 @@ runs:
   steps:
     - name: Checkout
       uses: actions/checkout@v6.0.2
+    - name: Setup pnpm
+      uses: pnpm/action-setup@v4
+      with:
+        version: 10.33.0
     - uses: actions/setup-node@v4
       with:
         node-version-file: '.tool-versions'
-    - name: Npm cli install
+        cache: 'pnpm'
+    - name: pnpm install
       working-directory: ./docs
-      run: npm ci --min-release-age 3
+      run: pnpm install --frozen-lockfile
       shell: bash
     - name: Setup Ruby
       uses: ruby/setup-ruby@v1.180.1

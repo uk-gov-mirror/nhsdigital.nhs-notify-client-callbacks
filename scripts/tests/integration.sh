@@ -4,8 +4,8 @@ set -euo pipefail
 
 cd "$(git rev-parse --show-toplevel)"
 
-npm ci
+pnpm install --frozen-lockfile
 
 source ./scripts/tests/integration-env.sh
 
-npm run test:integration
+pnpm run test:integration

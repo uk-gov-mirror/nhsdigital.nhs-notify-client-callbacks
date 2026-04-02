@@ -11,7 +11,7 @@
     ".github": false,
     ".vscode": false
   },
-  "jest.jestCommandLine": "npm run test:unit --workspaces --",
+  "jest.jestCommandLine": "pnpm run --recursive test:unit --",
   "sonarlint.connectedMode.project": {
     "connectionId": "nhsdigital",
     "projectKey": "NHSDigital_nhs-notify-client-callbacks"

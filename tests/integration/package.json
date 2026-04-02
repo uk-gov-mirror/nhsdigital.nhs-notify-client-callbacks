@@ -13,19 +13,20 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@nhs-notify-client-callbacks/logger": "*",
-    "@nhs-notify-client-callbacks/models": "*",
-    "@aws-sdk/client-cloudwatch-logs": "^3.1020.0",
-    "@aws-sdk/client-s3": "^3.1020.0",
-    "@aws-sdk/client-sqs": "^3.1020.0",
-    "async-wait-until": "^2.0.31",
-    "@nhs-notify-client-callbacks/test-support": "*"
+    "@aws-sdk/client-cloudwatch-logs": "catalog:aws",
+    "@aws-sdk/client-s3": "catalog:aws",
+    "@aws-sdk/client-sqs": "catalog:aws",
+    "@nhs-notify-client-callbacks/logger": "workspace:*",
+    "@nhs-notify-client-callbacks/models": "workspace:*",
+    "@nhs-notify-client-callbacks/test-support": "workspace:*",
+    "async-wait-until": "catalog:app"
   },
   "devDependencies": {
-    "@tsconfig/node22": "^22.0.5",
-    "@types/jest": "^29.5.14",
-    "async-wait-until": "^2.0.31",
-    "jest": "^29.7.0",
-    "typescript": "^5.9.3"
+    "@tsconfig/node22": "catalog:tools",
+    "@types/jest": "catalog:test",
+    "async-wait-until": "catalog:app",
+    "eslint": "catalog:lint",
+    "jest": "catalog:test",
+    "typescript": "catalog:tools"
   }
 }
