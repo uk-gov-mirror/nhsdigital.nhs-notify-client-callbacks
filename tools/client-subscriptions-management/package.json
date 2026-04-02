@@ -1,4 +1,7 @@
 {
+  "engines": {
+    "node": ">=24.14.1"
+  },
   "name": "client-subscriptions-management",
   "version": "0.0.1",
   "private": true,

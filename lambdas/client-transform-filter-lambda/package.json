@@ -18,6 +18,9 @@
     "jest-mock-extended": "^4.0.0",
     "typescript": "^5.9.3"
   },
+  "engines": {
+    "node": ">=24.14.1"
+  },
   "name": "nhs-notify-client-transform-filter-lambda",
   "private": true,
   "scripts": {

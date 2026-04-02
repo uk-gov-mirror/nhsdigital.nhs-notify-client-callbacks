@@ -48,9 +48,13 @@ jobs:
     steps:
       - name: "Checkout code"
         uses: actions/checkout@v6.0.2
+      - name: "Use Node.js"
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: '.tool-versions'
       - name: "Repo setup"
         run: |
-          npm ci
+          npm ci --min-release-age 3
       - name: "Generate dependencies"
         run: |
           npm run generate-dependencies --workspaces --if-present
@@ -62,9 +66,13 @@ jobs:
     steps:
       - name: "Checkout code"
         uses: actions/checkout@v6.0.2
+      - name: "Use Node.js"
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: '.tool-versions'
       - name: "Repo setup"
         run: |
-          npm ci
+          npm ci --min-release-age 3
       - name: "Generate dependencies"
         run: |
           npm run generate-dependencies --workspaces --if-present
@@ -90,9 +98,13 @@ jobs:
     steps:
       - name: "Checkout code"
         uses: actions/checkout@v6.0.2
+      - name: "Use Node.js"
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: '.tool-versions'
       - name: "Repo setup"
         run: |
-          npm ci
+          npm ci --min-release-age 3
       - name: "Generate dependencies"
         run: |
           npm run generate-dependencies --workspaces --if-present
@@ -106,9 +118,13 @@ jobs:
     steps:
       - name: "Checkout code"
         uses: actions/checkout@v6.0.2
+      - name: "Use Node.js"
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: '.tool-versions'
       - name: "Repo setup"
         run: |
-          npm ci
+          npm ci --min-release-age 3
       - name: "Generate dependencies"
         run: |
           npm run generate-dependencies --workspaces --if-present

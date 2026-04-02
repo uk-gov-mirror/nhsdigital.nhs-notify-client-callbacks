@@ -1,4 +1,7 @@
 {
+  "engines": {
+    "node": ">=24.14.1"
+  },
   "name": "@nhs-notify-client-callbacks/logger",
   "version": "0.0.1",
   "private": true,

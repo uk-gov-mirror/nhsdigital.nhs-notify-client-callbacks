@@ -5,7 +5,9 @@
   },
   "description": "",
   "devDependencies": {},
-  "engines": {},
+  "engines": {
+    "node": ">=24.14.1"
+  },
   "keywords": [],
   "license": "ISC",
   "name": "nhs-notify",

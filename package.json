@@ -68,6 +68,9 @@
     "targets:add": "npm run --silent targets-add --workspace tools/client-subscriptions-management --",
     "targets:del": "npm run --silent targets-del --workspace tools/client-subscriptions-management --"
   },
+  "engines": {
+    "node": ">=24.14.1"
+  },
   "workspaces": [
     "lambdas/client-transform-filter-lambda",
     "src/logger",

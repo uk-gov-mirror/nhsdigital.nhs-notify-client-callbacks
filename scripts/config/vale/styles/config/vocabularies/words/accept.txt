@@ -1,10 +1,12 @@
 ajv
+asdf
 auditability
 Bitwarden
 bot
-[Cc]onfig
+[Cc]onfigs?
 Cognito
 Cyber
+[Dd]LQs?
 Dependabot
 dev
 draw.io
@@ -19,6 +21,7 @@ Gitleaks
 Grype
 idempotence
 Jira
+namespace
 npm
 OAuth
 Octokit

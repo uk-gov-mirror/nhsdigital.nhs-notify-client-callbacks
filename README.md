@@ -30,7 +30,6 @@ The Client Callbacks infrastructure processes message and channel status events,
     - [Testing](#testing)
   - [Infrastructure](#infrastructure)
   - [Contributing](#contributing)
-  - [Contacts](#contacts)
   - [Licence](#licence)
 
 ## Architecture
@@ -69,7 +68,7 @@ cd nhs-notify-client-callbacks
 
 The following software packages, or their equivalents, are expected to be installed and configured:
 
-- [Node.js](https://nodejs.org/) 20.x or later (for Lambda development)
+- [Node.js](https://nodejs.org/) 24.14.1 or later (for Lambda development)
 - [Terraform](https://www.terraform.io/) 1.5.x or later
 - [AWS CLI](https://aws.amazon.com/cli/) configured with appropriate credentials
 - [asdf](https://asdf-vm.com/) version manager
@@ -146,11 +145,6 @@ Key development practices:
 - **Logging**: Use structured JSON logging with correlation IDs
 - **Infrastructure**: All infrastructure changes via Terraform with peer review
 - **Event Schema**: Follow NHS Notify CloudEvents specification from `nhs-notify-standards` repository
-
-## Contacts
-
-- [Tim Marston](https://github.com/cgitim) - Lead Developer
-- [Mike Wild](https://github.com/mjewildnhs) - Developer
 
 ## Licence
 

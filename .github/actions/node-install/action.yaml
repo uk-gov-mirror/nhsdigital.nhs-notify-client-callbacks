@@ -21,4 +21,4 @@ runs:
       env:
         NODE_AUTH_TOKEN: ${{ inputs.GITHUB_TOKEN }}
       run: |
-        npm ci
+        npm ci --min-release-age 3

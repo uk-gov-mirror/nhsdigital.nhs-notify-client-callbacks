@@ -15,6 +15,9 @@
   "dependencies": {
     "zod": "^4.3.6"
   },
+  "engines": {
+    "node": ">=24.14.1"
+  },
   "name": "@nhs-notify-client-callbacks/models",
   "private": true,
   "scripts": {
