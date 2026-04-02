@@ -21,7 +21,7 @@
   "name": "nhs-notify-mock-webhook-lambda",
   "private": true,
   "scripts": {
-    "lambda-build": "rm -rf dist && npx esbuild --bundle --minify --sourcemap --target=es2020 --platform=node --entry-names=[name] --outdir=dist src/index.ts",
+    "lambda-build": "rm -rf dist && pnpm exec esbuild --bundle --minify --sourcemap --target=es2020 --platform=node --entry-names=[name] --outdir=dist src/index.ts",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "test:unit": "jest",
