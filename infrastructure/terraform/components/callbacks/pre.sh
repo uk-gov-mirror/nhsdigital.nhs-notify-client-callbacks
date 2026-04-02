@@ -20,7 +20,7 @@ echo "deploy_mock_clients resolved to: ${deploy_mock_clients}"
 
 pnpm install --frozen-lockfile
 
-pnpm run --recursive --if-present generate-dependencies
+pnpm run generate-dependencies
 
 "${script_dir}/sync-client-config.sh"
 

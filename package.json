@@ -44,7 +44,7 @@
     }
   },
   "scripts": {
-    "generate-dependencies": "pnpm -r run generate-dependencies --if-present",
+    "generate-dependencies": "pnpm -r run --if-present generate-dependencies || true",
     "lint": "pnpm -r run lint",
     "lint:fix": "pnpm -r run lint:fix",
     "start": "pnpm --filter frontend run start",
