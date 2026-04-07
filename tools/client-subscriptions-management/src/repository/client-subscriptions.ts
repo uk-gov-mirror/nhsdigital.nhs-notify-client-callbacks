@@ -37,7 +37,9 @@ export class ClientSubscriptionRepository {
     );
     return keys
       .map((key) =>
-        key.replace(CLIENT_SUBSCRIPTIONS_PREFIX, "").replace(/\.json$/, ""),
+        String(key)
+          .replace(CLIENT_SUBSCRIPTIONS_PREFIX, "")
+          .replace(/\.json$/, ""),
       )
       .filter(Boolean);
   }
@@ -127,29 +129,32 @@ export class ClientSubscriptionRepository {
     }
     const updated: ClientSubscriptionConfiguration = {
       ...config,
-      subscriptions: config.subscriptions.map((sub) => {
-        if (sub.subscriptionId !== subscriptionId) return sub;
-        if (sub.subscriptionType === "MessageStatus") {
-          return {
-            ...sub,
-            ...(states.messageStatuses && {
-              messageStatuses: states.messageStatuses,
-            }),
-          };
-        }
-        if (sub.subscriptionType === "ChannelStatus") {
-          return {
-            ...sub,
-            ...(states.channelStatuses && {
-              channelStatuses: states.channelStatuses,
-            }),
-            ...(states.supplierStatuses && {
-              supplierStatuses: states.supplierStatuses,
-            }),
-          };
-        }
-        return sub;
-      }),
+      subscriptions: config.subscriptions.map(
+        // eslint-disable-next-line sonarjs/function-return-type -- false positive: complex conditional spread returns are all SubscriptionConfiguration subtypes
+        (sub): SubscriptionConfiguration => {
+          if (sub.subscriptionId !== subscriptionId) return sub;
+          if (sub.subscriptionType === "MessageStatus") {
+            return {
+              ...sub,
+              ...(states.messageStatuses && {
+                messageStatuses: states.messageStatuses,
+              }),
+            } as SubscriptionConfiguration;
+          }
+          if (sub.subscriptionType === "ChannelStatus") {
+            return {
+              ...sub,
+              ...(states.channelStatuses && {
+                channelStatuses: states.channelStatuses,
+              }),
+              ...(states.supplierStatuses && {
+                supplierStatuses: states.supplierStatuses,
+              }),
+            } as SubscriptionConfiguration;
+          }
+          return sub;
+        },
+      ),
     };
     return this.putClientConfig(clientId, updated, dryRun);
   }
@@ -186,7 +191,9 @@ export class ClientSubscriptionRepository {
     }
 
     const referencingSubscriptionIds = config.subscriptions
-      .filter((subscription) => subscription.targetIds.includes(targetId))
+      .filter((subscription) =>
+        (subscription.targetIds as readonly string[]).includes(targetId),
+      )
       .map((subscription) => subscription.subscriptionId);
 
     if (referencingSubscriptionIds.length > 0) {

@@ -12,16 +12,12 @@ export class ConfigCache {
 
   get(clientId: string): ClientSubscriptionConfiguration | undefined {
     const entry = this.cache.get(clientId);
-    if (!entry) {
-      return undefined;
-    }
 
-    if (entry.expiresAt <= Date.now()) {
+    if (entry && entry.expiresAt <= Date.now()) {
       this.cache.delete(clientId);
-      return undefined;
     }
 
-    return entry.value;
+    return this.cache.get(clientId)?.value;
   }
 
   set(clientId: string, value: ClientSubscriptionConfiguration): void {
