@@ -31,7 +31,7 @@
     "@nhs-notify-client-callbacks/models": "workspace:*",
     "table": "catalog:app",
     "yargs": "catalog:app",
-    "zod": "catalog:tools"
+    "zod": "catalog:app"
   },
   "devDependencies": {
     "@types/jest": "catalog:test",

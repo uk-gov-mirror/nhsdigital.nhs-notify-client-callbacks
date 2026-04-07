@@ -30,7 +30,7 @@ const basePinoLogger = pino(
     level: resolveLogLevel(process.env.LOG_LEVEL),
     formatters: {
       level: (label: string) => {
-        return { level: String(label).toUpperCase() };
+        return { level: label.toUpperCase() };
       },
     },
     timestamp: () => `,"timestamp":"${new Date().toISOString()}"`,

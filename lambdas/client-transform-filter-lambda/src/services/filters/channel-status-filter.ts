@@ -36,16 +36,14 @@ export const matchesChannelStatusSubscription = (
       // Check if supplier status changed AND client is subscribed to it
       const supplierStatusChanged =
         data.previousSupplierStatus !== data.supplierStatus;
-      const clientSubscribedSupplierStatus = (
-        subscription.supplierStatuses as readonly string[]
-      ).includes(data.supplierStatus);
+      const clientSubscribedSupplierStatus =
+        subscription.supplierStatuses.includes(data.supplierStatus);
 
       // Check if channel status changed AND client is subscribed to it
       const channelStatusChanged =
         data.previousChannelStatus !== data.channelStatus;
-      const clientSubscribedChannelStatus = (
-        subscription.channelStatuses as readonly string[]
-      ).includes(data.channelStatus);
+      const clientSubscribedChannelStatus =
+        subscription.channelStatuses.includes(data.channelStatus);
 
       const statusMatch =
         (supplierStatusChanged && clientSubscribedSupplierStatus) ||

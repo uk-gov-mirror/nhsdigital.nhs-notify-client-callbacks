@@ -26,9 +26,9 @@ export const matchesMessageStatusSubscription = (
     .some((subscription) => {
       const messageStatusChanged =
         data.previousMessageStatus !== data.messageStatus;
-      const clientSubscribedStatus = (
-        subscription.messageStatuses as readonly string[]
-      ).includes(data.messageStatus);
+      const clientSubscribedStatus = subscription.messageStatuses.includes(
+        data.messageStatus,
+      );
 
       if (!messageStatusChanged || !clientSubscribedStatus) {
         logger.debug(

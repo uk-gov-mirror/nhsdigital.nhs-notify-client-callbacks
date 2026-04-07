@@ -15,7 +15,7 @@
     "typescript": "catalog:tools"
   },
   "dependencies": {
-    "zod": "catalog:tools"
+    "zod": "catalog:app"
   },
   "engines": {
     "node": ">=24.14.1"

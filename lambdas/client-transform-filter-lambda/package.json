@@ -8,7 +8,7 @@
     "cloudevents": "catalog:app",
     "esbuild": "catalog:tools",
     "p-map": "catalog:app",
-    "zod": "catalog:tools"
+    "zod": "catalog:app"
   },
   "devDependencies": {
     "@tsconfig/node22": "catalog:tools",

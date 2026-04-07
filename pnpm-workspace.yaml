@@ -6,7 +6,7 @@ packages:
   - "tools/*"
 
 engineStrict: true
-minimumReleaseAge: 720
+minimumReleaseAge: 2880
 nodeOptions: "${NODE_OPTIONS:- } --experimental-vm-modules"
 trustPolicy: no-downgrade
 trustPolicyExclude:
@@ -31,6 +31,7 @@ catalogs:
     pino: "^10.3.1"
     table: "^6.9.0"
     yargs: "^17.7.2"
+    zod: "^4.3.6"
   lint:
     "@eslint/js": "^9.39.4"
     "@stylistic/eslint-plugin": "^5.10.0"
@@ -68,4 +69,3 @@ catalogs:
     ts-node: "^10.9.2"
     tsx: "^4.21.0"
     typescript: "^5.9.3"
-    zod: "^4.3.6"
