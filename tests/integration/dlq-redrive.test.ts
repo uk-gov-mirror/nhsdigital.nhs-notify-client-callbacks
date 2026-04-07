@@ -18,7 +18,11 @@ import {
   purgeQueues,
   sendSqsEvent,
 } from "./helpers/sqs";
-import { buildMockWebhookTargetPath } from "./helpers/mock-client-config";
+import {
+  buildMockWebhookTargetPath,
+  getAllSubscriptionTargetIds,
+  getMockItClientConfig,
+} from "./helpers/mock-client-config";
 import { awaitSignedCallbacksFromWebhookLogGroup } from "./helpers/cloudwatch";
 import { createMessageStatusPublishEvent } from "./helpers/event-factories";
 import sendEventToDlqAndRedrive from "./helpers/redrive";
@@ -27,41 +31,57 @@ describe("DLQ Redrive", () => {
   let sqsClient: SQSClient;
   let cloudWatchClient: CloudWatchLogsClient;
   let dlqQueueUrl!: string;
+  let allTargetDlqQueueUrls: string[];
   let inboundQueueUrl: string;
   let webhookLogGroupName: string;
 
   beforeAll(async () => {
     const deploymentDetails = getDeploymentDetails();
+    const mockClient1 = getMockItClientConfig();
+
+    const allSubscriptionTargetIds = getAllSubscriptionTargetIds();
 
     sqsClient = createSqsClient(deploymentDetails);
     cloudWatchClient = createCloudWatchLogsClient(deploymentDetails);
 
     inboundQueueUrl = buildInboundEventQueueUrl(deploymentDetails);
-    dlqQueueUrl = buildMockClientDlqQueueUrl(deploymentDetails);
+    dlqQueueUrl = buildMockClientDlqQueueUrl(
+      deploymentDetails,
+      mockClient1.targets,
+    );
+    allTargetDlqQueueUrls = allSubscriptionTargetIds.map((targetId) =>
+      buildMockClientDlqQueueUrl(deploymentDetails, [{ targetId }]),
+    );
     webhookLogGroupName = buildLambdaLogGroupName(
       deploymentDetails,
       "mock-webhook",
     );
 
-    await purgeQueues(sqsClient, [inboundQueueUrl, dlqQueueUrl]);
+    await purgeQueues(sqsClient, [inboundQueueUrl, ...allTargetDlqQueueUrls]);
   });
 
   afterAll(async () => {
-    await purgeQueues(sqsClient, [inboundQueueUrl, dlqQueueUrl]);
+    await purgeQueues(sqsClient, [inboundQueueUrl, ...allTargetDlqQueueUrls]);
     sqsClient.destroy();
     cloudWatchClient.destroy();
   });
 
   describe("Infrastructure validation", () => {
-    it("should confirm the target DLQ is accessible", async () => {
-      const response = await sqsClient.send(
-        new GetQueueAttributesCommand({
-          QueueUrl: dlqQueueUrl,
-          AttributeNames: ["QueueArn", "ApproximateNumberOfMessages"],
-        }),
+    it("should confirm a target DLQ is accessible for all configured subscription targets", async () => {
+      const responses = await Promise.all(
+        allTargetDlqQueueUrls.map((queueUrl) =>
+          sqsClient.send(
+            new GetQueueAttributesCommand({
+              QueueUrl: queueUrl,
+              AttributeNames: ["QueueArn", "ApproximateNumberOfMessages"],
+            }),
+          ),
+        ),
       );
 
-      expect(response.Attributes?.QueueArn).toBeDefined();
+      for (const response of responses) {
+        expect(response.Attributes?.QueueArn).toBeDefined();
+      }
     });
 
     it("should confirm the inbound event queue exists and is accessible", async () => {

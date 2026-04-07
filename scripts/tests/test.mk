@@ -29,6 +29,15 @@ test-contract: # Run your contract tests from scripts/test/contract @Testing
 test-integration: # Run your integration tests from scripts/test/integration @Testing
 	make _test name="integration"
 
+test-integration-local: # Run integration tests locally against a remoptely deployed environment (requires ENVIRONMENT) @Testing
+	make _test name="integration-local"
+
+test-integration-debug: # Debug a live environment - inspect queues, tail logs, check pipe state (requires ENVIRONMENT, AWS_PROFILE, ACTION) @Testing
+	make _test name="integration-debug" ACTION="$(or $(ACTION),$(word 2,$(MAKECMDGOALS)))"
+
+queue-status queue-peek tail-transform tail-webhook tail-pipe pipe-state:
+	@:
+
 test-load: # Run all your load tests @Testing
 	make \
 		test-capacity \

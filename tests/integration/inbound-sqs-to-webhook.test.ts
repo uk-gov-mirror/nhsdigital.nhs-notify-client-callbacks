@@ -1,5 +1,5 @@
-import { DeleteMessageCommand, SQSClient } from "@aws-sdk/client-sqs";
 import { CloudWatchLogsClient } from "@aws-sdk/client-cloudwatch-logs";
+import { DeleteMessageCommand, SQSClient } from "@aws-sdk/client-sqs";
 import {
   type ChannelStatusData,
   type MessageStatusData,
@@ -13,8 +13,18 @@ import {
   createSqsClient,
   getDeploymentDetails,
 } from "@nhs-notify-client-callbacks/test-support/helpers";
+import { awaitSignedCallbacksByCountFromWebhookLogGroup } from "./helpers/cloudwatch";
+import {
+  createChannelStatusPublishEvent,
+  createMessageStatusPublishEvent,
+} from "./helpers/event-factories";
+import {
+  buildMockWebhookTargetPath,
+  buildMockWebhookTargetPaths,
+  getMockItClient2Config,
+  getMockItClientConfig,
+} from "./helpers/mock-client-config";
 import { assertCallbackHeaders } from "./helpers/signature";
-import { buildMockWebhookTargetPath } from "./helpers/mock-client-config";
 import {
   awaitQueueMessage,
   awaitQueueMessageByMessageId,
@@ -23,10 +33,6 @@ import {
   purgeQueues,
   sendSqsEvent,
 } from "./helpers/sqs";
-import {
-  createChannelStatusPublishEvent,
-  createMessageStatusPublishEvent,
-} from "./helpers/event-factories";
 import {
   processChannelStatusEvent,
   processMessageStatusEvent,
@@ -40,21 +46,23 @@ describe("SQS to Webhook Integration", () => {
   let inboundEventDlqQueueUrl: string;
   let webhookLogGroupName: string;
   let webhookTargetPath: string;
+  let startTime: number;
 
   beforeAll(async () => {
     const deploymentDetails = getDeploymentDetails();
+    const { targets } = getMockItClientConfig();
 
     sqsClient = createSqsClient(deploymentDetails);
     cloudWatchClient = createCloudWatchLogsClient(deploymentDetails);
     callbackEventQueueUrl = buildInboundEventQueueUrl(deploymentDetails);
-    clientDlqQueueUrl = buildMockClientDlqQueueUrl(deploymentDetails);
+    clientDlqQueueUrl = buildMockClientDlqQueueUrl(deploymentDetails, targets);
     inboundEventDlqQueueUrl = buildInboundEventDlqQueueUrl(deploymentDetails);
     webhookLogGroupName = buildLambdaLogGroupName(
       deploymentDetails,
       "mock-webhook",
     );
     webhookTargetPath = buildMockWebhookTargetPath();
-
+    startTime = Date.now();
     await purgeQueues(sqsClient, [
       inboundEventDlqQueueUrl,
       clientDlqQueueUrl,
@@ -85,6 +93,7 @@ describe("SQS to Webhook Integration", () => {
         webhookLogGroupName,
         messageStatusEvent,
         webhookTargetPath,
+        startTime,
       );
 
       expect(callbacks).toHaveLength(1);
@@ -98,6 +107,55 @@ describe("SQS to Webhook Integration", () => {
       });
 
       assertCallbackHeaders(callbacks[0]);
+    }, 120_000);
+
+    it("should fan out a message status event to subscription with multiple target endpoints", async () => {
+      const client2Config = getMockItClient2Config();
+      const expectedPaths = buildMockWebhookTargetPaths("client2");
+
+      const messageStatusEvent: StatusPublishEvent<MessageStatusData> =
+        createMessageStatusPublishEvent({
+          data: {
+            clientId: client2Config.clientId,
+          },
+        });
+
+      await sendSqsEvent(sqsClient, callbackEventQueueUrl, messageStatusEvent);
+      await ensureInboundQueueIsEmpty(sqsClient, callbackEventQueueUrl);
+
+      const callbacks = await awaitSignedCallbacksByCountFromWebhookLogGroup(
+        cloudWatchClient,
+        webhookLogGroupName,
+        messageStatusEvent.data.messageId,
+        "MessageStatus",
+        expectedPaths.length,
+        startTime,
+      );
+
+      expect(callbacks).toHaveLength(expectedPaths.length);
+
+      const actualPaths = callbacks
+        .map((callback) => callback.path)
+        .toSorted((a, b) => a.localeCompare(b));
+      expect(actualPaths).toEqual(
+        expectedPaths.toSorted((a, b) => a.localeCompare(b)),
+      );
+
+      for (const callback of callbacks) {
+        expect(callback.payload).toMatchObject({
+          type: "MessageStatus",
+          attributes: expect.objectContaining({
+            messageId: messageStatusEvent.data.messageId,
+            messageStatus: "delivered",
+          }),
+        });
+
+        assertCallbackHeaders(
+          callback,
+          client2Config.apiKeyVar,
+          client2Config.applicationIdVar,
+        );
+      }
     }, 120_000);
   });
 
@@ -113,6 +171,7 @@ describe("SQS to Webhook Integration", () => {
         webhookLogGroupName,
         channelStatusEvent,
         webhookTargetPath,
+        startTime,
       );
 
       expect(callbacks).toHaveLength(1);

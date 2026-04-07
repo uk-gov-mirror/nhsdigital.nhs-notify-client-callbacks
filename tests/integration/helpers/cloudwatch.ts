@@ -144,6 +144,56 @@ export async function awaitSignedCallbacksFromWebhookLogGroup(
   return callbacks;
 }
 
+export async function awaitSignedCallbacksByCountFromWebhookLogGroup(
+  client: CloudWatchLogsClient,
+  logGroupName: string,
+  messageId: string,
+  callbackType: CallbackItem["type"],
+  expectedCount: number,
+  startTime: number,
+): Promise<SignedCallback[]> {
+  logger.debug(
+    `Waiting for callbacks in webhook CloudWatch log group (messageId=${messageId}, callbackType=${callbackType}, expectedCount=${expectedCount}, logGroup=${logGroupName})`,
+  );
+
+  let callbacks: SignedCallback[] = [];
+
+  try {
+    await waitUntil(
+      async () => {
+        callbacks = await querySignedCallbacksFromWebhookLogGroup(
+          client,
+          logGroupName,
+          messageId,
+          callbackType,
+          startTime,
+        );
+        return callbacks.length === expectedCount;
+      },
+      {
+        timeout: CALLBACK_WAIT_TIMEOUT_MS,
+        intervalBetweenAttempts: POLL_INTERVAL_MS,
+      },
+    );
+  } catch (error) {
+    if (error instanceof TimeoutError) {
+      logger.warn(
+        `Timed out waiting for callbacks in webhook CloudWatch log group (messageId=${messageId}, callbackType=${callbackType}, expectedCount=${expectedCount}, timeoutMs=${CALLBACK_WAIT_TIMEOUT_MS})`,
+      );
+    } else {
+      throw error;
+    }
+  }
+
+  if (callbacks.length !== expectedCount) {
+    throw new Error(
+      `Expected exactly ${expectedCount} callbacks for messageId="${messageId}" callbackType="${callbackType}", but found ${callbacks.length}`,
+    );
+  }
+
+  return callbacks;
+}
+
 type EmfEntry = Record<string, unknown>;
 
 function collectMetricNamesFromEvent(
