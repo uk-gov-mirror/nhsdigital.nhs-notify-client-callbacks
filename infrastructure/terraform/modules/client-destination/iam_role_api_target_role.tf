@@ -30,32 +30,38 @@ resource "aws_iam_policy" "api_target_role" {
 }
 
 data "aws_iam_policy_document" "api_target_role" {
-  statement {
-    sid    = "AllowAPIDestinationAccess"
-    effect = "Allow"
+  dynamic "statement" {
+    for_each = length(aws_cloudwatch_event_api_destination.per_target) > 0 ? [1] : []
+    content {
+      sid    = "AllowAPIDestinationAccess"
+      effect = "Allow"
 
-    actions = [
-      "events:InvokeApiDestination",
-    ]
+      actions = [
+        "events:InvokeApiDestination",
+      ]
 
-    resources = [
-      for destination in aws_cloudwatch_event_api_destination.per_target :
-      destination.arn
-    ]
+      resources = [
+        for destination in aws_cloudwatch_event_api_destination.per_target :
+        destination.arn
+      ]
+    }
   }
 
-  statement {
-    sid    = "AllowSQSSendMessageForDLQ"
-    effect = "Allow"
+  dynamic "statement" {
+    for_each = length(module.target_dlq) > 0 ? [1] : []
+    content {
+      sid    = "AllowSQSSendMessageForDLQ"
+      effect = "Allow"
 
-    actions = [
-      "sqs:SendMessage",
-    ]
+      actions = [
+        "sqs:SendMessage",
+      ]
 
-    resources = [
-      for dlq in module.target_dlq :
-      dlq.sqs_queue_arn
-    ]
+      resources = [
+        for dlq in module.target_dlq :
+        dlq.sqs_queue_arn
+      ]
+    }
   }
 
   statement {
