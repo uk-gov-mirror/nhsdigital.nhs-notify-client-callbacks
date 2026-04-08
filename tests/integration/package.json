@@ -13,7 +13,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@aws-sdk/client-cloudwatch": "^3.1019.0",
+    "@aws-sdk/client-cloudwatch": "^3.1021.0",
     "@nhs-notify-client-callbacks/logger": "*",
     "@nhs-notify-client-callbacks/models": "*",
     "@aws-sdk/client-cloudwatch-logs": "^3.1020.0",
