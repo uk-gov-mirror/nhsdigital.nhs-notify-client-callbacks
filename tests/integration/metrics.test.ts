@@ -19,7 +19,10 @@ import {
   purgeQueues,
   sendSqsEvent,
 } from "./helpers/sqs";
-import { buildMockWebhookTargetPath } from "./helpers/mock-client-config";
+import {
+  buildMockWebhookTargetPath,
+  getMockItClientConfig,
+} from "./helpers/mock-client-config";
 import {
   awaitAllEmfMetricsInLogGroup,
   awaitSignedCallbacksFromWebhookLogGroup,
@@ -37,11 +40,12 @@ describe("Metrics", () => {
 
   beforeAll(async () => {
     const deploymentDetails = getDeploymentDetails();
+    const { targets } = getMockItClientConfig();
 
     sqsClient = createSqsClient(deploymentDetails);
     cloudWatchClient = createCloudWatchLogsClient(deploymentDetails);
     callbackEventQueueUrl = buildInboundEventQueueUrl(deploymentDetails);
-    clientDlqQueueUrl = buildMockClientDlqQueueUrl(deploymentDetails);
+    clientDlqQueueUrl = buildMockClientDlqQueueUrl(deploymentDetails, targets);
     inboundEventDlqQueueUrl = buildInboundEventDlqQueueUrl(deploymentDetails);
     logGroupName = buildLambdaLogGroupName(
       deploymentDetails,

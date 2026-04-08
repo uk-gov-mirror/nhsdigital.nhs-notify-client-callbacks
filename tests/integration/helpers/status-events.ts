@@ -15,15 +15,17 @@ import { ensureInboundQueueIsEmpty, sendSqsEvent } from "./sqs";
 async function processStatusEvent<
   T extends MessageStatusData | ChannelStatusData,
 >(
-  sqsClient: SQSClient,
-  cloudWatchClient: CloudWatchLogsClient,
+  {
+    CloudWatchLogsClient: cloudWatchClient,
+    SQSClient: sqsClient,
+  }: { CloudWatchLogsClient: CloudWatchLogsClient; SQSClient: SQSClient },
   callbackEventQueueUrl: string,
   webhookLogGroupName: string,
   event: StatusPublishEvent<T>,
   callbackType: SignedCallback["payload"]["type"],
   webhookPath: string,
+  startTime: number,
 ): Promise<SignedCallback[]> {
-  const startTime = Date.now();
   const sendMessageResponse = await sendSqsEvent(
     sqsClient,
     callbackEventQueueUrl,
@@ -53,15 +55,16 @@ export async function processMessageStatusEvent(
   webhookLogGroupName: string,
   messageStatusEvent: StatusPublishEvent<MessageStatusData>,
   webhookPath: string,
+  startTime: number,
 ): Promise<SignedCallback[]> {
   return processStatusEvent(
-    sqsClient,
-    cloudWatchClient,
+    { CloudWatchLogsClient: cloudWatchClient, SQSClient: sqsClient },
     callbackEventQueueUrl,
     webhookLogGroupName,
     messageStatusEvent,
     "MessageStatus",
     webhookPath,
+    startTime,
   );
 }
 
@@ -72,14 +75,15 @@ export async function processChannelStatusEvent(
   webhookLogGroupName: string,
   channelStatusEvent: StatusPublishEvent<ChannelStatusData>,
   webhookPath: string,
+  startTime: number,
 ): Promise<SignedCallback[]> {
   return processStatusEvent(
-    sqsClient,
-    cloudWatchClient,
+    { CloudWatchLogsClient: cloudWatchClient, SQSClient: sqsClient },
     callbackEventQueueUrl,
     webhookLogGroupName,
     channelStatusEvent,
     "ChannelStatus",
     webhookPath,
+    startTime,
   );
 }
