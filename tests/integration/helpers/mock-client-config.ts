@@ -29,9 +29,7 @@ const ALL_CLIENT_FIXTURE_KEYS = Object.keys(
 ) as ClientFixtureKey[];
 
 function dedupe(values: string[]): string[] {
-  return values.filter(
-    (value, index, allValues) => allValues.indexOf(value) === index,
-  );
+  return [...new Set(values)];
 }
 
 export function getClientConfig(key: ClientFixtureKey): MockItClientConfig {

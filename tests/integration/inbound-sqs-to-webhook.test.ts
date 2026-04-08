@@ -38,6 +38,12 @@ import {
   processMessageStatusEvent,
 } from "./helpers/status-events";
 
+function compareStrings(a: string, b: string): number {
+  if (a > b) return 1;
+  if (a < b) return -1;
+  return 0;
+}
+
 describe("SQS to Webhook Integration", () => {
   let sqsClient: SQSClient;
   let cloudWatchClient: CloudWatchLogsClient;
@@ -136,10 +142,8 @@ describe("SQS to Webhook Integration", () => {
 
       const actualPaths = callbacks
         .map((callback) => callback.path)
-        .toSorted((a, b) => a.localeCompare(b));
-      expect(actualPaths).toEqual(
-        expectedPaths.toSorted((a, b) => a.localeCompare(b)),
-      );
+        .toSorted(compareStrings);
+      expect(actualPaths).toEqual(expectedPaths.toSorted(compareStrings));
 
       for (const callback of callbacks) {
         expect(callback.payload).toMatchObject({
