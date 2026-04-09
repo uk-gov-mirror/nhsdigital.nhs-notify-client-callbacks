@@ -43,8 +43,8 @@ cbFailures = cbFailures + 1
 local circuitAlreadyOpen = openedUntil > 0 and now < openedUntil
 
 if not circuitAlreadyOpen
-  and cbAttempts >= cbMinAttempts
-  and (cbFailures / cbAttempts) > cbErrorThreshold then
+    and cbAttempts >= cbMinAttempts
+    and (cbFailures / cbAttempts) > cbErrorThreshold then
   redis.call("HSET", cbKey,
     "opened_until_ms", now + cooldownMs,
     "cb_window_from", 0,

@@ -22,6 +22,7 @@ describe("EndpointGate", () => {
       cbWindowPeriodMs: 30_000,
       cbErrorThreshold: 0.5,
       cbMinAttempts: 4,
+      cbProbeIntervalMs: 10_000,
     });
   });
 
@@ -31,7 +32,7 @@ describe("EndpointGate", () => {
 
       const result = await gate.admit();
 
-      expect(result).toEqual({ allowed: true, effectiveRate: 5 });
+      expect(result).toEqual({ allowed: true, effectiveRate: 5, probe: false });
       expect(redis.eval).toHaveBeenCalledWith(
         expect.any(String),
         expect.objectContaining({
@@ -42,6 +43,7 @@ describe("EndpointGate", () => {
             "5000",
             "60000",
             "30000",
+            "10000",
           ]) as unknown,
         }),
       );
@@ -73,6 +75,14 @@ describe("EndpointGate", () => {
       });
     });
 
+    it("allows probe request when circuit is open and interval elapsed", async () => {
+      redis.eval.mockResolvedValueOnce([1, "probe", 0, 0]);
+
+      const result = await gate.admit();
+
+      expect(result).toEqual({ allowed: true, effectiveRate: 0, probe: true });
+    });
+
     it("handles missing retryAfterMs", async () => {
       redis.eval.mockResolvedValueOnce([0, "rate_limited", undefined, 5]);
 
@@ -91,7 +101,7 @@ describe("EndpointGate", () => {
 
       const result = await gate.admit();
 
-      expect(result).toEqual({ allowed: true, effectiveRate: 2 });
+      expect(result).toEqual({ allowed: true, effectiveRate: 2, probe: false });
     });
 
     it("defaults effectiveRate to 0 when missing from allowed response", async () => {
@@ -99,7 +109,7 @@ describe("EndpointGate", () => {
 
       const result = await gate.admit();
 
-      expect(result).toEqual({ allowed: true, effectiveRate: 0 });
+      expect(result).toEqual({ allowed: true, effectiveRate: 0, probe: false });
     });
 
     it("defaults effectiveRate to 0 when missing from denied response", async () => {
@@ -130,6 +140,7 @@ describe("EndpointGate", () => {
             "20",
             "30000",
             "300000",
+            "60000",
             "60000",
           ]) as unknown,
         }),

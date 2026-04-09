@@ -15,7 +15,7 @@ const RECORD_RESULT_LUA = readFileSync(
 );
 
 export type AdmitResult =
-  | { allowed: true; effectiveRate: number }
+  | { allowed: true; effectiveRate: number; probe: boolean }
   | {
       allowed: false;
       reason: "circuit_open" | "rate_limited";
@@ -37,6 +37,7 @@ export interface EndpointGateConfig {
   cbWindowPeriodMs: number;
   cbErrorThreshold: number;
   cbMinAttempts: number;
+  cbProbeIntervalMs: number;
 }
 
 const DEFAULT_CONFIG: EndpointGateConfig = {
@@ -47,6 +48,7 @@ const DEFAULT_CONFIG: EndpointGateConfig = {
   cbWindowPeriodMs: 60_000,
   cbErrorThreshold: 0.5,
   cbMinAttempts: 10,
+  cbProbeIntervalMs: 60_000,
 };
 
 export class EndpointGate {
@@ -78,11 +80,16 @@ export class EndpointGate {
         String(this.config.cooldownMs),
         String(this.config.decayPeriodMs),
         String(this.config.cbWindowPeriodMs),
+        String(this.config.cbProbeIntervalMs),
       ],
     })) as [number, string, number, number];
 
     if (Number(raw[0]) === 1) {
-      return { allowed: true, effectiveRate: Number(raw[3] ?? 0) };
+      return {
+        allowed: true,
+        effectiveRate: Number(raw[3] ?? 0),
+        probe: raw[1] === "probe",
+      };
     }
 
     return {

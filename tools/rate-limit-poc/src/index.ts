@@ -13,6 +13,7 @@ interface RunConfig {
   cbWindowPeriodMs: number;
   cbErrorThreshold: number;
   cbMinAttempts: number;
+  cbProbeIntervalMs: number;
   successRate: number;
   minDelayMs: number;
   maxDelayMs: number;
@@ -20,7 +21,7 @@ interface RunConfig {
 }
 
 interface RequestResult {
-  admitOutcome: "allowed" | "rate_limited" | "circuit_open";
+  admitOutcome: "allowed" | "probe" | "rate_limited" | "circuit_open";
   recordOutcome?: "success" | "failure";
   circuitOpened: boolean;
   effectiveRate: number;
@@ -30,6 +31,7 @@ interface WorkerStats {
   workerId: number;
   total: number;
   allowed: number;
+  probes: number;
   rateLimited: number;
   circuitOpen: number;
   successRecorded: number;
@@ -54,6 +56,7 @@ function parseConfig(): RunConfig {
     cbWindowPeriodMs: Number(env.CB_WINDOW_PERIOD_MS ?? "60000"),
     cbErrorThreshold: Number(env.CB_ERROR_THRESHOLD ?? "0.5"),
     cbMinAttempts: Number(env.CB_MIN_ATTEMPTS ?? "10"),
+    cbProbeIntervalMs: Number(env.CB_PROBE_INTERVAL_MS ?? "60000"),
     successRate: Number(env.SUCCESS_RATE ?? "0.9"),
     minDelayMs: Number(env.MIN_DELAY_MS ?? "5"),
     maxDelayMs: Number(env.MAX_DELAY_MS ?? "50"),
@@ -85,6 +88,8 @@ async function runSingleRequest(
     };
   }
 
+  const admitOutcome = result.probe ? "probe" : "allowed";
+
   await delay(randomInt(config.minDelayMs, config.maxDelayMs));
 
   const isSuccess = Math.random() > 1 - config.successRate; // NOSONAR — PoC only
@@ -92,7 +97,7 @@ async function runSingleRequest(
   const recordResult = await gate.recordResult(outcome);
 
   return {
-    admitOutcome: "allowed",
+    admitOutcome,
     recordOutcome: outcome,
     circuitOpened: !recordResult.ok && recordResult.state === "opened",
     effectiveRate: result.effectiveRate,
@@ -111,6 +116,7 @@ function summarize(
     workerId,
     total: results.length,
     allowed: results.filter((r) => r.admitOutcome === "allowed").length,
+    probes: results.filter((r) => r.admitOutcome === "probe").length,
     rateLimited: results.filter((r) => r.admitOutcome === "rate_limited")
       .length,
     circuitOpen: results.filter((r) => r.admitOutcome === "circuit_open")
@@ -177,6 +183,7 @@ async function runWorker(
     cbWindowPeriodMs: config.cbWindowPeriodMs,
     cbErrorThreshold: config.cbErrorThreshold,
     cbMinAttempts: config.cbMinAttempts,
+    cbProbeIntervalMs: config.cbProbeIntervalMs,
   });
 
   const start = Date.now();
@@ -197,6 +204,7 @@ function printWorkerStats(stats: WorkerStats): void {
   console.log(`\n  Worker ${stats.workerId}:`);
   console.log(`    Requests:     ${stats.total}`);
   console.log(`    Allowed:      ${stats.allowed}`);
+  console.log(`    Probes:       ${stats.probes}`);
   console.log(`    Rate limited: ${stats.rateLimited}`);
   console.log(`    Circuit open: ${stats.circuitOpen}`);
   console.log(`    Success:      ${stats.successRecorded}`);
@@ -243,6 +251,7 @@ async function run(): Promise<void> {
 
   const totalRequests = allStats.reduce((sum, s) => sum + s.total, 0);
   const totalAllowed = allStats.reduce((sum, s) => sum + s.allowed, 0);
+  const totalProbes = allStats.reduce((sum, s) => sum + s.probes, 0);
   const totalRateLimited = allStats.reduce((sum, s) => sum + s.rateLimited, 0);
   const totalCircuitOpen = allStats.reduce((sum, s) => sum + s.circuitOpen, 0);
   const totalSuccess = allStats.reduce((sum, s) => sum + s.successRecorded, 0);
@@ -253,6 +262,7 @@ async function run(): Promise<void> {
   console.log(`Workers:             ${config.workers}`);
   console.log(`Total requests:      ${totalRequests}`);
   console.log(`Total allowed:       ${totalAllowed}`);
+  console.log(`Total probes:        ${totalProbes}`);
   console.log(`Total rate limited:  ${totalRateLimited}`);
   console.log(`Total circuit open:  ${totalCircuitOpen}`);
   console.log(`Total success:       ${totalSuccess}`);
