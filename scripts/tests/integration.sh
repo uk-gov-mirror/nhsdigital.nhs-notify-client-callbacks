@@ -12,4 +12,4 @@ JEST_ARGS=()
 [ -n "${TEST_FILE:-}" ] && JEST_ARGS+=("$TEST_FILE")
 [ -n "${TEST_NAME:-}" ] && JEST_ARGS+=(--testNamePattern "$TEST_NAME")
 
-pnpm run test:integration -- "${JEST_ARGS[@]}"
+pnpm run test:integration "${JEST_ARGS[@]}"

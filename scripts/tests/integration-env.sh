@@ -19,13 +19,13 @@ for CLIENT_ENTRY in "${CLIENTS[@]}"; do
   CLIENT_ID=$(jq -r '.clientId' "${SEED_CONFIG_FILE}")
 
   echo "Retrieving client config for ${CLIENT_ID}"
-  CLIENT_CONFIG=$(pnpm run --silent clients:get -- \
+  CLIENT_CONFIG=$(pnpm run --silent clients:get \
     --client-id "${CLIENT_ID}" \
     --environment "${ENVIRONMENT}" \
     --region "${AWS_REGION}")
 
   echo "Retrieving application ID for ${CLIENT_ID}"
-  APPLICATION_ID=$(pnpm run --silent applications-map:get -- \
+  APPLICATION_ID=$(pnpm run --silent applications-map:get \
     --client-id "${CLIENT_ID}" \
     --environment "${ENVIRONMENT}" \
     --region "${AWS_REGION}")
