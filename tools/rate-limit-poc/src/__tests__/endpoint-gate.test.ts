@@ -19,16 +19,17 @@ describe("EndpointGate", () => {
       refillPerSec: 5,
       failureThreshold: 3,
       cooldownMs: 5000,
+      decayPeriodMs: 60_000,
     });
   });
 
   describe("admit", () => {
     it("returns allowed when token is available", async () => {
-      redis.eval.mockResolvedValueOnce([1, "allowed", 0]);
+      redis.eval.mockResolvedValueOnce([1, "allowed", 0, 5]);
 
       const result = await gate.admit();
 
-      expect(result).toEqual({ allowed: true });
+      expect(result).toEqual({ allowed: true, effectiveRate: 5 });
       expect(redis.eval).toHaveBeenCalledWith(
         expect.any(String),
         expect.objectContaining({
@@ -36,15 +37,15 @@ describe("EndpointGate", () => {
           arguments: expect.arrayContaining([
             "10",
             "5",
-            "3",
             "5000",
+            "60000",
           ]) as unknown,
         }),
       );
     });
 
     it("returns rate_limited when tokens exhausted", async () => {
-      redis.eval.mockResolvedValueOnce([0, "rate_limited", 1000]);
+      redis.eval.mockResolvedValueOnce([0, "rate_limited", 1000, 5]);
 
       const result = await gate.admit();
 
@@ -52,11 +53,12 @@ describe("EndpointGate", () => {
         allowed: false,
         reason: "rate_limited",
         retryAfterMs: 1000,
+        effectiveRate: 5,
       });
     });
 
     it("returns circuit_open when circuit breaker is open", async () => {
-      redis.eval.mockResolvedValueOnce([0, "circuit_open", 25_000]);
+      redis.eval.mockResolvedValueOnce([0, "circuit_open", 25_000, 0]);
 
       const result = await gate.admit();
 
@@ -64,11 +66,12 @@ describe("EndpointGate", () => {
         allowed: false,
         reason: "circuit_open",
         retryAfterMs: 25_000,
+        effectiveRate: 0,
       });
     });
 
     it("handles missing retryAfterMs", async () => {
-      redis.eval.mockResolvedValueOnce([0, "rate_limited", undefined]);
+      redis.eval.mockResolvedValueOnce([0, "rate_limited", undefined, 5]);
 
       const result = await gate.admit();
 
@@ -76,12 +79,42 @@ describe("EndpointGate", () => {
         allowed: false,
         reason: "rate_limited",
         retryAfterMs: 0,
+        effectiveRate: 5,
+      });
+    });
+
+    it("returns reduced effectiveRate during ramp-up", async () => {
+      redis.eval.mockResolvedValueOnce([1, "allowed", 0, 2]);
+
+      const result = await gate.admit();
+
+      expect(result).toEqual({ allowed: true, effectiveRate: 2 });
+    });
+
+    it("defaults effectiveRate to 0 when missing from allowed response", async () => {
+      redis.eval.mockResolvedValueOnce([1, "allowed", 0, undefined]);
+
+      const result = await gate.admit();
+
+      expect(result).toEqual({ allowed: true, effectiveRate: 0 });
+    });
+
+    it("defaults effectiveRate to 0 when missing from denied response", async () => {
+      redis.eval.mockResolvedValueOnce([0, "rate_limited", 1000, undefined]);
+
+      const result = await gate.admit();
+
+      expect(result).toEqual({
+        allowed: false,
+        reason: "rate_limited",
+        retryAfterMs: 1000,
+        effectiveRate: 0,
       });
     });
 
     it("uses default config when no overrides provided", async () => {
       const defaultGate = new EndpointGate(redis, "default-endpoint");
-      redis.eval.mockResolvedValueOnce([1, "allowed", 0]);
+      redis.eval.mockResolvedValueOnce([1, "allowed", 0, 20]);
 
       await defaultGate.admit();
 
@@ -92,8 +125,8 @@ describe("EndpointGate", () => {
           arguments: expect.arrayContaining([
             "100",
             "20",
-            "5",
             "30000",
+            "300000",
           ]) as unknown,
         }),
       );
@@ -111,7 +144,12 @@ describe("EndpointGate", () => {
         expect.any(String),
         expect.objectContaining({
           keys: ["cb:{test-endpoint}"],
-          arguments: expect.arrayContaining(["1", "3", "5000"]) as unknown,
+          arguments: expect.arrayContaining([
+            "1",
+            "3",
+            "5000",
+            "60000",
+          ]) as unknown,
         }),
       );
     });

@@ -15,11 +15,12 @@ const RECORD_RESULT_LUA = readFileSync(
 );
 
 export type AdmitResult =
-  | { allowed: true }
+  | { allowed: true; effectiveRate: number }
   | {
       allowed: false;
       reason: "circuit_open" | "rate_limited";
       retryAfterMs: number;
+      effectiveRate: number;
     };
 
 export type RecordResultOutcome =
@@ -33,6 +34,7 @@ export interface EndpointGateConfig {
   refillPerSec: number;
   failureThreshold: number;
   cooldownMs: number;
+  decayPeriodMs: number;
 }
 
 const DEFAULT_CONFIG: EndpointGateConfig = {
@@ -40,6 +42,7 @@ const DEFAULT_CONFIG: EndpointGateConfig = {
   refillPerSec: 20,
   failureThreshold: 5,
   cooldownMs: 30_000,
+  decayPeriodMs: 300_000,
 };
 
 export class EndpointGate {
@@ -68,19 +71,20 @@ export class EndpointGate {
         String(Date.now()),
         String(this.config.capacity),
         String(this.config.refillPerSec),
-        String(this.config.failureThreshold),
         String(this.config.cooldownMs),
+        String(this.config.decayPeriodMs),
       ],
-    })) as [number, string, number];
+    })) as [number, string, number, number];
 
     if (Number(raw[0]) === 1) {
-      return { allowed: true };
+      return { allowed: true, effectiveRate: Number(raw[3] ?? 0) };
     }
 
     return {
       allowed: false,
       reason: raw[1] as "circuit_open" | "rate_limited",
       retryAfterMs: Number(raw[2] ?? 0),
+      effectiveRate: Number(raw[3] ?? 0),
     };
   }
 
@@ -92,6 +96,7 @@ export class EndpointGate {
         outcome === "success" ? "1" : "0",
         String(this.config.failureThreshold),
         String(this.config.cooldownMs),
+        String(this.config.decayPeriodMs),
       ],
     })) as [number, string];
 

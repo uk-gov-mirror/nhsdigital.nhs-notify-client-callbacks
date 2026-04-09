@@ -3,8 +3,8 @@
 -- ARGV[1] = now_ms
 -- ARGV[2] = capacity
 -- ARGV[3] = refill_per_sec
--- ARGV[4] = failure_threshold
--- ARGV[5] = cooldown_ms
+-- ARGV[4] = cooldown_ms
+-- ARGV[5] = decay_period_ms
 
 local cbKey = KEYS[1]
 local rlKey = KEYS[2]
@@ -12,8 +12,8 @@ local rlKey = KEYS[2]
 local now = tonumber(ARGV[1])
 local capacity = tonumber(ARGV[2])
 local refillPerSec = tonumber(ARGV[3])
-local failureThreshold = tonumber(ARGV[4])
-local cooldownMs = tonumber(ARGV[5])
+local cooldownMs = tonumber(ARGV[4])
+local decayPeriodMs = tonumber(ARGV[5])
 
 local cb = redis.call("HMGET", cbKey, "state", "failures", "opened_until_ms", "probe_in_flight")
 local state = cb[1] or "closed"
@@ -27,7 +27,7 @@ local lastRefill = tonumber(rl[2] or now)
 
 if state == "open" then
   if now < openedUntil then
-    return { 0, "circuit_open", openedUntil - now }
+    return { 0, "circuit_open", openedUntil - now, 0 }
   end
   state = "half_open"
   probeInFlight = 0
@@ -35,14 +35,26 @@ end
 
 if state == "half_open" then
   if probeInFlight == 1 then
-    return { 0, "circuit_open", cooldownMs }
+    return { 0, "circuit_open", cooldownMs, 0 }
   end
   probeInFlight = 1
 end
 
+local effectiveRate = refillPerSec
+
+if openedUntil > 0 and now > openedUntil and decayPeriodMs > 0 then
+  local sinceClose = now - openedUntil
+  if sinceClose >= decayPeriodMs then
+    openedUntil = 0
+  else
+    local fraction = sinceClose / decayPeriodMs
+    effectiveRate = math.max(1, math.floor(refillPerSec * fraction))
+  end
+end
+
 local elapsed = now - lastRefill
 if elapsed > 0 then
-  local refill = math.floor((elapsed * refillPerSec) / 1000)
+  local refill = math.floor((elapsed * effectiveRate) / 1000)
   if refill > 0 then
     tokens = math.min(capacity, tokens + refill)
     lastRefill = now
@@ -60,7 +72,7 @@ if tokens < 1 then
     "tokens", tokens,
     "last_refill_ms", lastRefill
   )
-  return { 0, "rate_limited", 1000 }
+  return { 0, "rate_limited", 1000, effectiveRate }
 end
 
 tokens = tokens - 1
@@ -79,4 +91,4 @@ redis.call("HSET", rlKey,
 redis.call("EXPIRE", cbKey, math.ceil(cooldownMs / 1000) + 60)
 redis.call("EXPIRE", rlKey, 120)
 
-return { 1, "allowed", 0 }
+return { 1, "allowed", 0, effectiveRate }

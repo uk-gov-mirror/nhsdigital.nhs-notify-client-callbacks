@@ -10,6 +10,7 @@ interface RunConfig {
   refillPerSec: number;
   failureThreshold: number;
   cooldownMs: number;
+  decayPeriodMs: number;
   successRate: number;
   minDelayMs: number;
   maxDelayMs: number;
@@ -20,6 +21,7 @@ interface RequestResult {
   admitOutcome: "allowed" | "rate_limited" | "circuit_open";
   recordOutcome?: "success" | "failure";
   circuitOpened: boolean;
+  effectiveRate: number;
 }
 
 interface WorkerStats {
@@ -31,6 +33,8 @@ interface WorkerStats {
   successRecorded: number;
   failureRecorded: number;
   circuitOpened: number;
+  minEffectiveRate: number;
+  maxEffectiveRate: number;
   durationMs: number;
 }
 
@@ -45,6 +49,7 @@ function parseConfig(): RunConfig {
     refillPerSec: Number(env.REFILL_PER_SEC ?? "20"),
     failureThreshold: Number(env.FAILURE_THRESHOLD ?? "5"),
     cooldownMs: Number(env.COOLDOWN_MS ?? "30000"),
+    decayPeriodMs: Number(env.DECAY_PERIOD_MS ?? "300000"),
     successRate: Number(env.SUCCESS_RATE ?? "0.9"),
     minDelayMs: Number(env.MIN_DELAY_MS ?? "5"),
     maxDelayMs: Number(env.MAX_DELAY_MS ?? "50"),
@@ -69,7 +74,11 @@ async function runSingleRequest(
   const result = await gate.admit();
 
   if (!result.allowed) {
-    return { admitOutcome: result.reason, circuitOpened: false };
+    return {
+      admitOutcome: result.reason,
+      circuitOpened: false,
+      effectiveRate: result.effectiveRate,
+    };
   }
 
   await delay(randomInt(config.minDelayMs, config.maxDelayMs));
@@ -82,6 +91,7 @@ async function runSingleRequest(
     admitOutcome: "allowed",
     recordOutcome: outcome,
     circuitOpened: !recordResult.ok && recordResult.state === "opened",
+    effectiveRate: result.effectiveRate,
   };
 }
 
@@ -90,6 +100,9 @@ function summarize(
   results: RequestResult[],
   durationMs: number,
 ): WorkerStats {
+  const effectiveRates = results
+    .map((r) => r.effectiveRate)
+    .filter((r) => r > 0);
   return {
     workerId,
     total: results.length,
@@ -103,6 +116,10 @@ function summarize(
     failureRecorded: results.filter((r) => r.recordOutcome === "failure")
       .length,
     circuitOpened: results.filter((r) => r.circuitOpened).length,
+    minEffectiveRate:
+      effectiveRates.length > 0 ? Math.min(...effectiveRates) : 0,
+    maxEffectiveRate:
+      effectiveRates.length > 0 ? Math.max(...effectiveRates) : 0,
     durationMs,
   };
 }
@@ -153,6 +170,7 @@ async function runWorker(
     refillPerSec: config.refillPerSec,
     failureThreshold: config.failureThreshold,
     cooldownMs: config.cooldownMs,
+    decayPeriodMs: config.decayPeriodMs,
   });
 
   const start = Date.now();
@@ -178,6 +196,9 @@ function printWorkerStats(stats: WorkerStats): void {
   console.log(`    Success:      ${stats.successRecorded}`);
   console.log(`    Failure:      ${stats.failureRecorded}`);
   console.log(`    CB opened:    ${stats.circuitOpened}`);
+  console.log(
+    `    Eff. rate:    ${stats.minEffectiveRate}–${stats.maxEffectiveRate} req/s`,
+  );
   console.log(`    Duration:     ${stats.durationMs}ms`);
   console.log(
     `    Throughput:   ${((stats.total / stats.durationMs) * 1000).toFixed(1)} calls/s (${((stats.allowed / stats.durationMs) * 1000).toFixed(1)} allowed/s)`,
