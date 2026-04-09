@@ -33,12 +33,7 @@ describe("EndpointGate", () => {
         expect.any(String),
         expect.objectContaining({
           keys: ["cb:{test-endpoint}", "rl:{test-endpoint}"],
-          arguments: expect.arrayContaining([
-            "10",
-            "5",
-            "3",
-            "5000",
-          ]) as unknown,
+          arguments: expect.arrayContaining(["10", "5", "5000"]) as unknown,
         }),
       );
     });
@@ -89,12 +84,7 @@ describe("EndpointGate", () => {
         expect.any(String),
         expect.objectContaining({
           keys: ["cb:{default-endpoint}", "rl:{default-endpoint}"],
-          arguments: expect.arrayContaining([
-            "100",
-            "20",
-            "5",
-            "30000",
-          ]) as unknown,
+          arguments: expect.arrayContaining(["100", "20", "30000"]) as unknown,
         }),
       );
     });

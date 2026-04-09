@@ -68,7 +68,6 @@ export class EndpointGate {
         String(Date.now()),
         String(this.config.capacity),
         String(this.config.refillPerSec),
-        String(this.config.failureThreshold),
         String(this.config.cooldownMs),
       ],
     })) as [number, string, number];
