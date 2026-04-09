@@ -5,6 +5,7 @@
 -- ARGV[3] = refill_per_sec
 -- ARGV[4] = cooldown_ms
 -- ARGV[5] = decay_period_ms
+-- ARGV[6] = cb_window_period_ms
 
 local cbKey = KEYS[1]
 local rlKey = KEYS[2]
@@ -14,30 +15,31 @@ local capacity = tonumber(ARGV[2])
 local refillPerSec = tonumber(ARGV[3])
 local cooldownMs = tonumber(ARGV[4])
 local decayPeriodMs = tonumber(ARGV[5])
+local cbWindowPeriodMs = tonumber(ARGV[6])
 
-local cb = redis.call("HMGET", cbKey, "state", "failures", "opened_until_ms", "probe_in_flight")
-local state = cb[1] or "closed"
-local failures = tonumber(cb[2] or "0")
-local openedUntil = tonumber(cb[3] or "0")
-local probeInFlight = tonumber(cb[4] or "0")
+local cb = redis.call("HMGET", cbKey,
+  "opened_until_ms", "cb_window_from", "cb_failures", "cb_attempts")
+local openedUntil = tonumber(cb[1] or "0")
+local cbWindowFrom = tonumber(cb[2] or "0")
+local cbFailures = tonumber(cb[3] or "0")
+local cbAttempts = tonumber(cb[4] or "0")
 
 local rl = redis.call("HMGET", rlKey, "tokens", "last_refill_ms")
 local tokens = tonumber(rl[1] or capacity)
 local lastRefill = tonumber(rl[2] or now)
 
-if state == "open" then
-  if now < openedUntil then
-    return { 0, "circuit_open", openedUntil - now, 0 }
-  end
-  state = "half_open"
-  probeInFlight = 0
+if openedUntil > 0 and now < openedUntil then
+  return { 0, "circuit_open", openedUntil - now, 0 }
 end
 
-if state == "half_open" then
-  if probeInFlight == 1 then
-    return { 0, "circuit_open", cooldownMs, 0 }
-  end
-  probeInFlight = 1
+if cbWindowFrom > 0 and (now - cbWindowFrom) > cbWindowPeriodMs then
+  cbFailures = 0
+  cbAttempts = 0
+  cbWindowFrom = now
+end
+
+if cbWindowFrom == 0 then
+  cbWindowFrom = now
 end
 
 local effectiveRate = refillPerSec
@@ -63,10 +65,10 @@ end
 
 if tokens < 1 then
   redis.call("HSET", cbKey,
-    "state", state,
-    "failures", failures,
     "opened_until_ms", openedUntil,
-    "probe_in_flight", probeInFlight
+    "cb_window_from", cbWindowFrom,
+    "cb_failures", cbFailures,
+    "cb_attempts", cbAttempts
   )
   redis.call("HSET", rlKey,
     "tokens", tokens,
@@ -78,10 +80,10 @@ end
 tokens = tokens - 1
 
 redis.call("HSET", cbKey,
-  "state", state,
-  "failures", failures,
   "opened_until_ms", openedUntil,
-  "probe_in_flight", probeInFlight
+  "cb_window_from", cbWindowFrom,
+  "cb_failures", cbFailures,
+  "cb_attempts", cbAttempts
 )
 redis.call("HSET", rlKey,
   "tokens", tokens,

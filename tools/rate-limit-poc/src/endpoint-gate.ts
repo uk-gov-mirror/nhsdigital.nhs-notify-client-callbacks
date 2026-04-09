@@ -32,17 +32,21 @@ export type Outcome = "success" | "failure";
 export interface EndpointGateConfig {
   capacity: number;
   refillPerSec: number;
-  failureThreshold: number;
   cooldownMs: number;
   decayPeriodMs: number;
+  cbWindowPeriodMs: number;
+  cbErrorThreshold: number;
+  cbMinAttempts: number;
 }
 
 const DEFAULT_CONFIG: EndpointGateConfig = {
   capacity: 100,
   refillPerSec: 20,
-  failureThreshold: 5,
   cooldownMs: 30_000,
   decayPeriodMs: 300_000,
+  cbWindowPeriodMs: 60_000,
+  cbErrorThreshold: 0.5,
+  cbMinAttempts: 10,
 };
 
 export class EndpointGate {
@@ -73,6 +77,7 @@ export class EndpointGate {
         String(this.config.refillPerSec),
         String(this.config.cooldownMs),
         String(this.config.decayPeriodMs),
+        String(this.config.cbWindowPeriodMs),
       ],
     })) as [number, string, number, number];
 
@@ -94,9 +99,10 @@ export class EndpointGate {
       arguments: [
         String(Date.now()),
         outcome === "success" ? "1" : "0",
-        String(this.config.failureThreshold),
         String(this.config.cooldownMs),
         String(this.config.decayPeriodMs),
+        String(this.config.cbErrorThreshold),
+        String(this.config.cbMinAttempts),
       ],
     })) as [number, string];
 

@@ -17,9 +17,11 @@ describe("EndpointGate", () => {
     gate = new EndpointGate(redis, "test-endpoint", {
       capacity: 10,
       refillPerSec: 5,
-      failureThreshold: 3,
       cooldownMs: 5000,
       decayPeriodMs: 60_000,
+      cbWindowPeriodMs: 30_000,
+      cbErrorThreshold: 0.5,
+      cbMinAttempts: 4,
     });
   });
 
@@ -39,6 +41,7 @@ describe("EndpointGate", () => {
             "5",
             "5000",
             "60000",
+            "30000",
           ]) as unknown,
         }),
       );
@@ -127,6 +130,7 @@ describe("EndpointGate", () => {
             "20",
             "30000",
             "300000",
+            "60000",
           ]) as unknown,
         }),
       );
@@ -146,9 +150,10 @@ describe("EndpointGate", () => {
           keys: ["cb:{test-endpoint}"],
           arguments: expect.arrayContaining([
             "1",
-            "3",
             "5000",
             "60000",
+            "0.5",
+            "4",
           ]) as unknown,
         }),
       );

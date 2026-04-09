@@ -8,9 +8,11 @@ interface RunConfig {
   workers: number;
   capacity: number;
   refillPerSec: number;
-  failureThreshold: number;
   cooldownMs: number;
   decayPeriodMs: number;
+  cbWindowPeriodMs: number;
+  cbErrorThreshold: number;
+  cbMinAttempts: number;
   successRate: number;
   minDelayMs: number;
   maxDelayMs: number;
@@ -47,9 +49,11 @@ function parseConfig(): RunConfig {
     workers: Number(env.WORKERS ?? "1"),
     capacity: Number(env.CAPACITY ?? "100"),
     refillPerSec: Number(env.REFILL_PER_SEC ?? "20"),
-    failureThreshold: Number(env.FAILURE_THRESHOLD ?? "5"),
     cooldownMs: Number(env.COOLDOWN_MS ?? "30000"),
     decayPeriodMs: Number(env.DECAY_PERIOD_MS ?? "300000"),
+    cbWindowPeriodMs: Number(env.CB_WINDOW_PERIOD_MS ?? "60000"),
+    cbErrorThreshold: Number(env.CB_ERROR_THRESHOLD ?? "0.5"),
+    cbMinAttempts: Number(env.CB_MIN_ATTEMPTS ?? "10"),
     successRate: Number(env.SUCCESS_RATE ?? "0.9"),
     minDelayMs: Number(env.MIN_DELAY_MS ?? "5"),
     maxDelayMs: Number(env.MAX_DELAY_MS ?? "50"),
@@ -168,9 +172,11 @@ async function runWorker(
   const gate = new EndpointGate(redis as RedisClientType, config.endpoint, {
     capacity: config.capacity,
     refillPerSec: config.refillPerSec,
-    failureThreshold: config.failureThreshold,
     cooldownMs: config.cooldownMs,
     decayPeriodMs: config.decayPeriodMs,
+    cbWindowPeriodMs: config.cbWindowPeriodMs,
+    cbErrorThreshold: config.cbErrorThreshold,
+    cbMinAttempts: config.cbMinAttempts,
   });
 
   const start = Date.now();
