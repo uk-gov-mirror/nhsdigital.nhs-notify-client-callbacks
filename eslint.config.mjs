@@ -71,6 +71,7 @@ export default defineConfig([
             "tests/performance/tsconfig.json",
             "tests/test-support/tsconfig.json",
             "tests/test-team/tsconfig.json",
+            "tools/*/tsconfig.json",
             "utils/*/tsconfig.json",
           ],
         }),
@@ -200,7 +201,12 @@ export default defineConfig([
     },
   },
   {
-    files: ["**/utils/**", "tests/test-team/**", "tests/performance/helpers/**", "lambdas/**/src/**"],
+    files: [
+      "**/utils/**",
+      "tests/test-team/**",
+      "tests/performance/helpers/**",
+      "lambdas/**/src/**",
+    ],
     rules: {
       "import-x/prefer-default-export": 0,
     },
@@ -262,6 +268,13 @@ export default defineConfig([
     rules: {
       "no-console": "off",
       "import-x/first": "off",
+    },
+  },
+  {
+    files: ["tools/rate-limit-poc/**/*.ts"],
+    rules: {
+      "no-console": "off",
+      "sonarjs/pseudo-random": "off",
     },
   },
   {

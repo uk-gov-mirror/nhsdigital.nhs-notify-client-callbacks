@@ -79,6 +79,7 @@
     "tests/integration",
     "tests/performance",
     "tests/test-support",
-    "tools/client-subscriptions-management"
+    "tools/client-subscriptions-management",
+    "tools/rate-limit-poc"
   ]
 }
