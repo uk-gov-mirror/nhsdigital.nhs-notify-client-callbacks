@@ -66,7 +66,7 @@ catalogs:
     "@types/aws-lambda": "^8.10.161"
     "@types/node": "^24.12.0"
     "@types/yargs": "^17.0.24"
-    esbuild: "^0.27.4"
+    esbuild: "^0.28.0"
     ts-node: "^10.9.2"
     tsx: "^4.21.0"
     typescript: "^5.9.3"
