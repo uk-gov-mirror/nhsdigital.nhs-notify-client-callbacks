@@ -8,7 +8,7 @@ include scripts/init.mk
 # Example CI/CD targets are: dependencies, build, clean, etc.
 
 dependencies: # Install dependencies needed to build and test the project @Pipeline
-	npm ci
+	pnpm install --frozen-lockfile
 
 build: # Build the project artefact @Pipeline
 	(cd docs && make build)

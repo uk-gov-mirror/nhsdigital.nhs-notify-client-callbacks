@@ -41,7 +41,7 @@ async function buildResponse(
     requestContext?: { http?: { method?: string } };
   };
   const headers = Object.fromEntries(
-    Object.entries(event.headers).map(([k, v]) => [k.toLowerCase(), v]),
+    Object.entries(event.headers).map(([k, v]) => [String(k).toLowerCase(), v]),
   ) as Record<string, string | undefined>;
 
   const path = event.path ?? eventWithFunctionUrlFields.rawPath;

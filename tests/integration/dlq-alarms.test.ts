@@ -16,7 +16,7 @@ function buildDlqDepthAlarmName(
 }
 
 function getQueueNameFromUrl(queueUrl: string): string {
-  const queueName = queueUrl.split("/").pop();
+  const queueName = /\/([^/]+)$/.exec(queueUrl)?.[1];
   if (!queueName) {
     throw new Error(`Unable to derive queue name from URL: ${queueUrl}`);
   }

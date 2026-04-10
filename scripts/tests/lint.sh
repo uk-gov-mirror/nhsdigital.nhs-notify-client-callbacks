@@ -5,5 +5,5 @@ set -euo pipefail
 cd "$(git rev-parse --show-toplevel)"
 
 # Run linting across all workspaces
-npm ci
-npm run lint
+pnpm install --frozen-lockfile
+pnpm run lint

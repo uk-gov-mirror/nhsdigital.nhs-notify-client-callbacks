@@ -18,9 +18,9 @@ for _tfvar_file in \
 done
 echo "deploy_mock_clients resolved to: ${deploy_mock_clients}"
 
-npm ci
+pnpm install --frozen-lockfile
 
-npm run generate-dependencies --workspaces --if-present
+pnpm run generate-dependencies
 
 "${script_dir}/sync-client-config.sh"
 
@@ -36,4 +36,4 @@ if [ "${deploy_mock_clients}" == "true" ]; then
   fi
 fi
 
-npm run lambda-build --workspaces --if-present
+pnpm run --recursive --if-present lambda-build
