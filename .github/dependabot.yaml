@@ -1,7 +1,6 @@
 version: 2
 
 updates:
-
   - package-ecosystem: "docker"
     directory: "/"
     schedule:
@@ -24,6 +23,30 @@ updates:
       default-days: 7
     exclude-paths:
       - "docs/adr/assets/ADR-003/examples/**"
+    groups:
+      aws-sdk:
+        patterns:
+          - "@aws-sdk/*"
+      eslint:
+        patterns:
+          - "eslint"
+          - "eslint-*"
+          - "@eslint/*"
+          - "@typescript-eslint/*"
+          - "typescript-eslint"
+          - "@stylistic/*"
+      jest:
+        patterns:
+          - "jest"
+          - "jest-*"
+          - "ts-jest"
+          - "@types/jest"
+      typescript:
+        patterns:
+          - "typescript"
+          - "ts-node"
+          - "tsx"
+          - "@tsconfig/*"
 
   - package-ecosystem: "pip"
     directory: "/"
