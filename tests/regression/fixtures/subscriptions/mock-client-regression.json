@@ -1,0 +1,61 @@
+{
+  "clientId": "mock-client-regression",
+  "subscriptions": [
+    {
+      "subscriptionId": "sub-reg-msg-status",
+      "subscriptionType": "MessageStatus",
+      "messageStatuses": [
+        "DELIVERED",
+        "FAILED",
+        "SENDING",
+        "PENDING_ENRICHMENT",
+        "ENRICHED"
+      ],
+      "targetIds": [
+        "target-reg-webhook"
+      ]
+    },
+    {
+      "subscriptionId": "sub-reg-ch-status-nhsapp",
+      "subscriptionType": "ChannelStatus",
+      "channelType": "NHSAPP",
+      "channelStatuses": [
+        "DELIVERED"
+      ],
+      "supplierStatuses": [
+        "delivered",
+        "read"
+      ],
+      "targetIds": [
+        "target-reg-webhook"
+      ]
+    },
+    {
+      "subscriptionId": "sub-reg-ch-status-sms",
+      "subscriptionType": "ChannelStatus",
+      "channelType": "SMS",
+      "channelStatuses": [
+        "DELIVERED"
+      ],
+      "supplierStatuses": [
+        "delivered"
+      ],
+      "targetIds": [
+        "target-reg-webhook"
+      ]
+    }
+  ],
+  "targets": [
+    {
+      "targetId": "target-reg-webhook",
+      "type": "API",
+      "invocationEndpoint": "https://REPLACED_BY_TERRAFORM",
+      "invocationMethod": "POST",
+      "invocationRateLimit": 10,
+      "apiKey": {
+        "headerName": "x-api-key",
+        "headerValue": "REPLACED_BY_TERRAFORM"
+      }
+    }
+  ]
+}

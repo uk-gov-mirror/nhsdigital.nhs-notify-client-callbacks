@@ -49,6 +49,7 @@
     "lint:fix": "pnpm -r run lint:fix",
     "start": "pnpm --filter frontend run start",
     "test:integration": "pnpm --filter './tests/integration' run test:integration",
+    "test:regression": "pnpm --filter './tests/regression' run test:regression",
     "test:unit": "pnpm -r run test:unit",
     "test:unit:silent": "LOG_LEVEL=silent pnpm -r run test:unit",
     "typecheck": "pnpm -r run typecheck",

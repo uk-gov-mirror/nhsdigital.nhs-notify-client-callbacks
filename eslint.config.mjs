@@ -69,6 +69,7 @@ export default defineConfig([
             "lambdas/*/tsconfig.json",
             "tests/integration/tsconfig.json",
             "tests/performance/tsconfig.json",
+            "tests/regression/tsconfig.json",
             "tests/test-support/tsconfig.json",
             "tests/test-team/tsconfig.json",
             "utils/*/tsconfig.json",
@@ -221,6 +222,10 @@ export default defineConfig([
       "tests/integration/*.test.ts",
       "tests/performance/helpers/**",
       "tests/performance/*.test.ts",
+      "tests/regression/helpers/**",
+      "tests/regression/*.test.ts",
+      "tests/regression/jest.global-setup.ts",
+      "tests/regression/jest.global-teardown.ts",
       "tests/test-support/helpers/**",
     ],
     rules: {
@@ -273,6 +278,12 @@ export default defineConfig([
   },
   {
     files: ["tests/performance/**/*.ts"],
+    rules: {
+      "no-console": "off",
+    },
+  },
+  {
+    files: ["tests/regression/**/*.ts"],
     rules: {
       "no-console": "off",
     },

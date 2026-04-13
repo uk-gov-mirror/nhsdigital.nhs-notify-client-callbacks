@@ -19,6 +19,12 @@ publish: # Publish the project artefact @Pipeline
 deploy: # Deploy the project artefact to the target environment @Pipeline
 	# TODO: Implement the artefact deployment step
 
+test-regression: # Run regression tests from scripts/tests/regression @Testing
+	make _test name="regression"
+
+test-regression-local: # Run regression tests locally (requires ENVIRONMENT, AWS_PROFILE) @Testing
+	make _test name="regression-local"
+
 clean:: # Clean-up project resources (main) @Operations
 	rm -f .version version.json
 	rm -rf node_modules

@@ -1,0 +1,18 @@
+{
+  "compilerOptions": {
+    "baseUrl": ".",
+    "isolatedModules": true,
+    "paths": {
+      "helpers": [
+        "./helpers/index"
+      ]
+    },
+    "resolveJsonModule": true,
+    "types": ["jest"]
+  },
+  "extends": "../../tsconfig.base.json",
+  "include": [
+    "**/*.ts",
+    "jest.config.ts"
+  ]
+}
