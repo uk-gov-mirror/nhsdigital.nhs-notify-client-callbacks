@@ -314,15 +314,18 @@ importers:
       '@types/jest':
         specifier: catalog:test
         version: 30.0.0
+      '@types/node':
+        specifier: catalog:tools
+        version: 24.12.0
       eslint:
         specifier: catalog:lint
         version: 9.39.4
       jest:
         specifier: catalog:test
-        version: 30.3.0(@types/node@25.5.0)(ts-node@10.9.2(@types/node@25.5.0)(typescript@5.9.3))
+        version: 30.3.0(@types/node@24.12.0)(ts-node@10.9.2(@types/node@25.5.0)(typescript@5.9.3))
       jest-mock-extended:
         specifier: catalog:test
-        version: 4.0.0(@jest/globals@30.3.0)(jest@30.3.0(@types/node@25.5.0)(ts-node@10.9.2(@types/node@25.5.0)(typescript@5.9.3)))(typescript@5.9.3)
+        version: 4.0.0(@jest/globals@30.3.0)(jest@30.3.0(@types/node@24.12.0)(ts-node@10.9.2(@types/node@25.5.0)(typescript@5.9.3)))(typescript@5.9.3)
       typescript:
         specifier: catalog:tools
         version: 5.9.3
@@ -382,15 +385,18 @@ importers:
       '@types/jest':
         specifier: catalog:test
         version: 30.0.0
+      '@types/node':
+        specifier: catalog:tools
+        version: 24.12.0
       eslint:
         specifier: catalog:lint
         version: 9.39.4
       jest:
         specifier: catalog:test
-        version: 30.3.0(@types/node@25.5.0)(ts-node@10.9.2(@types/node@25.5.0)(typescript@5.9.3))
+        version: 30.3.0(@types/node@24.12.0)(ts-node@10.9.2(@types/node@25.5.0)(typescript@5.9.3))
       ts-jest:
         specifier: catalog:test
-        version: 29.4.9(@babel/core@7.29.0)(@jest/transform@30.3.0)(@jest/types@30.3.0)(babel-jest@30.3.0(@babel/core@7.29.0))(esbuild@0.28.0)(jest-util@30.3.0)(jest@30.3.0(@types/node@25.5.0)(ts-node@10.9.2(@types/node@25.5.0)(typescript@5.9.3)))(typescript@5.9.3)
+        version: 29.4.9(@babel/core@7.29.0)(@jest/transform@30.3.0)(@jest/types@30.3.0)(babel-jest@30.3.0(@babel/core@7.29.0))(esbuild@0.28.0)(jest-util@30.3.0)(jest@30.3.0(@types/node@24.12.0)(ts-node@10.9.2(@types/node@25.5.0)(typescript@5.9.3)))(typescript@5.9.3)
       typescript:
         specifier: catalog:tools
         version: 5.9.3
@@ -8180,6 +8186,13 @@ snapshots:
       pretty-format: 30.3.0
       slash: 3.0.0
       stack-utils: 2.0.6
+
+  jest-mock-extended@4.0.0(@jest/globals@30.3.0)(jest@30.3.0(@types/node@24.12.0)(ts-node@10.9.2(@types/node@25.5.0)(typescript@5.9.3)))(typescript@5.9.3):
+    dependencies:
+      '@jest/globals': 30.3.0
+      jest: 30.3.0(@types/node@24.12.0)(ts-node@10.9.2(@types/node@25.5.0)(typescript@5.9.3))
+      ts-essentials: 10.1.1(typescript@5.9.3)
+      typescript: 5.9.3
 
   jest-mock-extended@4.0.0(@jest/globals@30.3.0)(jest@30.3.0(@types/node@25.5.0)(ts-node@10.9.2(@types/node@25.5.0)(typescript@5.9.3)))(typescript@5.9.3):
     dependencies:

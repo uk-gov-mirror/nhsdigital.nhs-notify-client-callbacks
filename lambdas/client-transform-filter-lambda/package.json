@@ -14,6 +14,7 @@
     "@tsconfig/node22": "catalog:tools",
     "@types/aws-lambda": "catalog:tools",
     "@types/jest": "catalog:test",
+    "@types/node": "catalog:tools",
     "eslint": "catalog:lint",
     "jest": "catalog:test",
     "jest-mock-extended": "catalog:test",
