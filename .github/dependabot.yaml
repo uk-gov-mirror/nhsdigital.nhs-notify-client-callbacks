@@ -15,7 +15,7 @@ updates:
     cooldown:
       default-days: 7
 
-  - package-ecosystem: "pnpm"
+  - package-ecosystem: "npm"
     directory: "/"
     schedule:
       interval: "daily"
