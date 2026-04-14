@@ -10,7 +10,6 @@ import type {
 import type { Logger } from "services/logger";
 import type { CallbackMetrics } from "services/metrics";
 import type { ConfigLoader } from "services/config-loader";
-import type { ApplicationsMapService } from "services/ssm-applications-map";
 import { ObservabilityService } from "services/observability";
 import { ConfigLoaderService } from "services/config-loader-service";
 import {
@@ -71,15 +70,6 @@ const makeStubConfigLoaderService = (): ConfigLoaderService => {
   return { getLoader: () => loader } as unknown as ConfigLoaderService;
 };
 
-const makeStubApplicationsMapService = (): ApplicationsMapService =>
-  ({
-    getApplicationId: jest
-      .fn()
-      .mockImplementation(
-        async (clientId: string) => `test-app-id-${clientId}`,
-      ),
-  }) as unknown as ApplicationsMapService;
-
 describe("Lambda handler", () => {
   const mockLogger = {
     info: jest.fn(),
@@ -109,7 +99,6 @@ describe("Lambda handler", () => {
     createObservabilityService: () =>
       new ObservabilityService(mockLogger, mockMetrics, mockMetricsLogger),
     createConfigLoaderService: makeStubConfigLoaderService,
-    createApplicationsMapService: makeStubApplicationsMapService,
   });
 
   beforeEach(() => {
@@ -173,7 +162,6 @@ describe("Lambda handler", () => {
     expect(result).toHaveLength(1);
     expect(result[0]).toHaveProperty("payload");
     expect(result[0]).toHaveProperty("subscriptions");
-    expect(result[0]).toHaveProperty("signatures");
     const dataItem = result[0].payload.data[0];
     expect(dataItem.type).toBe("MessageStatus");
     expect((dataItem.attributes as MessageStatusAttributes).messageStatus).toBe(
@@ -203,7 +191,6 @@ describe("Lambda handler", () => {
         new ObservabilityService(mockLogger, mockMetrics, mockMetricsLogger),
       createConfigLoaderService: () =>
         ({ getLoader: () => customConfigLoader }) as ConfigLoaderService,
-      createApplicationsMapService: makeStubApplicationsMapService,
     });
 
     const sqsMessage: SQSRecord = {
@@ -231,65 +218,6 @@ describe("Lambda handler", () => {
         subscriptionType: "MessageStatus",
         targetIds: ["target-match"],
       }),
-    );
-  });
-
-  it("should throw when any target is missing an apiKey", async () => {
-    const customConfigLoader = {
-      loadClientConfig: jest.fn().mockResolvedValue(
-        createClientSubscriptionConfig("client-abc-123", {
-          subscriptions: [
-            createMessageStatusSubscription(["DELIVERED"], {
-              targetIds: ["target-no-key", DEFAULT_TARGET_ID],
-            }),
-          ],
-          targets: [
-            createTarget({
-              targetId: "target-no-key",
-              apiKey: undefined as unknown as {
-                headerName: string;
-                headerValue: string;
-              },
-            }),
-            createTarget({
-              targetId: DEFAULT_TARGET_ID,
-              apiKey: {
-                headerName: "x-api-key",
-                headerValue: "valid-key",
-              },
-            }),
-          ],
-        }),
-      ),
-    } as unknown as ConfigLoader;
-
-    const handlerWithMixedTargets = createHandler({
-      createObservabilityService: () =>
-        new ObservabilityService(mockLogger, mockMetrics, mockMetricsLogger),
-      createConfigLoaderService: () =>
-        ({ getLoader: () => customConfigLoader }) as ConfigLoaderService,
-      createApplicationsMapService: makeStubApplicationsMapService,
-    });
-
-    const sqsMessage: SQSRecord = {
-      messageId: "sqs-msg-id-mixed",
-      receiptHandle: "receipt-handle-mixed",
-      body: JSON.stringify(validMessageStatusEvent),
-      attributes: {
-        ApproximateReceiveCount: "1",
-        SentTimestamp: "1519211230",
-        SenderId: "ABCDEFGHIJ",
-        ApproximateFirstReceiveTimestamp: "1519211230",
-      },
-      messageAttributes: {},
-      md5OfBody: "mock-md5",
-      eventSource: "aws:sqs",
-      eventSourceARN: "arn:aws:sqs:eu-west-2:123456789:mock-queue",
-      awsRegion: "eu-west-2",
-    };
-
-    await expect(handlerWithMixedTargets([sqsMessage])).rejects.toThrow(
-      "Missing apiKey for target target-no-key",
     );
   });
 
@@ -414,7 +342,6 @@ describe("Lambda handler", () => {
     expect(result).toHaveLength(1);
     expect(result[0]).toHaveProperty("payload");
     expect(result[0]).toHaveProperty("subscriptions");
-    expect(result[0]).toHaveProperty("signatures");
     const dataItem = result[0].payload.data[0];
     expect(dataItem.type).toBe("ChannelStatus");
     expect((dataItem.attributes as ChannelStatusAttributes).channelStatus).toBe(
@@ -481,7 +408,6 @@ describe("Lambda handler", () => {
     const faultyHandler = createHandler({
       createObservabilityService: () => faultyObservability,
       createConfigLoaderService: makeStubConfigLoaderService,
-      createApplicationsMapService: makeStubApplicationsMapService,
     });
 
     const sqsMessage: SQSRecord = {
@@ -661,7 +587,6 @@ describe("createHandler default wiring", () => {
     expect(state.processEvents).toHaveBeenCalledWith(
       [],
       state.mockObservabilityInstance,
-      expect.any(Object),
       expect.any(Object),
     );
     expect(result).toEqual(["ok"]);

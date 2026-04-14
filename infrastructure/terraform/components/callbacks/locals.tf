@@ -20,7 +20,7 @@ locals {
       targets = [
         for target in try(client.targets, []) :
         merge(target, {
-          invocationEndpoint = "${aws_lambda_function_url.mock_webhook[0].function_url}${target.targetId}"
+          invocationEndpoint = try(target.mtls.enabled, false) ? "https://${aws_lb.mock_webhook_mtls[0].dns_name}/${target.targetId}" : "http://${aws_lb.mock_webhook_mtls[0].dns_name}/${target.targetId}"
           apiKey             = merge(target.apiKey, { headerValue = random_password.mock_webhook_api_key[0].result })
         })
       ]
@@ -28,39 +28,29 @@ locals {
   } : local.config_clients
 
 
-  config_targets = merge([
-    for client_id, data in local.config_clients : {
-      for target in try(data.targets, []) : target.targetId => {
-        client_id                        = client_id
-        target_id                        = target.targetId
-        invocation_endpoint              = var.deploy_mock_clients ? "${aws_lambda_function_url.mock_webhook[0].function_url}${target.targetId}" : target.invocationEndpoint
-        invocation_rate_limit_per_second = target.invocationRateLimit
-        http_method                      = target.invocationMethod
-        header_name                      = target.apiKey.headerName
-        header_value                     = var.deploy_mock_clients ? random_password.mock_webhook_api_key[0].result : target.apiKey.headerValue
-      }
-    }
-  ]...)
-
-  config_subscriptions = merge([
-    for client_id, data in local.config_clients : {
-      for subscription in try(data.subscriptions, []) : subscription.subscriptionId => {
-        client_id       = client_id
+  client_subscriptions = {
+    for client_id, data in local.config_clients :
+    client_id => {
+      for subscription in try(data.subscriptions, []) :
+      subscription.subscriptionId => {
         subscription_id = subscription.subscriptionId
         target_ids      = try(subscription.targetIds, [])
       }
     }
-  ]...)
+  }
 
-  subscription_targets = merge([
-    for subscription_id, subscription in local.config_subscriptions : {
-      for target_id in subscription.target_ids :
-      "${subscription_id}-${target_id}" => {
-        subscription_id = subscription_id
-        target_id       = target_id
+  client_subscription_targets = {
+    for client_id, data in local.config_clients :
+    client_id => merge([
+      for subscription in try(data.subscriptions, []) : {
+        for target_id in try(subscription.targetIds, []) :
+        "${subscription.subscriptionId}-${target_id}" => {
+          subscription_id = subscription.subscriptionId
+          target_id       = target_id
+        }
       }
-    }
-  ]...)
+    ]...)
+  }
 
   applications_map_parameter_name = coalesce(var.applications_map_parameter_name, "/${var.project}/${var.environment}/${var.component}/applications-map")
 }

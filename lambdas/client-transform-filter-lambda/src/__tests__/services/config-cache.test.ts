@@ -3,7 +3,7 @@ import {
   createClientSubscriptionConfig,
   createMessageStatusSubscription,
 } from "__tests__/helpers/client-subscription-fixtures";
-import { ConfigCache } from "services/config-cache";
+import { ConfigCache } from "@nhs-notify-client-callbacks/config-cache";
 
 const createConfig = (): ClientSubscriptionConfiguration =>
   createClientSubscriptionConfig("client-1", {

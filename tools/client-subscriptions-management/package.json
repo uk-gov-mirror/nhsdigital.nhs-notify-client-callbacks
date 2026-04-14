@@ -29,6 +29,7 @@
     "@aws-sdk/client-sts": "catalog:aws",
     "@aws-sdk/credential-providers": "catalog:aws",
     "@nhs-notify-client-callbacks/models": "workspace:*",
+    "picocolors": "catalog:app",
     "table": "catalog:app",
     "yargs": "catalog:app",
     "zod": "catalog:app"

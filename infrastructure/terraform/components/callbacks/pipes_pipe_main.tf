@@ -26,8 +26,7 @@ resource "aws_pipes_pipe" "main" {
     input_template = <<EOF
 {
   "payload": <$.payload>,
-  "subscriptions": <$.subscriptions>,
-  "signatures": <$.signatures>
+  "subscriptions": <$.subscriptions>
 }
 EOF
   }

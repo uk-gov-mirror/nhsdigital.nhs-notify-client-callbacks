@@ -32,7 +32,14 @@ const config: KnipConfig = {
       // Resolved transitively through tsconfig.base.json → @tsconfig/node22
       ignoreDependencies: ["@tsconfig/node22"],
     },
+    "lambdas/https-client-lambda": {
+      ignoreDependencies: ["@tsconfig/node22"],
+      entry: ["src/__tests__/**/*.ts"],
+    },
     "lambdas/mock-webhook-lambda": {
+      ignoreDependencies: ["@tsconfig/node22"],
+    },
+    "src/config-cache": {
       ignoreDependencies: ["@tsconfig/node22"],
     },
     "src/logger": {
@@ -42,6 +49,7 @@ const config: KnipConfig = {
       ignoreDependencies: ["@tsconfig/node22"],
     },
     "tests/integration": {
+      entry: ["helpers/**/*.ts"],
       ignoreDependencies: [
         "@tsconfig/node22",
         // Used in helpers/sqs.ts and helpers/cloudwatch.ts; flagged because

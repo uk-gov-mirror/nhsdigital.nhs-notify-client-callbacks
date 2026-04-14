@@ -1,5 +1,6 @@
 import type {
   ChannelStatusData,
+  ClientCallbackPayload,
   MessageStatusData,
   StatusPublishEvent,
 } from "@nhs-notify-client-callbacks/models";
@@ -16,6 +17,37 @@ type ChannelEventOverrides = {
   event?: Partial<StatusPublishEvent<ChannelStatusData>>;
   data?: Partial<ChannelStatusData>;
 };
+
+type DeliveryMessage = {
+  payload: ClientCallbackPayload;
+  subscriptions: string[];
+  targetId: string;
+};
+
+export function createDeliveryMessage(
+  overrides?: Partial<DeliveryMessage>,
+): DeliveryMessage {
+  const config = getMockItClientConfig();
+  const targetId =
+    overrides?.targetId ?? config.targets[0]?.targetId ?? "target-001";
+
+  return {
+    payload:
+      overrides?.payload ??
+      ({
+        data: [
+          {
+            type: "MessageStatus",
+            attributes: { messageStatus: "delivered" },
+            links: { message: "https://api.example.invalid/messages/msg-001" },
+            meta: { idempotencyKey: crypto.randomUUID() },
+          },
+        ],
+      } as ClientCallbackPayload),
+    subscriptions: overrides?.subscriptions ?? ["sub-001"],
+    targetId,
+  };
+}
 
 export function createMessageStatusPublishEvent(
   overrides?: MessageEventOverrides,

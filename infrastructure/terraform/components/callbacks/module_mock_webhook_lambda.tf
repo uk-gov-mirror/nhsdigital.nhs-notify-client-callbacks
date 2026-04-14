@@ -64,34 +64,3 @@ data "aws_iam_policy_document" "mock_webhook_lambda" {
     ]
   }
 }
-
-# Lambda Function URL for mock webhook (test/dev only)
-resource "aws_lambda_function_url" "mock_webhook" {
-  count              = var.deploy_mock_clients ? 1 : 0
-  function_name      = module.mock_webhook_lambda[0].function_name
-  authorization_type = "NONE" # Public endpoint for testing
-
-  cors {
-    allow_origins = ["*"]
-    allow_methods = ["POST"]
-    allow_headers = ["*"]
-    max_age       = 86400
-  }
-}
-
-resource "aws_lambda_permission" "mock_webhook_function_url" {
-  count                  = var.deploy_mock_clients ? 1 : 0
-  statement_id_prefix    = "FunctionURLAllowPublicAccess"
-  action                 = "lambda:InvokeFunctionUrl"
-  function_name          = module.mock_webhook_lambda[0].function_name
-  principal              = "*"
-  function_url_auth_type = "NONE"
-}
-
-resource "aws_lambda_permission" "mock_webhook_function_invoke" {
-  count               = var.deploy_mock_clients ? 1 : 0
-  statement_id_prefix = "FunctionURLAllowInvokeAction"
-  action              = "lambda:InvokeFunction"
-  function_name       = module.mock_webhook_lambda[0].function_name
-  principal           = "*"
-}
