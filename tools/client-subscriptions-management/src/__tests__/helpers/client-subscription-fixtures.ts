@@ -24,6 +24,8 @@ export const createTarget = (
     headerValue: "secret",
     ...overrides.apiKey,
   },
+  mtls: { enabled: false },
+  certPinning: { enabled: false },
   ...overrides,
 });
 

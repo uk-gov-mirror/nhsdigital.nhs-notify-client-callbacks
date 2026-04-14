@@ -56,7 +56,6 @@ export const handler: CliCommand<ClientsPutArgs>["handler"] = async (argv) => {
     return;
   }
 
-  // Safe as this is an internal tool and this CLI option we are expecting the user will run locally and manually
   // eslint-disable-next-line security/detect-non-literal-fs-filename
   const rawJson = argv.json ?? readFileSync(argv.file!, "utf8");
 

@@ -1,5 +1,5 @@
 import { S3Client } from "@aws-sdk/client-s3";
-import { ConfigCache } from "services/config-cache";
+import { ConfigCache } from "@nhs-notify-client-callbacks/config-cache";
 import { ConfigLoader } from "services/config-loader";
 
 const DEFAULT_CACHE_TTL_SECONDS = 60;

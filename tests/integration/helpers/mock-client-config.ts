@@ -20,6 +20,11 @@ export const CLIENT_FIXTURES = {
     apiKeyVar: "MOCK_CLIENT_2_API_KEY",
     applicationIdVar: "MOCK_CLIENT_2_APPLICATION_ID",
   },
+  clientMtls: {
+    fixture: "mock-client-mtls.json",
+    apiKeyVar: "MOCK_CLIENT_MTLS_API_KEY",
+    applicationIdVar: "MOCK_CLIENT_MTLS_APPLICATION_ID",
+  },
 } as const;
 
 export type ClientFixtureKey = keyof typeof CLIENT_FIXTURES;

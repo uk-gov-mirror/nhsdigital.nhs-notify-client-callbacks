@@ -1,8 +1,32 @@
+import { X509Certificate } from "node:crypto";
 import type { APIGatewayProxyEvent, APIGatewayProxyResult } from "aws-lambda";
 import { Logger } from "@nhs-notify-client-callbacks/logger";
 import type { ClientCallbackPayload } from "@nhs-notify-client-callbacks/models";
 
 const logger = new Logger();
+
+function verifyClientCertificate(certHeader: string | undefined): {
+  valid: boolean;
+  reason?: string;
+} {
+  if (!certHeader) {
+    return { valid: false, reason: "No client certificate provided" };
+  }
+  try {
+    const pem = decodeURIComponent(certHeader);
+    const cert = new X509Certificate(pem);
+    const now = new Date();
+    if (now < new Date(cert.validFrom) || now > new Date(cert.validTo)) {
+      return {
+        valid: false,
+        reason: "Client certificate is not within its validity period",
+      };
+    }
+    return { valid: true };
+  } catch {
+    return { valid: false, reason: "Failed to parse client certificate" };
+  }
+}
 
 function isClientCallbackPayload(
   value: unknown,
@@ -36,20 +60,44 @@ function isClientCallbackPayload(
 async function buildResponse(
   event: APIGatewayProxyEvent,
 ): Promise<APIGatewayProxyResult> {
-  const eventWithFunctionUrlFields = event as APIGatewayProxyEvent & {
+  const eventWithContextFields = event as APIGatewayProxyEvent & {
     rawPath?: string;
-    requestContext?: { http?: { method?: string } };
+    requestContext?: {
+      http?: { method?: string };
+      elb?: { targetGroupArn: string };
+    };
   };
   const headers = Object.fromEntries(
     Object.entries(event.headers).map(([k, v]) => [String(k).toLowerCase(), v]),
   ) as Record<string, string | undefined>;
 
-  const path = event.path ?? eventWithFunctionUrlFields.rawPath;
+  const path = event.path ?? eventWithContextFields.rawPath;
+
+  const isAlbInvocation = Boolean(eventWithContextFields.requestContext?.elb);
+  let isMtls = false;
+  if (isAlbInvocation) {
+    const certResult = verifyClientCertificate(
+      headers["x-amzn-mtls-clientcert"],
+    );
+    isMtls = certResult.valid;
+    if (isMtls) {
+      logger.info("mTLS client certificate verified", {
+        fingerprint: headers["x-amzn-mtls-clientcert-fingerprint"] ?? "",
+        isMtls: true,
+      });
+    } else {
+      logger.info("Mock webhook invoked without mTLS", {
+        isMtls: false,
+        reason: certResult.reason,
+      });
+    }
+  }
 
   logger.info("Mock webhook invoked", {
     path,
     method: event.httpMethod,
     hasBody: Boolean(event.body),
+    isMtls,
     "x-api-key": headers["x-api-key"],
     "x-hmac-sha256-signature": headers["x-hmac-sha256-signature"],
     payload: event.body,

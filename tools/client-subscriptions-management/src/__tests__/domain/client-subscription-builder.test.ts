@@ -8,6 +8,16 @@ const UUID_REGEX =
   /^[\da-f]{8}-[\da-f]{4}-4[\da-f]{3}-[89ab][\da-f]{3}-[\da-f]{12}$/i;
 
 describe("buildTarget", () => {
+  let warnSpy: jest.SpyInstance;
+
+  beforeEach(() => {
+    warnSpy = jest.spyOn(console, "warn").mockImplementation();
+  });
+
+  afterEach(() => {
+    warnSpy.mockRestore();
+  });
+
   it("builds a target with required fields", () => {
     const result = buildTarget({
       apiEndpoint: "https://example.com/webhook",
@@ -22,6 +32,8 @@ describe("buildTarget", () => {
       invocationMethod: "POST",
       invocationRateLimit: 10,
       apiKey: { headerName: "x-api-key", headerValue: "secret" },
+      mtls: { enabled: false },
+      certPinning: { enabled: false },
     });
     expect(result.targetId).toMatch(UUID_REGEX);
   });
@@ -34,6 +46,73 @@ describe("buildTarget", () => {
     });
 
     expect(result.apiKey.headerName).toBe("x-api-key");
+  });
+
+  it("emits warning when mtls is disabled", () => {
+    buildTarget({
+      apiEndpoint: "https://example.com/webhook",
+      apiKey: "secret",
+      rateLimit: 10,
+      mtls: { enabled: false },
+    });
+
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.stringContaining("mTLS is disabled"),
+    );
+  });
+
+  it("emits warning when mtls enabled but certPinning disabled", () => {
+    buildTarget({
+      apiEndpoint: "https://example.com/webhook",
+      apiKey: "secret",
+      rateLimit: 10,
+      mtls: { enabled: true },
+      certPinning: { enabled: false },
+    });
+
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.stringContaining("certificate pinning is disabled"),
+    );
+  });
+
+  it("emits warning when certPinning enabled without spkiHash", () => {
+    buildTarget({
+      apiEndpoint: "https://example.com/webhook",
+      apiKey: "secret",
+      rateLimit: 10,
+      mtls: { enabled: true },
+      certPinning: { enabled: true },
+    });
+
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.stringContaining("no SPKI hash is stored"),
+    );
+  });
+
+  it("emits warning when certPinning enabled but mtls disabled", () => {
+    buildTarget({
+      apiEndpoint: "https://example.com/webhook",
+      apiKey: "secret",
+      rateLimit: 10,
+      mtls: { enabled: false },
+      certPinning: { enabled: true },
+    });
+
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.stringContaining("mTLS is disabled"),
+    );
+  });
+
+  it("emits no warnings for fully secure config", () => {
+    buildTarget({
+      apiEndpoint: "https://example.com/webhook",
+      apiKey: "secret",
+      rateLimit: 10,
+      mtls: { enabled: true },
+      certPinning: { enabled: true, spkiHash: "abc123" },
+    });
+
+    expect(warnSpy).not.toHaveBeenCalled();
   });
 });
 

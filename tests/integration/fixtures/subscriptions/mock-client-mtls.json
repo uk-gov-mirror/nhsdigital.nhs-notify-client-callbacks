@@ -1,0 +1,36 @@
+{
+  "clientId": "mock-client-mtls",
+  "subscriptions": [
+    {
+      "messageStatuses": [
+        "DELIVERED",
+        "FAILED"
+      ],
+      "subscriptionId": "sub-mtls-msg-001",
+      "subscriptionType": "MessageStatus",
+      "targetIds": [
+        "target-mtls-001"
+      ]
+    }
+  ],
+  "targets": [
+    {
+      "apiKey": {
+        "headerName": "x-api-key",
+        "headerValue": "REPLACED_BY_TERRAFORM"
+      },
+      "certPinning": {
+        "enabled": true,
+        "spkiHash": "REPLACED_BY_TERRAFORM"
+      },
+      "invocationEndpoint": "https://REPLACED_BY_TERRAFORM",
+      "invocationMethod": "POST",
+      "invocationRateLimit": 10,
+      "mtls": {
+        "enabled": true
+      },
+      "targetId": "target-mtls-001",
+      "type": "API"
+    }
+  ]
+}

@@ -42,7 +42,6 @@ module "client_transform_filter_lambda" {
     CLIENT_SUBSCRIPTION_CONFIG_PREFIX     = "client_subscriptions/"
     CLIENT_SUBSCRIPTION_CACHE_TTL_SECONDS = "60"
     MESSAGE_ROOT_URI                      = var.message_root_uri
-    APPLICATIONS_MAP_PARAMETER            = local.applications_map_parameter_name
   }
 }
 
@@ -84,19 +83,6 @@ data "aws_iam_policy_document" "client_transform_filter_lambda" {
 
     resources = [
       "${module.client_config_bucket.arn}/*",
-    ]
-  }
-
-  statement {
-    sid    = "SSMApplicationsMapRead"
-    effect = "Allow"
-
-    actions = [
-      "ssm:GetParameter",
-    ]
-
-    resources = [
-      "arn:aws:ssm:${var.region}:${var.aws_account_id}:parameter${local.applications_map_parameter_name}",
     ]
   }
 

@@ -19,6 +19,8 @@ const expectFailedParse = (
   return result;
 };
 
+const VALID_SPKI_HASH = "KL/yFsVH+gnkkzdQ+DSlV8xMQOMehksgT6aOqQviOu8=";
+
 const createValidConfig = (): ClientSubscriptionConfiguration => ({
   clientId: "client-1",
   subscriptions: [
@@ -45,6 +47,8 @@ const createValidConfig = (): ClientSubscriptionConfiguration => ({
       invocationMethod: "POST",
       invocationRateLimit: 10,
       apiKey: { headerName: "x-api-key", headerValue: "secret" },
+      mtls: { enabled: true },
+      certPinning: { enabled: true, spkiHash: VALID_SPKI_HASH },
     },
   ],
 });
@@ -146,5 +150,106 @@ describe("parseClientSubscriptionConfiguration", () => {
         path: ["subscriptions", 0, "targetIds", 0],
       }),
     ]);
+  });
+
+  it("parses a valid config with mtls, certPinning, and delivery fields", () => {
+    const config = createValidConfig();
+    config.targets[0].delivery = {
+      maxRetryDurationSeconds: 7200,
+      circuitBreaker: { enabled: true },
+    };
+
+    expect(parseClientSubscriptionConfiguration(config)).toEqual({
+      success: true,
+      data: config,
+    });
+  });
+
+  it("returns a failed parse result when mtls field is missing", () => {
+    const config = createValidConfig();
+    const target = config.targets[0] as Record<string, unknown>;
+    delete target.mtls;
+
+    const result = expectFailedParse(
+      parseClientSubscriptionConfiguration(config),
+    );
+
+    expect(result.error.issues).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          path: expect.arrayContaining(["targets", 0, "mtls"]),
+        }),
+      ]),
+    );
+  });
+
+  it("returns a failed parse result when spkiHash has an invalid pattern", () => {
+    const config = createValidConfig();
+    config.targets[0].certPinning.spkiHash = "not-a-valid-hash";
+
+    const result = expectFailedParse(
+      parseClientSubscriptionConfiguration(config),
+    );
+
+    expect(result.error.issues).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          message: "Invalid SPKI hash",
+        }),
+      ]),
+    );
+  });
+
+  it("returns a failed parse result when certPinning.enabled is true without spkiHash", () => {
+    const config = createValidConfig();
+    config.targets[0].certPinning = { enabled: true };
+
+    const result = expectFailedParse(
+      parseClientSubscriptionConfiguration(config),
+    );
+
+    expect(result.error.issues).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          message: "spkiHash is required when certPinning is enabled",
+        }),
+      ]),
+    );
+  });
+
+  it("returns a failed parse result when maxRetryDurationSeconds is below 60", () => {
+    const config = createValidConfig();
+    config.targets[0].delivery = { maxRetryDurationSeconds: 59 };
+
+    const result = expectFailedParse(
+      parseClientSubscriptionConfiguration(config),
+    );
+
+    expect(result.success).toBe(false);
+  });
+
+  it("returns a failed parse result when maxRetryDurationSeconds is above 43200", () => {
+    const config = createValidConfig();
+    config.targets[0].delivery = { maxRetryDurationSeconds: 43_201 };
+
+    const result = expectFailedParse(
+      parseClientSubscriptionConfiguration(config),
+    );
+
+    expect(result.success).toBe(false);
+  });
+
+  it("accepts maxRetryDurationSeconds at boundary value 60", () => {
+    const config = createValidConfig();
+    config.targets[0].delivery = { maxRetryDurationSeconds: 60 };
+
+    expect(parseClientSubscriptionConfiguration(config).success).toBe(true);
+  });
+
+  it("accepts maxRetryDurationSeconds at boundary value 43200", () => {
+    const config = createValidConfig();
+    config.targets[0].delivery = { maxRetryDurationSeconds: 43_200 };
+
+    expect(parseClientSubscriptionConfiguration(config).success).toBe(true);
   });
 });

@@ -3,17 +3,13 @@ import { Logger } from "services/logger";
 import { CallbackMetrics, createMetricLogger } from "services/metrics";
 import { ObservabilityService } from "services/observability";
 import { ConfigLoaderService } from "services/config-loader-service";
-import { ApplicationsMapService } from "services/ssm-applications-map";
 import { type TransformedEvent, processEvents } from "handler";
 
 export const configLoaderService = new ConfigLoaderService();
 
-export const applicationsMapService = new ApplicationsMapService();
-
 export interface HandlerDependencies {
   createObservabilityService?: () => ObservabilityService;
   createConfigLoaderService?: () => ConfigLoaderService;
-  createApplicationsMapService?: () => ApplicationsMapService;
 }
 
 function createDefaultObservabilityService(): ObservabilityService {
@@ -28,10 +24,6 @@ function createDefaultConfigLoaderService(): ConfigLoaderService {
   return configLoaderService;
 }
 
-function createDefaultApplicationsMapService(): ApplicationsMapService {
-  return applicationsMapService;
-}
-
 export function createHandler(
   dependencies: Partial<HandlerDependencies> = {},
 ): (event: SQSRecord[]) => Promise<TransformedEvent[]> {
@@ -41,19 +33,10 @@ export function createHandler(
   const configLoader = (
     dependencies.createConfigLoaderService ?? createDefaultConfigLoaderService
   )();
-  const applicationsMap = (
-    dependencies.createApplicationsMapService ??
-    createDefaultApplicationsMapService
-  )();
 
   return async (event: SQSRecord[]): Promise<TransformedEvent[]> => {
     const observability = createObservabilityService();
-    return processEvents(
-      event,
-      observability,
-      configLoader.getLoader(),
-      applicationsMap,
-    );
+    return processEvents(event, observability, configLoader.getLoader());
   };
 }
 

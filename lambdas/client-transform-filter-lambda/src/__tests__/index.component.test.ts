@@ -15,26 +15,12 @@ jest.mock("@aws-sdk/client-s3", () => {
   };
 });
 
-const mockSsmSend = jest.fn();
-jest.mock("@aws-sdk/client-ssm", () => {
-  const actual = jest.requireActual("@aws-sdk/client-ssm");
-  return {
-    ...actual,
-    SSMClient: jest.fn().mockImplementation(() => ({
-      send: mockSsmSend,
-    })),
-  };
-});
-
-// Set environment variables before importing the handler/module under test so that
-// services constructed at module import time (e.g. applicationsMapService) see
-// the correct configuration.
+// Set environment variables before importing the handler/module under test.
 process.env.CLIENT_SUBSCRIPTION_CONFIG_BUCKET = "test-bucket";
 process.env.CLIENT_SUBSCRIPTION_CONFIG_PREFIX = "client_subscriptions/";
 process.env.CLIENT_SUBSCRIPTION_CACHE_TTL_SECONDS = "60";
 process.env.METRICS_NAMESPACE = "test-namespace";
 process.env.ENVIRONMENT = "test";
-process.env.APPLICATIONS_MAP_PARAMETER = "/test/applications-map";
 
 jest.mock("aws-embedded-metrics", () => ({
   createMetricsLogger: jest.fn(() => ({
@@ -50,12 +36,11 @@ jest.mock("aws-embedded-metrics", () => ({
 }));
 
 import { GetObjectCommand, NoSuchKey } from "@aws-sdk/client-s3";
-import { GetParameterCommand } from "@aws-sdk/client-ssm";
 import type { SQSRecord } from "aws-lambda";
 import { EventTypes } from "@nhs-notify-client-callbacks/models";
 import { createMessageStatusConfig } from "__tests__/helpers/client-subscription-fixtures";
 import { createS3Client } from "services/config-loader-service";
-import { applicationsMapService, configLoaderService, handler } from "..";
+import { configLoaderService, handler } from "..";
 
 const makeSqsRecord = (body: object): SQSRecord => ({
   messageId: "sqs-id",
@@ -104,18 +89,8 @@ const validMessageStatusEvent = (clientId: string, messageStatus: string) => ({
 });
 
 describe("Lambda handler with S3 subscription filtering", () => {
-  const applicationsMap = JSON.stringify({
-    "client-1": "app-id-1",
-    "client-a": "app-id-a",
-    "client-b": "app-id-b",
-    "client-no-config": "app-id-no-config",
-  });
-
   beforeEach(() => {
     mockSend.mockClear();
-    mockSsmSend.mockClear();
-    applicationsMapService.reset();
-    mockSsmSend.mockResolvedValue({ Parameter: { Value: applicationsMap } });
     // Reset loader and clear cache for clean state between tests
     configLoaderService.reset(
       createS3Client({ AWS_ENDPOINT_URL: "http://localhost:4566" }),
@@ -129,7 +104,6 @@ describe("Lambda handler with S3 subscription filtering", () => {
     delete process.env.CLIENT_SUBSCRIPTION_CACHE_TTL_SECONDS;
     delete process.env.METRICS_NAMESPACE;
     delete process.env.ENVIRONMENT;
-    delete process.env.APPLICATIONS_MAP_PARAMETER;
   });
 
   it("passes event through when client config matches subscription", async () => {
@@ -148,12 +122,8 @@ describe("Lambda handler with S3 subscription filtering", () => {
     expect(result).toHaveLength(1);
     expect(mockSend).toHaveBeenCalledTimes(1);
     expect(mockSend.mock.calls[0][0]).toBeInstanceOf(GetObjectCommand);
-    expect(mockSsmSend).toHaveBeenCalledTimes(1);
-    expect(mockSsmSend.mock.calls[0][0]).toBeInstanceOf(GetParameterCommand);
     expect(result[0]).toHaveProperty("payload");
     expect(result[0]).toHaveProperty("subscriptions");
-    expect(result[0]).toHaveProperty("signatures");
-    expect(Object.values(result[0].signatures)[0]).toMatch(/^[0-9a-f]+$/);
   });
 
   it("filters out event when status is not in subscription", async () => {
@@ -250,26 +220,5 @@ describe("Lambda handler with S3 subscription filtering", () => {
     expect(result).toHaveLength(3);
     // S3 fetched once per distinct client (client-a and client-b), not once per event
     expect(mockSend).toHaveBeenCalledTimes(2);
-  });
-
-  it("filters out event when no applicationId found in SSM map", async () => {
-    mockSend.mockResolvedValue({
-      Body: {
-        transformToString: jest
-          .fn()
-          .mockResolvedValue(
-            JSON.stringify(createValidConfig("client-unknown")),
-          ),
-      },
-    });
-    mockSsmSend.mockResolvedValue({
-      Parameter: { Value: JSON.stringify({}) },
-    });
-
-    const result = await handler([
-      makeSqsRecord(validMessageStatusEvent("client-unknown", "DELIVERED")),
-    ]);
-
-    expect(result).toHaveLength(0);
   });
 });

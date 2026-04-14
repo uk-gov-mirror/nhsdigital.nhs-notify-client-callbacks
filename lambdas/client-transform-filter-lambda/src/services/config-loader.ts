@@ -1,6 +1,6 @@
 import { GetObjectCommand, NoSuchKey, S3Client } from "@aws-sdk/client-s3";
 import type { ClientSubscriptionConfiguration } from "@nhs-notify-client-callbacks/models";
-import { ConfigCache } from "services/config-cache";
+import { ConfigCache } from "@nhs-notify-client-callbacks/config-cache";
 import { logger } from "services/logger";
 import { wrapUnknownError } from "services/error-handler";
 import {

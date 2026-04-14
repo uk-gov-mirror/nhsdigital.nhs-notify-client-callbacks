@@ -28,6 +28,7 @@ export default defineConfig([
     "**/test-results",
     "**/playwright-report*",
     "eslint.config.mjs",
+    "**/lua-transform.js",
   ]),
 
   //imports
@@ -200,7 +201,7 @@ export default defineConfig([
     },
   },
   {
-    files: ["**/utils/**", "tests/test-team/**", "tests/performance/helpers/**", "lambdas/**/src/**"],
+    files: ["**/utils/**", "tests/test-team/**", "tests/performance/helpers/**", "lambdas/**/src/**", "src/**/src/**"],
     rules: {
       "import-x/prefer-default-export": 0,
     },

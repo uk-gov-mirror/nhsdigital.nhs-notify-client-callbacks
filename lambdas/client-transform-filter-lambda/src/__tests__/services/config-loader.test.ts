@@ -1,6 +1,6 @@
 import { GetObjectCommand, NoSuchKey, S3Client } from "@aws-sdk/client-s3";
 import { createMessageStatusConfig } from "__tests__/helpers/client-subscription-fixtures";
-import { ConfigCache } from "services/config-cache";
+import { ConfigCache } from "@nhs-notify-client-callbacks/config-cache";
 import { ConfigLoader } from "services/config-loader";
 import { ConfigValidationError } from "services/validators/config-validator";
 

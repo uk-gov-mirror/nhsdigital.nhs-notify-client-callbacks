@@ -22,6 +22,20 @@ const httpsUrlSchema = z.string().refine(
   },
 );
 
+const SPKI_HASH_PATTERN = /^[A-Za-z0-9+/]{43}=$/;
+
+const certPinningSchema = z
+  .object({
+    enabled: z.boolean(),
+    spkiHash: z
+      .string()
+      .regex(SPKI_HASH_PATTERN, "Invalid SPKI hash")
+      .optional(),
+  })
+  .refine((val) => !val.enabled || val.spkiHash !== undefined, {
+    message: "spkiHash is required when certPinning is enabled",
+  });
+
 const targetSchema = z.object({
   targetId: z.string(),
   type: z.literal("API"),
@@ -32,6 +46,20 @@ const targetSchema = z.object({
     headerName: z.string(),
     headerValue: z.string(),
   }),
+  mtls: z.object({
+    enabled: z.boolean(),
+  }),
+  certPinning: certPinningSchema,
+  delivery: z
+    .object({
+      maxRetryDurationSeconds: z.number().min(60).max(43_200).optional(),
+      circuitBreaker: z
+        .object({
+          enabled: z.boolean(),
+        })
+        .optional(),
+    })
+    .optional(),
 });
 
 const baseSubscriptionSchema = z.object({

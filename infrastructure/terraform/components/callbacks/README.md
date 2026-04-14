@@ -18,6 +18,7 @@
 | <a name="input_component"></a> [component](#input\_component) | The variable encapsulating the name of this component | `string` | `"callbacks"` | no |
 | <a name="input_default_tags"></a> [default\_tags](#input\_default\_tags) | A map of default tags to apply to all taggable resources within the component | `map(string)` | `{}` | no |
 | <a name="input_deploy_mock_clients"></a> [deploy\_mock\_clients](#input\_deploy\_mock\_clients) | Flag to deploy mock webhook lambda for integration testing (test/dev environments only) | `bool` | `false` | no |
+| <a name="input_elasticache_data_storage_maximum_gb"></a> [elasticache\_data\_storage\_maximum\_gb](#input\_elasticache\_data\_storage\_maximum\_gb) | Maximum data storage in GB for the ElastiCache Serverless delivery state cache | `number` | `1` | no |
 | <a name="input_enable_event_anomaly_detection"></a> [enable\_event\_anomaly\_detection](#input\_enable\_event\_anomaly\_detection) | Enable CloudWatch anomaly detection alarm for inbound event queue message reception | `bool` | `true` | no |
 | <a name="input_enable_xray_tracing"></a> [enable\_xray\_tracing](#input\_enable\_xray\_tracing) | Enable AWS X-Ray active tracing for Lambda functions | `bool` | `false` | no |
 | <a name="input_environment"></a> [environment](#input\_environment) | The name of the tfscaffold environment | `string` | n/a | yes |
@@ -30,6 +31,12 @@
 | <a name="input_log_level"></a> [log\_level](#input\_log\_level) | The log level to be used in lambda functions within the component. Any log with a lower severity than the configured value will not be logged: https://docs.python.org/3/library/logging.html#levels | `string` | `"INFO"` | no |
 | <a name="input_log_retention_in_days"></a> [log\_retention\_in\_days](#input\_log\_retention\_in\_days) | The retention period in days for the Cloudwatch Logs events to be retained, default of 0 is indefinite | `number` | `0` | no |
 | <a name="input_message_root_uri"></a> [message\_root\_uri](#input\_message\_root\_uri) | The root URI used for constructing message links in callback payloads | `string` | n/a | yes |
+| <a name="input_mtls_cert_secret_arn"></a> [mtls\_cert\_secret\_arn](#input\_mtls\_cert\_secret\_arn) | Secrets Manager ARN for the shared mTLS client certificate (production) | `string` | `""` | no |
+| <a name="input_mtls_mock_server_cert_s3_key"></a> [mtls\_mock\_server\_cert\_s3\_key](#input\_mtls\_mock\_server\_cert\_s3\_key) | S3 key for the mock webhook server certificate PEM (signed by the test CA) | `string` | `""` | no |
+| <a name="input_mtls_mock_server_key_s3_key"></a> [mtls\_mock\_server\_key\_s3\_key](#input\_mtls\_mock\_server\_key\_s3\_key) | S3 key for the mock webhook server private key PEM | `string` | `""` | no |
+| <a name="input_mtls_test_ca_s3_key"></a> [mtls\_test\_ca\_s3\_key](#input\_mtls\_test\_ca\_s3\_key) | S3 key for the test CA certificate PEM bundle used for server verification and the mock webhook server cert chain | `string` | `""` | no |
+| <a name="input_mtls_test_cert_s3_key"></a> [mtls\_test\_cert\_s3\_key](#input\_mtls\_test\_cert\_s3\_key) | S3 key for the test mTLS client certificate bundle (dev) | `string` | `""` | no |
+| <a name="input_mtls_test_certs_s3_bucket"></a> [mtls\_test\_certs\_s3\_bucket](#input\_mtls\_test\_certs\_s3\_bucket) | S3 bucket containing test mTLS certificate material (dev) | `string` | `""` | no |
 | <a name="input_parent_acct_environment"></a> [parent\_acct\_environment](#input\_parent\_acct\_environment) | Name of the environment responsible for the acct resources used, affects things like DNS zone. Useful for named dev environments | `string` | `"main"` | no |
 | <a name="input_pipe_event_patterns"></a> [pipe\_event\_patterns](#input\_pipe\_event\_patterns) | value | `list(string)` | `[]` | no |
 | <a name="input_pipe_log_level"></a> [pipe\_log\_level](#input\_pipe\_log\_level) | Log level for the EventBridge Pipe. | `string` | `"ERROR"` | no |
@@ -45,7 +52,7 @@
 | Name | Source | Version |
 |------|--------|---------|
 | <a name="module_client_config_bucket"></a> [client\_config\_bucket](#module\_client\_config\_bucket) | https://github.com/NHSDigital/nhs-notify-shared-modules/releases/download/3.0.7/terraform-s3bucket.zip | n/a |
-| <a name="module_client_destination"></a> [client\_destination](#module\_client\_destination) | ../../modules/client-destination | n/a |
+| <a name="module_client_delivery"></a> [client\_delivery](#module\_client\_delivery) | ../../modules/client-delivery | n/a |
 | <a name="module_client_transform_filter_lambda"></a> [client\_transform\_filter\_lambda](#module\_client\_transform\_filter\_lambda) | https://github.com/NHSDigital/nhs-notify-shared-modules/releases/download/3.0.7/terraform-lambda.zip | n/a |
 | <a name="module_kms"></a> [kms](#module\_kms) | https://github.com/NHSDigital/nhs-notify-shared-modules/releases/download/3.0.7/terraform-kms.zip | n/a |
 | <a name="module_mock_webhook_lambda"></a> [mock\_webhook\_lambda](#module\_mock\_webhook\_lambda) | https://github.com/NHSDigital/nhs-notify-shared-modules/releases/download/3.0.7/terraform-lambda.zip | n/a |

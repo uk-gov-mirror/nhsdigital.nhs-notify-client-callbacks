@@ -7,12 +7,15 @@ import type {
   MessageStatusSubscriptionConfiguration,
   SupplierStatus,
 } from "@nhs-notify-client-callbacks/models";
+import pc from "picocolors";
 
 export type BuildTargetArgs = {
   apiEndpoint: string;
   apiKey: string;
   apiKeyHeaderName?: string;
   rateLimit: number;
+  mtls?: { enabled: boolean };
+  certPinning?: { enabled: boolean; spkiHash?: string };
 };
 
 export type BuildMessageStatusSubscriptionArgs = {
@@ -30,6 +33,31 @@ export type BuildChannelStatusSubscriptionArgs = {
 };
 
 export function buildTarget(args: BuildTargetArgs): CallbackTarget {
+  const mtls = args.mtls ?? { enabled: false };
+  const certPinning = args.certPinning ?? { enabled: false };
+
+  const warnings: string[] = [];
+
+  if (!mtls.enabled) {
+    warnings.push("mTLS is disabled — callbacks will not use mutual TLS");
+  }
+
+  if (mtls.enabled && !certPinning.enabled) {
+    warnings.push("mTLS is enabled but certificate pinning is disabled");
+  }
+
+  if (certPinning.enabled && !certPinning.spkiHash) {
+    warnings.push("Certificate pinning is enabled but no SPKI hash is stored");
+  }
+
+  if (!mtls.enabled && certPinning.enabled) {
+    warnings.push("Certificate pinning is enabled but mTLS is disabled");
+  }
+
+  for (const warning of warnings) {
+    console.warn(pc.bold(pc.red(`WARNING: ${warning}`)));
+  }
+
   return {
     targetId: crypto.randomUUID(),
     type: "API",
@@ -40,6 +68,8 @@ export function buildTarget(args: BuildTargetArgs): CallbackTarget {
       headerName: args.apiKeyHeaderName ?? "x-api-key",
       headerValue: args.apiKey,
     },
+    mtls,
+    certPinning,
   };
 }
 

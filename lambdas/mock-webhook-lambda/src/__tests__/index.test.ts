@@ -1,5 +1,13 @@
+import { X509Certificate } from "node:crypto";
 import type { APIGatewayProxyEvent } from "aws-lambda";
 import { handler } from "index";
+
+jest.mock("node:crypto", () => ({
+  ...jest.requireActual("node:crypto"),
+  X509Certificate: jest.fn(),
+}));
+
+const mockX509Certificate = X509Certificate as unknown as jest.Mock;
 
 const TEST_API_KEY = "test-api-key";
 
@@ -31,6 +39,28 @@ const createMockEvent = (
   rawPath?: string,
 ): APIGatewayProxyEvent =>
   ({ body, headers, rawPath }) as unknown as APIGatewayProxyEvent;
+
+const createAlbEvent = (
+  body: string | null,
+  headers: Record<string, string> = DEFAULT_HEADERS,
+  extraHeaders: Record<string, string> = {},
+): APIGatewayProxyEvent =>
+  ({
+    body,
+    path: "/target-abc",
+    httpMethod: "POST",
+    headers: { ...headers, ...extraHeaders },
+    requestContext: {
+      elb: {
+        targetGroupArn:
+          "arn:aws:elasticloadbalancing:eu-west-2:123456789012:targetgroup/mock/abc",
+      },
+    },
+  }) as unknown as APIGatewayProxyEvent;
+
+const FAKE_CERT_HEADER = encodeURIComponent(
+  "-----BEGIN CERTIFICATE-----\nZmFrZQ==\n-----END CERTIFICATE-----",
+);
 
 describe("Mock Webhook Lambda", () => {
   beforeAll(() => {
@@ -379,5 +409,146 @@ describe("Mock Webhook Lambda", () => {
       });
       expect(context).toHaveProperty("payload");
     });
+  });
+});
+
+describe("ALB mTLS certificate logging", () => {
+  beforeAll(() => {
+    process.env.API_KEY = TEST_API_KEY;
+  });
+
+  afterAll(() => {
+    delete process.env.API_KEY;
+  });
+
+  beforeEach(() => {
+    mockX509Certificate.mockReset();
+    mockX509Certificate.mockImplementation(() => ({
+      validFrom: new Date(Date.now() - 86_400_000).toString(),
+      validTo: new Date(Date.now() + 86_400_000).toString(),
+    }));
+  });
+
+  it("logs isMtls=false and proceeds when ALB invocation has no client certificate header", async () => {
+    const event = createAlbEvent(JSON.stringify({ data: [] }));
+    const result = await handler(event);
+
+    expect(result.statusCode).not.toBe(401);
+    expect(mockLogger.info).toHaveBeenCalledWith(
+      "Mock webhook invoked without mTLS",
+      expect.objectContaining({ isMtls: false }),
+    );
+  });
+
+  it("logs isMtls=false and proceeds when client certificate header cannot be parsed", async () => {
+    mockX509Certificate.mockImplementationOnce(() => {
+      throw new Error("Invalid certificate");
+    });
+    const event = createAlbEvent(
+      JSON.stringify({ data: [] }),
+      DEFAULT_HEADERS,
+      { "x-amzn-mtls-clientcert": FAKE_CERT_HEADER },
+    );
+    const result = await handler(event);
+
+    expect(result.statusCode).not.toBe(401);
+    expect(mockLogger.info).toHaveBeenCalledWith(
+      "Mock webhook invoked without mTLS",
+      expect.objectContaining({ isMtls: false }),
+    );
+  });
+
+  it("logs isMtls=false and proceeds when client certificate is expired", async () => {
+    mockX509Certificate.mockImplementationOnce(() => ({
+      validFrom: new Date(Date.now() - 172_800_000).toString(),
+      validTo: new Date(Date.now() - 86_400_000).toString(),
+    }));
+    const event = createAlbEvent(
+      JSON.stringify({ data: [] }),
+      DEFAULT_HEADERS,
+      { "x-amzn-mtls-clientcert": FAKE_CERT_HEADER },
+    );
+    const result = await handler(event);
+
+    expect(result.statusCode).not.toBe(401);
+    expect(mockLogger.info).toHaveBeenCalledWith(
+      "Mock webhook invoked without mTLS",
+      expect.objectContaining({ isMtls: false }),
+    );
+  });
+
+  it("logs isMtls=true and proceeds when certificate is valid", async () => {
+    const event = createAlbEvent(
+      JSON.stringify({ data: [] }),
+      { "x-api-key": "wrong-key" },
+      { "x-amzn-mtls-clientcert": FAKE_CERT_HEADER },
+    );
+    const result = await handler(event);
+
+    expect(mockLogger.info).toHaveBeenCalledWith(
+      "mTLS client certificate verified",
+      expect.objectContaining({ isMtls: true }),
+    );
+    expect(result.statusCode).toBe(401);
+    const body = JSON.parse(result.body);
+    expect(body.message).toBe("Unauthorized");
+  });
+
+  it("processes request successfully when certificate is valid and API key is correct", async () => {
+    const callback = {
+      data: [
+        {
+          type: "MessageStatus",
+          attributes: {
+            messageId: "msg-alb-mtls",
+            messageReference: "ref-alb",
+            messageStatus: "delivered",
+            timestamp: "2026-01-01T00:00:00Z",
+          },
+          links: { message: "some-link" },
+          meta: { idempotencyKey: "idem-key-alb" },
+        },
+      ],
+    };
+    const event = createAlbEvent(JSON.stringify(callback), DEFAULT_HEADERS, {
+      "x-amzn-mtls-clientcert": FAKE_CERT_HEADER,
+    });
+    const result = await handler(event);
+
+    expect(result.statusCode).toBe(200);
+    const body = JSON.parse(result.body);
+    expect(body.message).toBe("Callback received");
+  });
+
+  it("processes non-mTLS ALB request successfully when API key is correct", async () => {
+    const callback = {
+      data: [
+        {
+          type: "MessageStatus",
+          attributes: {
+            messageId: "msg-alb-no-mtls",
+            messageReference: "ref-alb",
+            messageStatus: "delivered",
+            timestamp: "2026-01-01T00:00:00Z",
+          },
+          links: { message: "some-link" },
+          meta: { idempotencyKey: "idem-key-alb-no-mtls" },
+        },
+      ],
+    };
+    const event = createAlbEvent(JSON.stringify(callback), DEFAULT_HEADERS);
+    const result = await handler(event);
+
+    expect(result.statusCode).toBe(200);
+    const body = JSON.parse(result.body);
+    expect(body.message).toBe("Callback received");
+  });
+
+  it("non-ALB invocations skip certificate check", async () => {
+    const event = createMockEvent(JSON.stringify({ data: [] }));
+    const result = await handler(event);
+
+    const body = JSON.parse(result.body);
+    expect(body.message).not.toBe("Mutual TLS authentication required");
   });
 });
