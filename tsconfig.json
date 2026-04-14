@@ -1,14 +1,18 @@
 {
   "$schema": "https://json.schemastore.org/tsconfig",
   "compilerOptions": {
+    "allowImportingTsExtensions": true,
     "noEmit": true
   },
   "extends": "./tsconfig.base.json",
   "include": [
+    "jest.config.base.ts",
+    "lambdas/*/jest.config.ts",
     "lambdas/*/src/**/*",
     "scripts/*/src/**/*",
-    "tools/*/src/**/*",
     "src/**/*",
-    "tests/**/*"
+    "tests/**/*",
+    "tools/*/jest.config.ts",
+    "tools/*/src/**/*"
   ]
 }

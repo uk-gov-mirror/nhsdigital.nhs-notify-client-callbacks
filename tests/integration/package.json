@@ -25,6 +25,7 @@
   "devDependencies": {
     "@tsconfig/node22": "catalog:tools",
     "@types/jest": "catalog:test",
+    "@types/node": "catalog:tools",
     "async-wait-until": "catalog:app",
     "eslint": "catalog:lint",
     "jest": "catalog:test",

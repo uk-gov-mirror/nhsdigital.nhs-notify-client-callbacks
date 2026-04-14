@@ -13,16 +13,22 @@ import {
 import { createClientSubscriptionConfig } from "src/__tests__/helpers/client-subscription-fixtures";
 
 const mockPutClientConfig = jest.fn();
+const mockReadFileSync = jest.mocked(readFileSync);
 
 jest.mock("src/entrypoint/cli/helper", () => ({
   ...jest.requireActual("src/entrypoint/cli/helper"),
   createRepository: jest.fn(),
 }));
 
-jest.mock("node:fs", () => ({
-  ...jest.requireActual("node:fs"),
-  readFileSync: jest.fn(),
-}));
+jest.mock("node:fs", () => {
+  const actualFs = jest.requireActual<typeof import("node:fs")>("node:fs");
+  return {
+    ...actualFs,
+    readFileSync: jest.fn((...args: Parameters<typeof actualFs.readFileSync>) =>
+      actualFs.readFileSync(...args),
+    ),
+  };
+});
 
 const validConfig = createClientSubscriptionConfig();
 const mockCreateRepository = getMockCreateRepository();
@@ -32,6 +38,7 @@ describe("clients-put CLI", () => {
 
   beforeEach(() => {
     mockPutClientConfig.mockReset();
+    mockReadFileSync.mockClear();
     resetMockCreateRepository({
       putClientConfig: mockPutClientConfig,
     });
@@ -165,7 +172,15 @@ describe("clients-put CLI", () => {
   });
 
   it("reads config from --file input", async () => {
-    (readFileSync as jest.Mock).mockReturnValue(JSON.stringify(validConfig));
+    const configPath = path.join(tmpdir(), "config.json");
+    const actualFs = jest.requireActual<typeof import("node:fs")>("node:fs");
+    mockReadFileSync.mockImplementation((...args) => {
+      const [targetPath, options] = args;
+      if (targetPath === configPath && options === "utf8") {
+        return JSON.stringify(validConfig);
+      }
+      return actualFs.readFileSync(...args);
+    });
     mockPutClientConfig.mockResolvedValue(validConfig);
 
     await cli.main([
@@ -176,17 +191,15 @@ describe("clients-put CLI", () => {
       "--bucket-name",
       "bucket-1",
       "--file",
-      path.join(tmpdir(), "config.json"),
+      configPath,
     ]);
 
-    expect(readFileSync).toHaveBeenCalledWith(
-      path.join(tmpdir(), "config.json"),
-      "utf8",
-    );
+    expect(readFileSync).toHaveBeenCalledWith(configPath, "utf8");
     expect(mockPutClientConfig).toHaveBeenCalledTimes(1);
   });
 
   it("rejects non-json --file path", async () => {
+    const invalidPath = "config.txt";
     await cli.main([
       "node",
       "script",
@@ -195,14 +208,17 @@ describe("clients-put CLI", () => {
       "--bucket-name",
       "bucket-1",
       "--file",
-      "config.txt",
+      invalidPath,
     ]);
 
     expect(console.error).toHaveBeenCalledWith(
       "Error: --file must be a .json path",
     );
     expect(process.exitCode).toBe(1);
-    expect(readFileSync).not.toHaveBeenCalled();
+    expect(readFileSync).not.toHaveBeenCalledWith(
+      invalidPath,
+      expect.anything(),
+    );
     expect(mockPutClientConfig).not.toHaveBeenCalled();
   });
 

@@ -8,9 +8,11 @@
       ]
     }
   },
+  "exclude": [
+    "jest.config.ts"
+  ],
   "extends": "../../tsconfig.base.json",
   "include": [
-    "**/*.ts",
-    "jest.config.ts"
+    "**/*.ts"
   ]
 }

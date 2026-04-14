@@ -1,4 +1,4 @@
-import { nodeJestConfig } from "../../jest.config.base";
+import { nodeJestConfig } from "../../jest.config.base.ts";
 
 export default {
   ...nodeJestConfig,

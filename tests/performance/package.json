@@ -23,6 +23,7 @@
   "devDependencies": {
     "@tsconfig/node22": "catalog:tools",
     "@types/jest": "catalog:test",
+    "@types/node": "catalog:tools",
     "eslint": "catalog:lint",
     "jest": "catalog:test",
     "typescript": "catalog:tools"
