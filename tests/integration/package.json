@@ -15,7 +15,6 @@
   "dependencies": {
     "@aws-sdk/client-cloudwatch": "catalog:aws",
     "@aws-sdk/client-cloudwatch-logs": "catalog:aws",
-    "@aws-sdk/client-s3": "catalog:aws",
     "@aws-sdk/client-sqs": "catalog:aws",
     "@nhs-notify-client-callbacks/logger": "workspace:*",
     "@nhs-notify-client-callbacks/models": "workspace:*",

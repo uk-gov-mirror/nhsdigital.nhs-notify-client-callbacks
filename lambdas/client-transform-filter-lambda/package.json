@@ -17,7 +17,6 @@
     "@types/node": "catalog:tools",
     "eslint": "catalog:lint",
     "jest": "catalog:test",
-    "jest-mock-extended": "catalog:test",
     "typescript": "catalog:tools"
   },
   "engines": {

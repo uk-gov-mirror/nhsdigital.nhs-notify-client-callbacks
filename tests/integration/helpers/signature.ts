@@ -40,5 +40,3 @@ export function assertCallbackHeaders(
     computeExpectedSignature(callback.payload, apiKeyVar, applicationIdVar),
   );
 }
-
-export default computeExpectedSignature;

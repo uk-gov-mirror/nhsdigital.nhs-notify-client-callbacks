@@ -11,7 +11,6 @@ catalogs:
     async-wait-until: "^2.0.31"
     aws-embedded-metrics: "^4.2.1"
     cloudevents: "^10.0.0"
-    nhsuk-frontend: "^8.1.1"
     p-map: "^4.0.0"
     pino: "^10.3.1"
     table: "^6.9.0"
@@ -48,9 +47,7 @@ catalogs:
   test:
     "@types/jest": "^30.0.0"
     jest: "^30.3.0"
-    jest-environment-jsdom: "^30.3.0"
     jest-html-reporter: "^4.4.0"
-    jest-mock-extended: "^4.0.0"
     lcov-result-merger: "^5.0.1"
     ts-jest: "^29.4.9"
   tools:
@@ -59,6 +56,7 @@ catalogs:
     "@types/node": "^24.12.0"
     "@types/yargs": "^17.0.24"
     esbuild: "^0.28.0"
+    knip: "^5.0.0"
     ts-node: "^10.9.2"
     tsx: "^4.21.0"
     typescript: "^5.9.3"

@@ -1,8 +1,6 @@
 {
   "author": "",
-  "dependencies": {
-    "nhsuk-frontend": "catalog:app"
-  },
+  "dependencies": {},
   "description": "",
   "devDependencies": {},
   "engines": {

@@ -71,3 +71,10 @@ repos:
         entry: /usr/bin/env check=branch ./scripts/githooks/check-todos.sh
         language: script
         pass_filenames: false
+  - repo: local
+    hooks:
+      - id: knip
+        name: Knip
+        entry: pnpm exec knip --no-progress
+        language: system
+        pass_filenames: false

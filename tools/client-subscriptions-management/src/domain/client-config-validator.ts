@@ -4,6 +4,7 @@ import {
 } from "@nhs-notify-client-callbacks/models";
 import { prettifyError } from "zod";
 
+// eslint-disable-next-line import-x/prefer-default-export
 export const validateClientConfig = (
   rawConfig: unknown,
 ): ClientSubscriptionConfiguration => {
@@ -17,5 +18,3 @@ export const validateClientConfig = (
 
   return result.data;
 };
-
-export default validateClientConfig;

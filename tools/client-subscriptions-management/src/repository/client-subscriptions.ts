@@ -28,6 +28,7 @@ const parseStoredConfig = (
   return validateClientConfig(parsedConfig);
 };
 
+// eslint-disable-next-line import-x/prefer-default-export
 export class ClientSubscriptionRepository {
   constructor(private readonly s3Repository: S3Repository) {}
 
@@ -209,5 +210,3 @@ export class ClientSubscriptionRepository {
     return this.putClientConfig(clientId, updated, dryRun);
   }
 }
-
-export default ClientSubscriptionRepository;
