@@ -4,7 +4,9 @@ packages:
   - "src/*"
   - "tests/*"
   - "tools/*"
-blockExoticSubdeps: true
+
+overrides:
+  pretty-format>react-is: "19.0.0"
 
 catalogs:
   app:
@@ -68,3 +70,4 @@ nodeOptions: "${NODE_OPTIONS:- } --experimental-vm-modules"
 trustPolicy: no-downgrade
 trustPolicyExclude:
   - "semver@6.3.1"
+blockExoticSubdeps: true
