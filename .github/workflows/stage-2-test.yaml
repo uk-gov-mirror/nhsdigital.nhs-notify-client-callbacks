@@ -126,6 +126,31 @@ jobs:
       - name: "Run linting"
         run: |
           make test-lint
+  test-knip:
+    name: "Knip"
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: "Checkout code"
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - name: "Setup pnpm"
+        uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v5.0.0
+        with:
+          version: 10.33.0
+      - name: "Use Node.js"
+        uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
+        with:
+          node-version-file: '.tool-versions'
+          cache: 'pnpm'
+      - name: "Repo setup"
+        run: |
+          pnpm install --frozen-lockfile
+      - name: "Generate dependencies"
+        run: |
+          pnpm run generate-dependencies
+      - name: "Run knip"
+        run: |
+          make test-knip
   test-typecheck:
     name: "Typecheck"
     runs-on: ubuntu-latest

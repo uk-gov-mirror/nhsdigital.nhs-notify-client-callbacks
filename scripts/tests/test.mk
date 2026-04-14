@@ -38,6 +38,9 @@ test-integration-debug: # Debug a live environment - inspect queues, tail logs, 
 queue-status queue-peek tail-transform tail-webhook tail-pipe pipe-state:
 	@:
 
+test-knip: # Run knip dependency analysis
+	make _test name="knip"
+
 test-load: # Run all your load tests @Testing
 	make \
 		test-capacity \
