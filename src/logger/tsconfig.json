@@ -1,7 +1,11 @@
 {
   "compilerOptions": {
-    "baseUrl": "src",
-    "isolatedModules": true
+    "isolatedModules": true,
+    "paths": {
+      "*": [
+        "./src/*"
+      ]
+    }
   },
   "extends": "../../tsconfig.base.json",
   "include": [
