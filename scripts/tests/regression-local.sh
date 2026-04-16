@@ -40,5 +40,7 @@ fi
 AWS_ACCOUNT_ID="$(aws sts get-caller-identity --profile "$AWS_PROFILE" --query Account --output text)"
 
 export AWS_PROFILE AWS_REGION LOG_LEVEL NODE_OPTIONS AWS_ACCOUNT_ID ENVIRONMENT PROJECT COMPONENT
+[ -n "${AWS_CA_BUNDLE:-}" ] && export AWS_CA_BUNDLE
+[ -n "${NODE_EXTRA_CA_CERTS:-}" ] && export NODE_EXTRA_CA_CERTS
 
 CI=true exec ./scripts/tests/regression.sh

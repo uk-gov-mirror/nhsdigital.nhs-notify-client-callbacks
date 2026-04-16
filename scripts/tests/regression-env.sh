@@ -6,7 +6,7 @@ set -euo pipefail
 : "${AWS_REGION:?AWS_REGION must be set}"
 
 CLIENTS=(
-  "mock-client-regression.json:MOCK_CLIENT_REGRESSION"
+  "mock-client-1.json:MOCK_CLIENT_REGRESSION"
 )
 
 for CLIENT_ENTRY in "${CLIENTS[@]}"; do

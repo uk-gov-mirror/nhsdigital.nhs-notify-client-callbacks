@@ -20,6 +20,7 @@
     "@aws-sdk/client-s3": "catalog:aws",
     "@aws-sdk/client-ssm": "catalog:aws",
     "@aws-sdk/client-sqs": "catalog:aws",
+    "@aws-sdk/credential-providers": "catalog:aws",
     "@nhs-notify-client-callbacks/logger": "workspace:*",
     "@nhs-notify-client-callbacks/models": "workspace:*",
     "@nhs-notify-client-callbacks/test-support": "workspace:*",

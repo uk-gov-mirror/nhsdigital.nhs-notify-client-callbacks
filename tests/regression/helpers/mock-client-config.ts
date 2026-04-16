@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
-import type seedConfigJson from "../fixtures/subscriptions/mock-client-regression.json";
+import type seedConfigJson from "../fixtures/subscriptions/mock-client-1.json";
 
 type ClientFixtureShape = typeof seedConfigJson;
 
@@ -11,7 +11,7 @@ export type RegressionClientConfig = ClientFixtureShape & {
 
 export const CLIENT_FIXTURES = {
   regression: {
-    fixture: "mock-client-regression.json",
+    fixture: "mock-client-1.json",
     apiKeyVar: "MOCK_CLIENT_REGRESSION_API_KEY",
     applicationIdVar: "MOCK_CLIENT_REGRESSION_APPLICATION_ID",
   },
