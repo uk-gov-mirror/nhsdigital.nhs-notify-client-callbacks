@@ -14,6 +14,9 @@ test-unit: # Run your unit tests from scripts/test/unit @Testing
 test-lint: # Lint your code from scripts/test/lint @Testing
 	make _test name="lint"
 
+test-lua-lint: # Lint Lua scripts @Testing
+	make _test name="lua-lint"
+
 test-typecheck: # Typecheck your code from scripts/test/typecheck @Testing
 	make _test name="typecheck"
 
