@@ -3,7 +3,10 @@
     "globals": [
       "KEYS",
       "ARGV",
-      "redis"
+      "redis",
+      "cjson",
+      "cmsgpack",
+      "bit"
     ]
   }
 }
