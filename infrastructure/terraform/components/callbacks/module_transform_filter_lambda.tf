@@ -69,7 +69,7 @@ data "aws_iam_policy_document" "client_transform_filter_lambda" {
     ]
 
     resources = [
-      module.client_config_bucket.arn,
+      local.client_config_bucket_arn,
     ]
   }
 
@@ -82,7 +82,7 @@ data "aws_iam_policy_document" "client_transform_filter_lambda" {
     ]
 
     resources = [
-      "${module.client_config_bucket.arn}/*",
+      "${local.client_config_bucket_arn}/*",
     ]
   }
 
