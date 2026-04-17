@@ -23,6 +23,7 @@
     "@types/node": "catalog:tools",
     "@types/node-forge": "catalog:tools",
     "eslint": "catalog:lint",
+    "fengari": "^0.1.5",
     "jest": "catalog:test",
     "typescript": "catalog:tools"
   },
