@@ -7,7 +7,7 @@ TypeScript CLI utility for managing NHS Notify client subscription configuration
 From the repository root run:
 
 ```bash
-npm --workspace tools/client-subscriptions-management run <command> -- [options]
+pnpm --filter client-subscriptions-management run <command> -- [options]
 ```
 
 ## Example
@@ -15,7 +15,7 @@ npm --workspace tools/client-subscriptions-management run <command> -- [options]
 Deploy a message status subscription to the `dev` environment using a named AWS profile:
 
 ```bash
-npm --workspace tools/client-subscriptions-management run deploy -- message \
+pnpm --filter client-subscriptions-management run deploy -- message \
   --environment dev \
   --profile my-profile \
   --client-id my-client \
@@ -33,7 +33,7 @@ npm --workspace tools/client-subscriptions-management run deploy -- message \
 #### Message status
 
 ```bash
-npm --workspace tools/client-subscriptions-management run deploy -- message \
+pnpm --filter client-subscriptions-management run deploy -- message \
   --environment dev \
   --client-id client-123 \
   --message-statuses DELIVERED FAILED \
@@ -47,7 +47,7 @@ npm --workspace tools/client-subscriptions-management run deploy -- message \
 #### Channel status
 
 ```bash
-npm --workspace tools/client-subscriptions-management run deploy -- channel \
+pnpm --filter client-subscriptions-management run deploy -- channel \
   --environment dev \
   --client-id client-123 \
   --channel-type EMAIL \
@@ -67,7 +67,7 @@ Optional for both: `--client-name "Test Client"` (defaults to client-id if not p
 ### Get Client Subscriptions By Client ID
 
 ```bash
-npm --workspace tools/client-subscriptions-management run get-by-client-id -- \
+pnpm --filter client-subscriptions-management run get-by-client-id -- \
   --environment dev \
   --client-id client-123
 ```
@@ -75,7 +75,7 @@ npm --workspace tools/client-subscriptions-management run get-by-client-id -- \
 ### Put Message Status Subscription (S3 upload only)
 
 ```bash
-npm --workspace tools/client-subscriptions-management run put-message-status -- \
+pnpm --filter client-subscriptions-management run put-message-status -- \
   --environment dev \
   --client-id client-123 \
   --message-statuses DELIVERED FAILED \
@@ -91,7 +91,7 @@ Optional: `--client-name "Test Client"` (defaults to client-id if not provided),
 ### Put Channel Status Subscription (S3 upload only)
 
 ```bash
-npm --workspace tools/client-subscriptions-management run put-channel-status -- \
+pnpm --filter client-subscriptions-management run put-channel-status -- \
   --environment dev \
   --client-id client-123 \
   --channel-type EMAIL \

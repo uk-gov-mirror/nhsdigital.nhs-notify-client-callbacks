@@ -18,7 +18,7 @@ const config: KnipConfig = {
         // ESLint peer deps – referenced indirectly through plugin configs
         "@stylistic/eslint-plugin",
         "@typescript-eslint/parser",
-        // Used in lambdas' lambda-build npm script via pnpm exec
+        // Used in lambdas' lambda-build script via pnpm exec
         "esbuild",
         // Used in scripts/tests/unit.sh (shell script, not scanned by knip)
         "lcov-result-merger",

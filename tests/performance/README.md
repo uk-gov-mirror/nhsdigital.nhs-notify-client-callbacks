@@ -22,7 +22,7 @@ Load tests for the client-callbacks service. These tests run against a real depl
 From the repository root:
 
 ```bash
-ENVIRONMENT=dev AWS_ACCOUNT_ID=123456789012 npm run test:performance --workspace tests/performance
+ENVIRONMENT=dev AWS_ACCOUNT_ID=123456789012 pnpm run test:performance --filter tests/performance
 ```
 
 ## What the Tests Do

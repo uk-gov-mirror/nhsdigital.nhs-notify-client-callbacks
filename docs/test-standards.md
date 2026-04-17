@@ -104,7 +104,7 @@ AI must:
    - Verify mock return types match the actual function return types.
 
 7. **The "Test Execution" Mandate**:
-   - After creating or modifying a test, you MUST run it using the repo's test command - e.g. npm run test:unit
+   - After creating or modifying a test, you MUST run it using the repo's test command - e.g. pnpm run test:unit
    - If the test fails due to incorrect imports, paths, or signatures, fix and re-run.
    - Only report completion when the test passes (exit code 0) and test coverage checks also pass.
    - See section 6.2 for the full self-correction loop requirements.
@@ -192,7 +192,7 @@ AI must:
 
 When AI changes tests, it must:
 
-- run all the tests in the npm workspace.
+- run all the tests in the pnpm workspace.
 - report exactly what it ran and whether it passed.
 
 ### 6.2 AI Self-Correction Loop

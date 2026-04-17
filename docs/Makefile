@@ -20,10 +20,10 @@ $(if $(BASE_URL),-- --baseurl $(BASE_URL),-- --baseurl "")
 endef
 
 build: version
-	npm run build $(baseurlparam)
+	pnpm run build $(baseurlparam)
 
 debug: version
-	npm run debug
+	pnpm run debug
 
 version:
 	touch _config.version.yml
