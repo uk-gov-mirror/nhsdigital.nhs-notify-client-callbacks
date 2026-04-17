@@ -37,10 +37,10 @@ module "client_delivery" {
   elasticache_iam_username = "${var.project}-${var.environment}-${var.component}-elasticache-user"
 
   mtls_cert_secret_arn     = var.mtls_cert_secret_arn
-  mtls_test_cert_s3_bucket = var.mtls_test_certs_s3_bucket
-  mtls_test_cert_s3_key    = var.mtls_test_cert_s3_key # gitleaks:allow
-  mtls_test_ca_s3_key      = var.mtls_test_ca_s3_key   # gitleaks:allow
+  mtls_test_cert_s3_bucket = var.deploy_mock_clients ? module.mtls_test_certs_bucket[0].bucket : ""
+  mtls_test_cert_s3_key    = local.mtls_test_cert_s3_key # gitleaks:allow
+  mtls_test_ca_s3_key      = local.mtls_test_ca_s3_key   # gitleaks:allow
 
-  vpc_subnet_ids           = local.acct.private_subnet_ids
+  vpc_subnet_ids           = try(local.acct.private_subnets[local.bc_name], [])
   lambda_security_group_id = aws_security_group.https_client_lambda.id
 }

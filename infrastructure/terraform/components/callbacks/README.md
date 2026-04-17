@@ -9,6 +9,7 @@
 | <a name="requirement_terraform"></a> [terraform](#requirement\_terraform) | >= 1.10.1 |
 | <a name="requirement_aws"></a> [aws](#requirement\_aws) | 6.13 |
 | <a name="requirement_random"></a> [random](#requirement\_random) | ~> 3.0 |
+| <a name="requirement_tls"></a> [tls](#requirement\_tls) | ~> 4.0 |
 ## Inputs
 
 | Name | Description | Type | Default | Required |
@@ -32,11 +33,6 @@
 | <a name="input_log_retention_in_days"></a> [log\_retention\_in\_days](#input\_log\_retention\_in\_days) | The retention period in days for the Cloudwatch Logs events to be retained, default of 0 is indefinite | `number` | `0` | no |
 | <a name="input_message_root_uri"></a> [message\_root\_uri](#input\_message\_root\_uri) | The root URI used for constructing message links in callback payloads | `string` | n/a | yes |
 | <a name="input_mtls_cert_secret_arn"></a> [mtls\_cert\_secret\_arn](#input\_mtls\_cert\_secret\_arn) | Secrets Manager ARN for the shared mTLS client certificate (production) | `string` | `""` | no |
-| <a name="input_mtls_mock_server_cert_s3_key"></a> [mtls\_mock\_server\_cert\_s3\_key](#input\_mtls\_mock\_server\_cert\_s3\_key) | S3 key for the mock webhook server certificate PEM (signed by the test CA) | `string` | `""` | no |
-| <a name="input_mtls_mock_server_key_s3_key"></a> [mtls\_mock\_server\_key\_s3\_key](#input\_mtls\_mock\_server\_key\_s3\_key) | S3 key for the mock webhook server private key PEM | `string` | `""` | no |
-| <a name="input_mtls_test_ca_s3_key"></a> [mtls\_test\_ca\_s3\_key](#input\_mtls\_test\_ca\_s3\_key) | S3 key for the test CA certificate PEM bundle used for server verification and the mock webhook server cert chain | `string` | `""` | no |
-| <a name="input_mtls_test_cert_s3_key"></a> [mtls\_test\_cert\_s3\_key](#input\_mtls\_test\_cert\_s3\_key) | S3 key for the test mTLS client certificate bundle (dev) | `string` | `""` | no |
-| <a name="input_mtls_test_certs_s3_bucket"></a> [mtls\_test\_certs\_s3\_bucket](#input\_mtls\_test\_certs\_s3\_bucket) | S3 bucket containing test mTLS certificate material (dev) | `string` | `""` | no |
 | <a name="input_parent_acct_environment"></a> [parent\_acct\_environment](#input\_parent\_acct\_environment) | Name of the environment responsible for the acct resources used, affects things like DNS zone. Useful for named dev environments | `string` | `"main"` | no |
 | <a name="input_pipe_event_patterns"></a> [pipe\_event\_patterns](#input\_pipe\_event\_patterns) | value | `list(string)` | `[]` | no |
 | <a name="input_pipe_log_level"></a> [pipe\_log\_level](#input\_pipe\_log\_level) | Log level for the EventBridge Pipe. | `string` | `"ERROR"` | no |
@@ -56,6 +52,7 @@
 | <a name="module_client_transform_filter_lambda"></a> [client\_transform\_filter\_lambda](#module\_client\_transform\_filter\_lambda) | https://github.com/NHSDigital/nhs-notify-shared-modules/releases/download/3.0.7/terraform-lambda.zip | n/a |
 | <a name="module_kms"></a> [kms](#module\_kms) | https://github.com/NHSDigital/nhs-notify-shared-modules/releases/download/3.0.7/terraform-kms.zip | n/a |
 | <a name="module_mock_webhook_lambda"></a> [mock\_webhook\_lambda](#module\_mock\_webhook\_lambda) | https://github.com/NHSDigital/nhs-notify-shared-modules/releases/download/3.0.7/terraform-lambda.zip | n/a |
+| <a name="module_mtls_test_certs_bucket"></a> [mtls\_test\_certs\_bucket](#module\_mtls\_test\_certs\_bucket) | https://github.com/NHSDigital/nhs-notify-shared-modules/releases/download/3.0.7/terraform-s3bucket.zip | n/a |
 | <a name="module_sqs_inbound_event"></a> [sqs\_inbound\_event](#module\_sqs\_inbound\_event) | https://github.com/NHSDigital/nhs-notify-shared-modules/releases/download/3.0.7/terraform-sqs.zip | n/a |
 ## Outputs
 

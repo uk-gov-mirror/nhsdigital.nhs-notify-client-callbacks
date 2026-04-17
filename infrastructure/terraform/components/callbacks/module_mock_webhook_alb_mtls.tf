@@ -2,7 +2,7 @@ resource "aws_security_group" "mock_webhook_alb" {
   count       = var.deploy_mock_clients ? 1 : 0
   name        = "${local.csi}-mock-webhook-alb"
   description = "Security group for mock webhook ALB mTLS endpoint"
-  vpc_id      = local.acct.vpc_id
+  vpc_id      = local.acct.vpc_ids[local.bc_name]
 
   tags = merge(
     local.default_tags,
@@ -42,29 +42,11 @@ resource "aws_vpc_security_group_egress_rule" "mock_webhook_alb_egress" {
   tags              = local.default_tags
 }
 
-data "aws_s3_object" "mtls_mock_server_cert" {
-  count  = var.deploy_mock_clients ? 1 : 0
-  bucket = var.mtls_test_certs_s3_bucket
-  key    = var.mtls_mock_server_cert_s3_key
-}
-
-data "aws_s3_object" "mtls_mock_server_key" {
-  count  = var.deploy_mock_clients ? 1 : 0
-  bucket = var.mtls_test_certs_s3_bucket
-  key    = var.mtls_mock_server_key_s3_key
-}
-
-data "aws_s3_object" "mtls_ca_bundle" {
-  count  = var.deploy_mock_clients ? 1 : 0
-  bucket = var.mtls_test_certs_s3_bucket
-  key    = var.mtls_test_ca_s3_key # gitleaks:allow
-}
-
 resource "aws_acm_certificate" "mock_webhook_server" {
   count             = var.deploy_mock_clients ? 1 : 0
-  certificate_body  = data.aws_s3_object.mtls_mock_server_cert[0].body
-  private_key       = data.aws_s3_object.mtls_mock_server_key[0].body
-  certificate_chain = data.aws_s3_object.mtls_ca_bundle[0].body
+  certificate_body  = tls_locally_signed_cert.mock_server[0].cert_pem
+  private_key       = tls_private_key.mock_server[0].private_key_pem
+  certificate_chain = tls_self_signed_cert.test_ca[0].cert_pem
   tags              = local.default_tags
 }
 
@@ -74,7 +56,7 @@ resource "aws_lb" "mock_webhook_mtls" {
   internal           = true
   load_balancer_type = "application"
   security_groups    = [aws_security_group.mock_webhook_alb[0].id]
-  subnets            = local.acct.private_subnet_ids
+  subnets            = try(local.acct.private_subnets[local.bc_name], [])
   tags               = local.default_tags
 }
 

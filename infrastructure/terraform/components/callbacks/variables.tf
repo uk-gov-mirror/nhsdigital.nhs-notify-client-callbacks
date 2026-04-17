@@ -184,36 +184,6 @@ variable "mtls_cert_secret_arn" {
   default     = ""
 }
 
-variable "mtls_test_certs_s3_bucket" {
-  type        = string
-  description = "S3 bucket containing test mTLS certificate material (dev)"
-  default     = ""
-}
-
-variable "mtls_test_cert_s3_key" {
-  type        = string
-  description = "S3 key for the test mTLS client certificate bundle (dev)"
-  default     = ""
-}
-
-variable "mtls_test_ca_s3_key" {
-  type        = string
-  description = "S3 key for the test CA certificate PEM bundle used for server verification and the mock webhook server cert chain"
-  default     = ""
-}
-
-variable "mtls_mock_server_cert_s3_key" {
-  type        = string
-  description = "S3 key for the mock webhook server certificate PEM (signed by the test CA)"
-  default     = ""
-}
-
-variable "mtls_mock_server_key_s3_key" {
-  type        = string
-  description = "S3 key for the mock webhook server private key PEM"
-  default     = ""
-}
-
 variable "elasticache_data_storage_maximum_gb" {
   type        = number
   description = "Maximum data storage in GB for the ElastiCache Serverless delivery state cache"
