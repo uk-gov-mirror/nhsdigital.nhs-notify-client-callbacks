@@ -1,7 +1,7 @@
 resource "aws_cloudwatch_event_rule" "per_subscription" {
   for_each = var.subscriptions
 
-  name           = "${local.client_prefix}-${each.key}"
+  name           = "${local.csi}-${each.key}"
   description    = "Client Callbacks event rule for client ${var.client_id} subscription ${each.key}"
   event_bus_name = var.client_bus_name
 
@@ -11,7 +11,9 @@ resource "aws_cloudwatch_event_rule" "per_subscription" {
     }
   })
 
-  tags = local.default_tags
+  tags = merge(local.default_tags, {
+    SubscriptionId = each.value.subscription_id
+  })
 }
 
 resource "aws_cloudwatch_event_target" "per_subscription_target" {
@@ -19,7 +21,7 @@ resource "aws_cloudwatch_event_target" "per_subscription_target" {
 
   rule           = aws_cloudwatch_event_rule.per_subscription[each.value.subscription_id].name
   arn            = module.sqs_delivery.sqs_queue_arn
-  target_id      = "${local.client_prefix}-${each.value.target_id}"
+  target_id      = "${local.csi}-${each.value.target_id}"
   event_bus_name = var.client_bus_name
   role_arn       = aws_iam_role.eventbridge_sqs_target.arn
 

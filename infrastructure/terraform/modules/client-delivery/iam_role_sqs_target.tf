@@ -109,6 +109,7 @@ data "aws_iam_policy_document" "https_client_lambda" {
 
       resources = [
         "arn:aws:s3:::${var.mtls_test_cert_s3_bucket}/${var.mtls_test_cert_s3_key}",
+        "arn:aws:s3:::${var.mtls_test_cert_s3_bucket}/${var.mtls_test_ca_s3_key}",
       ]
     }
   }

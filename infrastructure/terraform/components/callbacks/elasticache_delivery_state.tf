@@ -7,7 +7,7 @@ resource "aws_elasticache_serverless_cache" "delivery_state" {
   snapshot_retention_limit = 0
 
   security_group_ids = [aws_security_group.elasticache_delivery_state.id]
-  subnet_ids         = local.acct.private_subnet_ids
+  subnet_ids         = try(local.acct.private_subnets[local.bc_name], [])
 
   kms_key_id = module.kms.key_arn
 
@@ -34,7 +34,7 @@ resource "aws_elasticache_serverless_cache" "delivery_state" {
 resource "aws_security_group" "elasticache_delivery_state" {
   name        = "${local.csi}-elasticache-delivery-state"
   description = "Security group for ElastiCache delivery state cluster"
-  vpc_id      = local.acct.vpc_id
+  vpc_id      = local.acct.vpc_ids[local.bc_name]
 
   tags = merge(
     local.default_tags,
@@ -58,7 +58,7 @@ resource "aws_vpc_security_group_ingress_rule" "elasticache_from_lambda" {
 resource "aws_security_group" "https_client_lambda" {
   name        = "${local.csi}-https-client-lambda"
   description = "Security group for per-client HTTPS Client Lambda functions"
-  vpc_id      = local.acct.vpc_id
+  vpc_id      = local.acct.vpc_ids[local.bc_name]
 
   tags = merge(
     local.default_tags,
