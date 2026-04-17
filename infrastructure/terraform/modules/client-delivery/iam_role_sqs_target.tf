@@ -82,6 +82,24 @@ data "aws_iam_policy_document" "https_client_lambda" {
   }
 
   dynamic "statement" {
+    for_each = var.lambda_security_group_id != "" ? [1] : []
+    content {
+      sid    = "VPCNetworkInterfacePermissions"
+      effect = "Allow"
+
+      actions = [
+        "ec2:CreateNetworkInterface",
+        "ec2:DeleteNetworkInterface",
+        "ec2:DescribeNetworkInterfaces",
+      ]
+
+      resources = [
+        "*",
+      ]
+    }
+  }
+
+  dynamic "statement" {
     for_each = var.mtls_cert_secret_arn != "" ? [1] : []
     content {
       sid    = "SecretsManagerMTLSCert"
