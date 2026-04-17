@@ -12,7 +12,7 @@ version.json
 
 # Please, add your custom content below!
 
-# dependencies
+# Dependencies
 node_modules
 .node-version
 */node_modules
