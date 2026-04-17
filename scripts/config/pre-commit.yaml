@@ -79,3 +79,10 @@ repos:
         entry: pnpm exec knip --no-progress
         language: system
         pass_filenames: false
+  - repo: local
+    hooks:
+      - id: check-lua-format
+        name: Check Lua format
+        entry: /usr/bin/env check=branch ./scripts/githooks/check-lua-format.sh
+        language: script
+        pass_filenames: false
