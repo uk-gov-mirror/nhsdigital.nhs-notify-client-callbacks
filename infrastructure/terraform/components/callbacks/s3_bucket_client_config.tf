@@ -55,7 +55,7 @@ data "aws_iam_policy_document" "client_config_bucket" {
     ]
 
     resources = [
-      module.client_config_bucket.arn,
+      local.client_config_bucket_arn,
     ]
   }
 
@@ -73,7 +73,7 @@ data "aws_iam_policy_document" "client_config_bucket" {
     ]
 
     resources = [
-      "${module.client_config_bucket.arn}/*",
+      "${local.client_config_bucket_arn}/*",
     ]
   }
 
@@ -91,8 +91,8 @@ data "aws_iam_policy_document" "client_config_bucket" {
     ]
 
     resources = [
-      module.client_config_bucket.arn,
-      "${module.client_config_bucket.arn}/*"
+      local.client_config_bucket_arn,
+      "${local.client_config_bucket_arn}/*"
     ]
 
     condition {

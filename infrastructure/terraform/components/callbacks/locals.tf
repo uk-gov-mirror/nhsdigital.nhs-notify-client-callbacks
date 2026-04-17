@@ -53,4 +53,6 @@ locals {
   }
 
   applications_map_parameter_name = coalesce(var.applications_map_parameter_name, "/${var.project}/${var.environment}/${var.component}/applications-map")
+
+  client_config_bucket_arn = "arn:aws:s3:::${var.project}-${var.aws_account_id}-${var.region}-${var.environment}-${var.component}-subscription-config"
 }
