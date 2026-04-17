@@ -23,25 +23,25 @@ Agents should look for a nested `AGENTS.md` in or near these areas before making
 
 ## Root package.json – role and usage
 
-The root `package.json` is the orchestration manifestgit co for this repo. It does not ship application code; it wires up shared dev tooling and delegates to workspace-level projects.
+The root `package.json` is the orchestration manifest for this repo. It does not ship application code; it wires up shared dev tooling and delegates to workspace-level projects.
 
-- Workspaces: Declares the set of npm workspaces (e.g. under `lambdas/`, `utils/`, `tests/`, `scripts/`). Agents should add a new workspace path here when introducing a new npm project.
-- Scripts: Provides top-level commands that fan out across workspaces using `--workspaces` (lint, typecheck, unit tests) and project-specific runners (e.g. `lambda-build`).
+- Workspaces: Declares the set of pnpm workspaces (e.g. under `lambdas/`, `utils/`, `tests/`, `scripts/`). Agents should add a new workspace path here when introducing a new pnpm project.
+- Scripts: Provides top-level commands that fan out across workspaces using `pnpm -r` (lint, typecheck, unit tests) and project-specific runners (e.g. `lambda-build`).
 - Dev tool dependencies: Centralises Jest, TypeScript, ESLint configurations and plugins to keep versions consistent across workspaces. Workspace projects should rely on these unless a local override is strictly needed.
 - Overrides/resolutions: Pins transitive dependencies (e.g. Jest/react-is) to avoid ecosystem conflicts. Agents must not remove overrides without verifying tests across all workspaces.
 
 Agent guidance:
 
-- Before adding or removing a workspace, update the root `workspaces` array and ensure CI scripts still succeed with `npm run lint`, `npm run typecheck`, and `npm run test:unit` at the repo root.
-- When adding repo-wide scripts, keep names consistent with existing patterns (e.g. `lint`, `lint:fix`, `typecheck`, `test:unit`, `lambda-build`) and prefer `--workspaces` fan-out.
+- Before adding or removing a workspace, update the root `workspaces` array and ensure CI scripts still succeed with `pnpm run lint`, `pnpm run typecheck`, and `pnpm run test:unit` at the repo root.
+- When adding repo-wide scripts, keep names consistent with existing patterns (e.g. `lint`, `lint:fix`, `typecheck`, `test:unit`, `lambda-build`) and prefer `pnpm -r` fan-out.
 - Do not publish from the root. If adding a new workspace intended for publication, mark that workspace package as `private: false` and keep the root as private.
 - Validate changes by running the repo pre-commit hooks: `make githooks-run`.
 
 Success criteria for changes affecting the root `package.json`:
 
-- `npm run lint`, `npm run typecheck`, and `npm run test:unit` pass at the repo root.
-- Workspace discovery is correct (new projects appear under `npm run typecheck --workspaces`).
-- No regression in lambda build tooling (`npm run lambda-build`).
+- `pnpm run lint`, `pnpm run typecheck`, and `pnpm run test:unit` pass at the repo root.
+- Workspace discovery is correct (new projects appear under `pnpm run typecheck -r`).
+- No regression in lambda build tooling (`pnpm run lambda-build`).
 
 ## What Agents Can / Can’t Do
 
@@ -81,7 +81,7 @@ When proposing a change, agents should:
 
   to catch formatting and basic lint issues. Domain specific checks will be defined in appropriate nested AGENTS.md files.
 
-- Suggest at least one extra validation step (for example `npm test:unit` in a lambda, or triggering a specific workflow).
+- Suggest at least one extra validation step (for example `pnpm run test:unit` in a lambda, or triggering a specific workflow).
 - Any required follow up activites which fall outside of the current task's scope should be clearly marked with a 'TODO: CCM-12345' comment. The human user should be prompted to create and provide a JIRA ticket ID to be added to the comment.
 
 ## Security & Safety

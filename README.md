@@ -102,7 +102,7 @@ make config
 Run unit tests for Lambda functions:
 
 ```shell
-npm test
+pnpm test:unit
 ```
 
 ## Infrastructure
