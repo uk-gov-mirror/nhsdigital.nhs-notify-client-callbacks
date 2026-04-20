@@ -1,31 +1,37 @@
 import recordResultLuaSrc from "services/record-result.lua";
 import { createRedisStore, evalLua } from "__tests__/helpers/lua-redis-mock";
 
+// ARGV: [now, success, cooldownMs, decayPeriodMs, cbErrorThreshold, cbMinAttempts, cbWindowPeriodMs]
+// KEYS: [cbKey]
+// Returns: [ok (0|1), state]  state: "closed" | "opened" | "failed"
+
 type RecordResultArgs = {
   now: number;
   success: boolean;
-  cbWindowPeriodMs: number;
+  cooldownMs: number;
+  decayPeriodMs: number;
   cbErrorThreshold: number;
   cbMinAttempts: number;
-  cbCooldownMs: number;
-  decayPeriodMs: number;
+  cbWindowPeriodMs: number;
 };
 
 const defaultArgs: RecordResultArgs = {
   now: 1_000_000,
   success: true,
-  cbWindowPeriodMs: 60_000,
+  cooldownMs: 60_000,
+  decayPeriodMs: 300_000,
   cbErrorThreshold: 0.5,
   cbMinAttempts: 10,
-  cbCooldownMs: 60_000,
-  decayPeriodMs: 300_000,
+  cbWindowPeriodMs: 60_000,
 };
+
+type RecordResultResult = [number, string];
 
 function runRecordResult(
   store: ReturnType<typeof createRedisStore>,
   args: Partial<RecordResultArgs> = {},
   targetId = "t1",
-) {
+): RecordResultResult {
   const merged = { ...defaultArgs, ...args };
   return evalLua(
     recordResultLuaSrc,
@@ -33,22 +39,24 @@ function runRecordResult(
     [
       merged.now.toString(),
       merged.success ? "1" : "0",
-      merged.cbWindowPeriodMs.toString(),
+      merged.cooldownMs.toString(),
+      merged.decayPeriodMs.toString(),
       merged.cbErrorThreshold.toString(),
       merged.cbMinAttempts.toString(),
-      merged.cbCooldownMs.toString(),
-      merged.decayPeriodMs.toString(),
+      merged.cbWindowPeriodMs.toString(),
     ],
     store,
-  );
+  ) as RecordResultResult;
 }
 
 describe("record-result.lua", () => {
   describe("success recording", () => {
     it("returns closed state for a successful result", () => {
       const store = createRedisStore();
-      const result = runRecordResult(store, { success: true });
-      expect(result).toEqual({ ok: true, state: "closed" });
+      const [ok, state] = runRecordResult(store, { success: true });
+
+      expect(ok).toBe(1);
+      expect(state).toBe("closed");
     });
 
     it("increments attempt count without incrementing failures", () => {
@@ -71,6 +79,14 @@ describe("record-result.lua", () => {
       expect(cbHash.get("cb_failures")).toBe("1");
     });
 
+    it("returns failed state for a single failure below threshold", () => {
+      const store = createRedisStore();
+      const [ok, state] = runRecordResult(store, { success: false });
+
+      expect(ok).toBe(0);
+      expect(state).toBe("failed");
+    });
+
     it("stays closed when below error threshold", () => {
       const store = createRedisStore();
       const now = 1_000_000;
@@ -82,8 +98,9 @@ describe("record-result.lua", () => {
         runRecordResult(store, { now, success: false });
       }
 
-      const result = runRecordResult(store, { now, success: true });
-      expect(result).toEqual({ ok: true, state: "closed" });
+      const [ok, state] = runRecordResult(store, { now, success: true });
+      expect(ok).toBe(1);
+      expect(state).toBe("closed");
     });
   });
 
@@ -92,22 +109,24 @@ describe("record-result.lua", () => {
       const store = createRedisStore();
       const now = 1_000_000;
 
-      for (let i = 0; i < 10; i++) {
-        runRecordResult(store, {
+      for (let i = 0; i < 4; i++) {
+        const [, state] = runRecordResult(store, {
           now,
           success: false,
           cbMinAttempts: 5,
           cbErrorThreshold: 0.5,
         });
+        expect(state).toBe("failed");
       }
 
-      const result = runRecordResult(store, {
+      const [ok, state] = runRecordResult(store, {
         now,
         success: false,
         cbMinAttempts: 5,
         cbErrorThreshold: 0.5,
       });
-      expect(result).toEqual({ ok: false, state: "opened" });
+      expect(ok).toBe(0);
+      expect(state).toBe("opened");
     });
 
     it("does not open circuit when below minimum attempts", () => {
@@ -122,162 +141,169 @@ describe("record-result.lua", () => {
         });
       }
 
-      const result = runRecordResult(store, {
+      const [ok, state] = runRecordResult(store, {
         now,
         success: false,
         cbMinAttempts: 10,
       });
-      expect(result).toEqual({ ok: true, state: "closed" });
+      expect(ok).toBe(0);
+      expect(state).toBe("failed");
     });
 
     it("sets opened_until_ms with cooldown on open", () => {
       const store = createRedisStore();
       const now = 1_000_000;
-      const cbCooldownMs = 30_000;
+      const cooldownMs = 30_000;
 
-      for (let i = 0; i < 10; i++) {
+      for (let i = 0; i < 5; i++) {
         runRecordResult(store, {
           now,
           success: false,
           cbMinAttempts: 5,
           cbErrorThreshold: 0.5,
-          cbCooldownMs,
+          cooldownMs,
         });
       }
 
       const cbHash = store.get("cb:t1")!;
-      expect(Number(cbHash.get("opened_until_ms"))).toBe(now + cbCooldownMs);
-    });
-  });
-
-  describe("window rolling", () => {
-    it("rolls window when period expires", () => {
-      const store = createRedisStore();
-      const windowPeriodMs = 60_000;
-      const t0 = 1_000_000;
-      const t1 = t0 + windowPeriodMs + 1;
-
-      for (let i = 0; i < 3; i++) {
-        runRecordResult(store, {
-          now: t0,
-          success: false,
-          cbWindowPeriodMs: windowPeriodMs,
-        });
-      }
-
-      runRecordResult(store, {
-        now: t1,
-        success: true,
-        cbWindowPeriodMs: windowPeriodMs,
-      });
-
-      const cbHash = store.get("cb:t1")!;
-      expect(cbHash.get("cb_prev_failures")).toBe("3");
-      expect(cbHash.get("cb_prev_attempts")).toBe("3");
-      expect(cbHash.get("cb_attempts")).toBe("1");
-      expect(cbHash.get("cb_failures")).toBe("0");
+      expect(Number(cbHash.get("opened_until_ms"))).toBe(now + cooldownMs);
     });
 
-    it("initialises window_from on first call", () => {
+    it("resets all counters on open", () => {
       const store = createRedisStore();
       const now = 1_000_000;
 
-      runRecordResult(store, { now });
+      for (let i = 0; i < 5; i++) {
+        runRecordResult(store, {
+          now,
+          success: false,
+          cbMinAttempts: 5,
+          cbErrorThreshold: 0.5,
+        });
+      }
 
       const cbHash = store.get("cb:t1")!;
-      expect(cbHash.get("cb_window_from")).toBe(now.toString());
+      expect(cbHash.get("cb_failures")).toBe("0");
+      expect(cbHash.get("cb_attempts")).toBe("0");
+      expect(cbHash.get("cb_window_from")).toBe("0");
+      expect(cbHash.get("cb_prev_failures")).toBe("0");
+      expect(cbHash.get("cb_prev_attempts")).toBe("0");
+    });
+
+    it("does not double-trip when circuit is already open", () => {
+      const store = createRedisStore();
+      const now = 1_000_000;
+      const openedUntil = now + 60_000;
+
+      store.set(
+        "cb:t1",
+        new Map([
+          ["opened_until_ms", openedUntil.toString()],
+          ["cb_window_from", now.toString()],
+        ]),
+      );
+
+      for (let i = 0; i < 20; i++) {
+        const [, state] = runRecordResult(store, {
+          now,
+          success: false,
+          cbMinAttempts: 5,
+          cbErrorThreshold: 0.5,
+        });
+        expect(state).toBe("failed");
+      }
+
+      const cbHash = store.get("cb:t1")!;
+      expect(Number(cbHash.get("opened_until_ms"))).toBe(openedUntil);
     });
   });
 
   describe("two-window blended rate", () => {
     it("blends previous window failures into current assessment", () => {
       const store = createRedisStore();
-      const windowPeriodMs = 60_000;
-      const t0 = 1_000_000;
+      const now = 1_000_000;
+      const cbWindowPeriodMs = 60_000;
 
-      for (let i = 0; i < 10; i++) {
-        runRecordResult(store, {
-          now: t0,
-          success: false,
-          cbWindowPeriodMs: windowPeriodMs,
-          cbMinAttempts: 5,
-          cbErrorThreshold: 0.5,
-        });
-      }
+      store.set(
+        "cb:t1",
+        new Map([
+          ["cb_window_from", now.toString()],
+          ["cb_prev_failures", "8"],
+          ["cb_prev_attempts", "10"],
+        ]),
+      );
 
-      const justAfterRoll = t0 + windowPeriodMs + 1;
-      const result = runRecordResult(store, {
-        now: justAfterRoll,
+      const [ok, state] = runRecordResult(store, {
+        now,
         success: false,
-        cbWindowPeriodMs: windowPeriodMs,
+        cbWindowPeriodMs,
         cbMinAttempts: 5,
         cbErrorThreshold: 0.5,
       });
-
-      expect(result).toEqual({ ok: false, state: "opened" });
+      expect(ok).toBe(0);
+      expect(state).toBe("opened");
     });
 
-    it("reduces previous window weight as current window progresses", () => {
+    it("reduces previous window weight as current window ages", () => {
       const store = createRedisStore();
-      const windowPeriodMs = 100_000;
+      const cbWindowPeriodMs = 100_000;
       const t0 = 1_000_000;
+      const nearEnd = t0 + cbWindowPeriodMs - 1;
 
-      for (let i = 0; i < 10; i++) {
-        runRecordResult(store, {
-          now: t0,
-          success: false,
-          cbWindowPeriodMs: windowPeriodMs,
-          cbMinAttempts: 5,
-          cbErrorThreshold: 0.5,
-        });
-      }
+      store.set(
+        "cb:t1",
+        new Map([
+          ["cb_window_from", t0.toString()],
+          ["cb_prev_failures", "10"],
+          ["cb_prev_attempts", "10"],
+        ]),
+      );
 
-      const nearEndOfWindow = t0 + windowPeriodMs + windowPeriodMs - 1;
       for (let i = 0; i < 20; i++) {
         runRecordResult(store, {
-          now: nearEndOfWindow,
+          now: nearEnd,
           success: true,
-          cbWindowPeriodMs: windowPeriodMs,
+          cbWindowPeriodMs,
           cbMinAttempts: 5,
           cbErrorThreshold: 0.5,
         });
       }
 
-      const result = runRecordResult(store, {
-        now: nearEndOfWindow,
-        success: true,
-        cbWindowPeriodMs: windowPeriodMs,
+      const [, state] = runRecordResult(store, {
+        now: nearEnd,
+        success: false,
+        cbWindowPeriodMs,
         cbMinAttempts: 5,
         cbErrorThreshold: 0.5,
       });
-      expect(result).toEqual({ ok: true, state: "closed" });
+      expect(state).toBe("failed");
+    });
+
+    it("ignores previous window when cbWindowPeriodMs is 0", () => {
+      const store = createRedisStore();
+      const now = 1_000_000;
+
+      store.set(
+        "cb:t1",
+        new Map([
+          ["cb_window_from", now.toString()],
+          ["cb_prev_failures", "100"],
+          ["cb_prev_attempts", "100"],
+        ]),
+      );
+
+      const [, state] = runRecordResult(store, {
+        now,
+        success: false,
+        cbWindowPeriodMs: 0,
+        cbMinAttempts: 5,
+        cbErrorThreshold: 0.5,
+      });
+      expect(state).toBe("failed");
     });
   });
 
   describe("decay period", () => {
-    it("clears opened_until_ms after decay period elapses", () => {
-      const store = createRedisStore();
-      const openedAt = 1_000_000;
-      const cooldownMs = 60_000;
-      const decayPeriodMs = 300_000;
-      const openedUntil = openedAt + cooldownMs;
-      const afterDecay = openedUntil + decayPeriodMs + 1;
-
-      store.set(
-        "cb:t1",
-        new Map([["opened_until_ms", openedUntil.toString()]]),
-      );
-
-      runRecordResult(store, {
-        now: afterDecay,
-        success: true,
-        decayPeriodMs,
-      });
-
-      const cbHash = store.get("cb:t1")!;
-      expect(cbHash.get("opened_until_ms")).toBe("0");
-    });
-
     it("preserves opened_until_ms during active decay", () => {
       const store = createRedisStore();
       const openedUntil = 1_060_000;
@@ -296,6 +322,37 @@ describe("record-result.lua", () => {
 
       const cbHash = store.get("cb:t1")!;
       expect(Number(cbHash.get("opened_until_ms"))).toBe(openedUntil);
+    });
+
+    it("clears opened_until_ms after decay period elapses", () => {
+      const store = createRedisStore();
+      const openedUntil = 1_060_000;
+      const decayPeriodMs = 300_000;
+      const afterDecay = openedUntil + decayPeriodMs + 1;
+
+      store.set(
+        "cb:t1",
+        new Map([["opened_until_ms", openedUntil.toString()]]),
+      );
+
+      runRecordResult(store, {
+        now: afterDecay,
+        success: true,
+        decayPeriodMs,
+      });
+
+      const cbHash = store.get("cb:t1")!;
+      expect(cbHash.get("opened_until_ms")).toBe("0");
+    });
+
+    it("clears opened_until_ms when circuit was never opened", () => {
+      const store = createRedisStore();
+      const now = 1_000_000;
+
+      runRecordResult(store, { now, success: true });
+
+      const cbHash = store.get("cb:t1")!;
+      expect(cbHash.get("opened_until_ms")).toBe("0");
     });
   });
 

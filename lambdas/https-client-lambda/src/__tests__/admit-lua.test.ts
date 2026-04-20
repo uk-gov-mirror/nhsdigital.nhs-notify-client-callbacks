@@ -1,71 +1,88 @@
 import admitLuaSrc from "services/admit.lua";
 import { createRedisStore, evalLua } from "__tests__/helpers/lua-redis-mock";
 
+// ARGV: [now, capacity, refillPerSec, cooldownMs, decayPeriodMs, cbWindowPeriodMs, cbProbeIntervalMs]
+// KEYS: [cbKey, rlKey]
+// Returns: [allowed (0|1), reason, retryAfterMs, effectiveRate]
+
 type AdmitArgs = {
   now: number;
-  refillPerSec: number;
   capacity: number;
-  cbProbeIntervalMs: number;
-  cbEnabled: boolean;
+  refillPerSec: number;
+  cooldownMs: number;
   decayPeriodMs: number;
+  cbWindowPeriodMs: number;
+  cbProbeIntervalMs: number;
 };
 
 const defaultArgs: AdmitArgs = {
   now: 1_000_000,
-  refillPerSec: 10,
   capacity: 10,
-  cbProbeIntervalMs: 60_000,
-  cbEnabled: true,
+  refillPerSec: 10,
+  cooldownMs: 60_000,
   decayPeriodMs: 300_000,
+  cbWindowPeriodMs: 60_000,
+  cbProbeIntervalMs: 60_000,
+};
+
+type AdmitResult = {
+  allowed: number;
+  reason: string;
+  retryAfterMs: number;
+  effectiveRate: number;
 };
 
 function runAdmit(
   store: ReturnType<typeof createRedisStore>,
   args: Partial<AdmitArgs> = {},
   targetId = "t1",
-) {
+): AdmitResult {
   const merged = { ...defaultArgs, ...args };
-  return evalLua(
+  const raw = evalLua(
     admitLuaSrc,
-    [`rl:${targetId}`, `cb:${targetId}`],
+    [`cb:${targetId}`, `rl:${targetId}`],
     [
       merged.now.toString(),
-      merged.refillPerSec.toString(),
       merged.capacity.toString(),
-      merged.cbProbeIntervalMs.toString(),
-      merged.cbEnabled ? "1" : "0",
+      merged.refillPerSec.toString(),
+      merged.cooldownMs.toString(),
       merged.decayPeriodMs.toString(),
+      merged.cbWindowPeriodMs.toString(),
+      merged.cbProbeIntervalMs.toString(),
     ],
     store,
-  );
+  ) as [number, string, number, number];
+  return {
+    allowed: raw[0],
+    reason: raw[1],
+    retryAfterMs: raw[2],
+    effectiveRate: raw[3],
+  };
 }
 
 describe("admit.lua", () => {
   describe("rate limiting", () => {
     it("allows the first request with full token bucket", () => {
       const store = createRedisStore();
-      const result = runAdmit(store);
+      const { allowed, effectiveRate, reason, retryAfterMs } = runAdmit(store);
 
-      expect(result).toEqual({
-        allowed: true,
-        probe: false,
-        effectiveRate: 10,
-      });
+      expect(allowed).toBe(1);
+      expect(reason).toBe("allowed");
+      expect(retryAfterMs).toBe(0);
+      expect(effectiveRate).toBe(10);
     });
 
-    it("deducts tokens on each call", () => {
+    it("depletes tokens on consecutive calls and rejects when empty", () => {
       const store = createRedisStore();
 
       for (let i = 0; i < 10; i++) {
-        const result = runAdmit(store);
-        expect(result).toMatchObject({ allowed: true });
+        const { allowed } = runAdmit(store);
+        expect(allowed).toBe(1);
       }
 
-      const result = runAdmit(store);
-      expect(result).toMatchObject({
-        allowed: false,
-        reason: "rate_limited",
-      });
+      const { allowed, reason } = runAdmit(store);
+      expect(allowed).toBe(0);
+      expect(reason).toBe("rate_limited");
     });
 
     it("returns retryAfterMs when rate limited", () => {
@@ -75,15 +92,19 @@ describe("admit.lua", () => {
         runAdmit(store);
       }
 
-      const result = runAdmit(store);
-      expect(result).toMatchObject({
-        allowed: false,
-        reason: "rate_limited",
-        retryAfterMs: expect.any(Number),
-      });
-      expect((result as { retryAfterMs: number }).retryAfterMs).toBeGreaterThan(
-        0,
-      );
+      const { retryAfterMs } = runAdmit(store);
+      expect(retryAfterMs).toBe(1000);
+    });
+
+    it("reports effective rate when rate limited", () => {
+      const store = createRedisStore();
+
+      for (let i = 0; i < 10; i++) {
+        runAdmit(store);
+      }
+
+      const { effectiveRate } = runAdmit(store);
+      expect(effectiveRate).toBe(10);
     });
 
     it("refills tokens over time", () => {
@@ -95,28 +116,24 @@ describe("admit.lua", () => {
       }
 
       const denied = runAdmit(store, { now });
-      expect(denied).toMatchObject({ allowed: false });
+      expect(denied.allowed).toBe(0);
 
-      const later = now + 1000;
-      const result = runAdmit(store, { now: later });
-      expect(result).toMatchObject({ allowed: true });
+      const refilled = runAdmit(store, { now: now + 1000 });
+      expect(refilled.allowed).toBe(1);
     });
 
     it("caps tokens at capacity", () => {
       const store = createRedisStore();
+      const now = 1_000_000;
 
-      const result = runAdmit(store, {
-        now: 1_000_000,
-        capacity: 5,
-        refillPerSec: 100,
-      });
-      expect(result).toMatchObject({ allowed: true });
+      runAdmit(store, { now, capacity: 5, refillPerSec: 100 });
 
-      const rlHash = store.get("rl:t1");
-      const tokensRaw = rlHash?.get("tokens");
-      expect(tokensRaw).toBeDefined();
-      const tokens = Number.parseFloat(tokensRaw ?? "");
-      expect(tokens).toBeLessThanOrEqual(4);
+      // Advance 10 seconds — would add 1000 tokens without cap
+      runAdmit(store, { now: now + 10_000, capacity: 5, refillPerSec: 100 });
+
+      const rlHash = store.get("rl:t1")!;
+      // Refill capped to capacity (5), then one consumed → 4
+      expect(Number(rlHash.get("tokens"))).toBe(4);
     });
 
     it("handles zero refill rate", () => {
@@ -126,17 +143,17 @@ describe("admit.lua", () => {
         runAdmit(store, { refillPerSec: 0 });
       }
 
-      const result = runAdmit(store, { refillPerSec: 0 });
-      expect(result).toMatchObject({
-        allowed: false,
-        reason: "rate_limited",
-        retryAfterMs: 1000,
+      const { allowed, reason, retryAfterMs } = runAdmit(store, {
+        refillPerSec: 0,
       });
+      expect(allowed).toBe(0);
+      expect(reason).toBe("rate_limited");
+      expect(retryAfterMs).toBe(1000);
     });
   });
 
   describe("circuit breaker", () => {
-    it("blocks requests when circuit is open", () => {
+    it("rejects when circuit is open", () => {
       const store = createRedisStore();
       const now = 1_000_000;
       const openedUntil = now + 60_000;
@@ -149,12 +166,10 @@ describe("admit.lua", () => {
         ]),
       );
 
-      const result = runAdmit(store, { now });
-      expect(result).toMatchObject({
-        allowed: false,
-        reason: "circuit_open",
-        effectiveRate: 0,
-      });
+      const { allowed, effectiveRate, reason } = runAdmit(store, { now });
+      expect(allowed).toBe(0);
+      expect(reason).toBe("circuit_open");
+      expect(effectiveRate).toBe(0);
     });
 
     it("returns retryAfterMs for open circuit", () => {
@@ -170,12 +185,8 @@ describe("admit.lua", () => {
         ]),
       );
 
-      const result = runAdmit(store, { now });
-      expect(result).toMatchObject({
-        allowed: false,
-        reason: "circuit_open",
-        retryAfterMs: 30_000,
-      });
+      const { retryAfterMs } = runAdmit(store, { now });
+      expect(retryAfterMs).toBe(30_000);
     });
 
     it("allows probe when probe interval has elapsed", () => {
@@ -192,15 +203,31 @@ describe("admit.lua", () => {
         ]),
       );
 
-      const result = runAdmit(store, {
+      const { allowed, effectiveRate, reason, retryAfterMs } = runAdmit(store, {
         now,
         cbProbeIntervalMs: 60_000,
       });
-      expect(result).toEqual({
-        allowed: true,
-        probe: true,
-        effectiveRate: 0,
-      });
+      expect(allowed).toBe(1);
+      expect(reason).toBe("probe");
+      expect(retryAfterMs).toBe(0);
+      expect(effectiveRate).toBe(0);
+    });
+
+    it("updates last_probe_ms after allowing a probe", () => {
+      const store = createRedisStore();
+      const now = 1_000_000;
+      const openedUntil = now + 120_000;
+      const lastProbe = now - 61_000;
+
+      store.set(
+        "cb:t1",
+        new Map([
+          ["opened_until_ms", openedUntil.toString()],
+          ["last_probe_ms", lastProbe.toString()],
+        ]),
+      );
+
+      runAdmit(store, { now, cbProbeIntervalMs: 60_000 });
 
       const cbHash = store.get("cb:t1")!;
       expect(cbHash.get("last_probe_ms")).toBe(now.toString());
@@ -220,28 +247,99 @@ describe("admit.lua", () => {
         ]),
       );
 
-      const result = runAdmit(store, {
+      const { allowed, reason } = runAdmit(store, {
         now,
         cbProbeIntervalMs: 60_000,
       });
-      expect(result).toMatchObject({
-        allowed: false,
-        reason: "circuit_open",
-      });
+      expect(allowed).toBe(0);
+      expect(reason).toBe("circuit_open");
     });
 
-    it("skips circuit breaker when disabled", () => {
+    it("does not probe when cbProbeIntervalMs is 0", () => {
       const store = createRedisStore();
       const now = 1_000_000;
-      const openedUntil = now + 60_000;
+      const openedUntil = now + 120_000;
 
       store.set(
         "cb:t1",
-        new Map([["opened_until_ms", openedUntil.toString()]]),
+        new Map([
+          ["opened_until_ms", openedUntil.toString()],
+          ["last_probe_ms", "0"],
+        ]),
       );
 
-      const result = runAdmit(store, { now, cbEnabled: false });
-      expect(result).toMatchObject({ allowed: true, probe: false });
+      const { allowed, reason } = runAdmit(store, {
+        now,
+        cbProbeIntervalMs: 0,
+      });
+      expect(allowed).toBe(0);
+      expect(reason).toBe("circuit_open");
+    });
+  });
+
+  describe("sliding window", () => {
+    it("initialises cbWindowFrom on first call", () => {
+      const store = createRedisStore();
+      const now = 1_000_000;
+
+      runAdmit(store, { now });
+
+      const cbHash = store.get("cb:t1")!;
+      expect(cbHash.get("cb_window_from")).toBe(now.toString());
+    });
+
+    it("rolls current window to previous when period expires", () => {
+      const store = createRedisStore();
+      const cbWindowPeriodMs = 60_000;
+      const t0 = 1_000_000;
+      const t1 = t0 + cbWindowPeriodMs + 1;
+
+      store.set(
+        "cb:t1",
+        new Map([
+          ["cb_window_from", t0.toString()],
+          ["cb_failures", "5"],
+          ["cb_attempts", "10"],
+          ["cb_prev_failures", "0"],
+          ["cb_prev_attempts", "0"],
+        ]),
+      );
+
+      runAdmit(store, { now: t1, cbWindowPeriodMs });
+
+      const cbHash = store.get("cb:t1")!;
+      expect(cbHash.get("cb_prev_failures")).toBe("5");
+      expect(cbHash.get("cb_prev_attempts")).toBe("10");
+      expect(cbHash.get("cb_failures")).toBe("0");
+      expect(cbHash.get("cb_attempts")).toBe("0");
+      expect(cbHash.get("cb_window_from")).toBe(t1.toString());
+    });
+
+    it("clears both windows when gap exceeds two periods", () => {
+      const store = createRedisStore();
+      const cbWindowPeriodMs = 60_000;
+      const t0 = 1_000_000;
+      const t1 = t0 + 2 * cbWindowPeriodMs + 1;
+
+      store.set(
+        "cb:t1",
+        new Map([
+          ["cb_window_from", t0.toString()],
+          ["cb_failures", "5"],
+          ["cb_attempts", "10"],
+          ["cb_prev_failures", "3"],
+          ["cb_prev_attempts", "7"],
+        ]),
+      );
+
+      runAdmit(store, { now: t1, cbWindowPeriodMs });
+
+      const cbHash = store.get("cb:t1")!;
+      expect(cbHash.get("cb_prev_failures")).toBe("0");
+      expect(cbHash.get("cb_prev_attempts")).toBe("0");
+      expect(cbHash.get("cb_failures")).toBe("0");
+      expect(cbHash.get("cb_attempts")).toBe("0");
+      expect(cbHash.get("cb_window_from")).toBe(t1.toString());
     });
   });
 
@@ -254,16 +352,12 @@ describe("admit.lua", () => {
 
       store.set("cb:t1", new Map([["opened_until_ms", closedAt.toString()]]));
 
-      const result = runAdmit(store, {
+      const { effectiveRate } = runAdmit(store, {
         now: halfwayThrough,
         refillPerSec: 10,
         decayPeriodMs,
       });
-      expect(result).toMatchObject({ allowed: true });
-      expect((result as { effectiveRate: number }).effectiveRate).toBeCloseTo(
-        5,
-        0,
-      );
+      expect(effectiveRate).toBe(5);
     });
 
     it("uses full rate after decay period ends", () => {
@@ -274,18 +368,16 @@ describe("admit.lua", () => {
 
       store.set("cb:t1", new Map([["opened_until_ms", closedAt.toString()]]));
 
-      const result = runAdmit(store, {
+      const { allowed, effectiveRate } = runAdmit(store, {
         now: afterDecay,
         refillPerSec: 10,
         decayPeriodMs,
       });
-      expect(result).toMatchObject({
-        allowed: true,
-        effectiveRate: 10,
-      });
+      expect(allowed).toBe(1);
+      expect(effectiveRate).toBe(10);
     });
 
-    it("clamps minimum effective rate to 0.001", () => {
+    it("clamps minimum effective rate to 1", () => {
       const store = createRedisStore();
       const closedAt = 1_000_000;
       const decayPeriodMs = 300_000;
@@ -293,13 +385,26 @@ describe("admit.lua", () => {
 
       store.set("cb:t1", new Map([["opened_until_ms", closedAt.toString()]]));
 
-      const result = runAdmit(store, {
+      const { effectiveRate } = runAdmit(store, {
         now: veryEarly,
         refillPerSec: 10,
         decayPeriodMs,
       });
-      const rate = (result as { effectiveRate: number }).effectiveRate;
-      expect(rate).toBeGreaterThanOrEqual(0.001);
+      expect(effectiveRate).toBeGreaterThanOrEqual(1);
+    });
+
+    it("clears openedUntil when decay period fully elapses", () => {
+      const store = createRedisStore();
+      const closedAt = 1_000_000;
+      const decayPeriodMs = 300_000;
+      const afterDecay = closedAt + decayPeriodMs + 1;
+
+      store.set("cb:t1", new Map([["opened_until_ms", closedAt.toString()]]));
+
+      runAdmit(store, { now: afterDecay, decayPeriodMs });
+
+      const cbHash = store.get("cb:t1")!;
+      expect(cbHash.get("opened_until_ms")).toBe("0");
     });
 
     it("does not decay when decayPeriodMs is 0", () => {
@@ -308,37 +413,17 @@ describe("admit.lua", () => {
 
       store.set("cb:t1", new Map([["opened_until_ms", closedAt.toString()]]));
 
-      const result = runAdmit(store, {
+      const { allowed, effectiveRate } = runAdmit(store, {
         now: closedAt + 1,
         refillPerSec: 10,
         decayPeriodMs: 0,
       });
-      expect(result).toMatchObject({
-        allowed: true,
-        effectiveRate: 10,
-      });
-    });
-
-    it("does not decay when circuit breaker is disabled", () => {
-      const store = createRedisStore();
-      const closedAt = 1_000_000;
-
-      store.set("cb:t1", new Map([["opened_until_ms", closedAt.toString()]]));
-
-      const result = runAdmit(store, {
-        now: closedAt + 1,
-        refillPerSec: 10,
-        decayPeriodMs: 300_000,
-        cbEnabled: false,
-      });
-      expect(result).toMatchObject({
-        allowed: true,
-        effectiveRate: 10,
-      });
+      expect(allowed).toBe(1);
+      expect(effectiveRate).toBe(10);
     });
   });
 
-  describe("redis state persistence", () => {
+  describe("state persistence", () => {
     it("persists token count and last_refill_ms", () => {
       const store = createRedisStore();
       runAdmit(store, { now: 1_000_000, capacity: 5 });
@@ -346,6 +431,30 @@ describe("admit.lua", () => {
       const rlHash = store.get("rl:t1")!;
       expect(rlHash.get("tokens")).toBeDefined();
       expect(rlHash.get("last_refill_ms")).toBe("1000000");
+    });
+
+    it("persists circuit breaker fields", () => {
+      const store = createRedisStore();
+      runAdmit(store, { now: 1_000_000 });
+
+      const cbHash = store.get("cb:t1")!;
+      expect(cbHash.has("opened_until_ms")).toBe(true);
+      expect(cbHash.has("cb_window_from")).toBe(true);
+      expect(cbHash.has("cb_failures")).toBe(true);
+      expect(cbHash.has("cb_attempts")).toBe(true);
+      expect(cbHash.has("cb_prev_failures")).toBe(true);
+      expect(cbHash.has("cb_prev_attempts")).toBe(true);
+    });
+
+    it("isolates state between targets", () => {
+      const store = createRedisStore();
+      runAdmit(store, {}, "target-a");
+      runAdmit(store, {}, "target-b");
+
+      expect(store.has("cb:target-a")).toBe(true);
+      expect(store.has("cb:target-b")).toBe(true);
+      expect(store.has("rl:target-a")).toBe(true);
+      expect(store.has("rl:target-b")).toBe(true);
     });
   });
 });
