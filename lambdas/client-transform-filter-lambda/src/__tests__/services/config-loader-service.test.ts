@@ -1,4 +1,5 @@
 import { S3Client } from "@aws-sdk/client-s3";
+import { ConfigSubscriptionCache } from "@nhs-notify-client-callbacks/config-subscription-cache";
 import { ConfigLoader } from "services/config-loader";
 import {
   ConfigLoaderService,
@@ -8,6 +9,7 @@ import {
 
 const mockS3Client = jest.mocked(S3Client);
 const mockConfigLoader = jest.mocked(ConfigLoader);
+const mockConfigSubscriptionCache = jest.mocked(ConfigSubscriptionCache);
 
 jest.mock("@aws-sdk/client-s3", () => ({
   S3Client: jest.fn(),
@@ -17,12 +19,19 @@ jest.mock("services/config-loader", () => ({
   ConfigLoader: jest.fn(),
 }));
 
+jest.mock("@nhs-notify-client-callbacks/config-subscription-cache", () => ({
+  ConfigSubscriptionCache: jest.fn().mockImplementation(() => ({
+    reset: jest.fn(),
+  })),
+}));
+
 describe("ConfigLoaderService", () => {
   const originalBucket = process.env.CLIENT_SUBSCRIPTION_CONFIG_BUCKET;
   const originalPrefix = process.env.CLIENT_SUBSCRIPTION_CONFIG_PREFIX;
 
   beforeEach(() => {
     mockConfigLoader.mockClear();
+    mockConfigSubscriptionCache.mockClear();
     process.env.CLIENT_SUBSCRIPTION_CONFIG_BUCKET = "test-bucket";
   });
 
@@ -60,7 +69,7 @@ describe("ConfigLoaderService", () => {
       delete process.env.CLIENT_SUBSCRIPTION_CONFIG_PREFIX;
       const service = new ConfigLoaderService();
       service.getLoader();
-      expect(mockConfigLoader).toHaveBeenCalledWith(
+      expect(mockConfigSubscriptionCache).toHaveBeenCalledWith(
         expect.objectContaining({ keyPrefix: "client_subscriptions/" }),
       );
     });
@@ -69,7 +78,7 @@ describe("ConfigLoaderService", () => {
       process.env.CLIENT_SUBSCRIPTION_CONFIG_PREFIX = "custom_prefix/";
       const service = new ConfigLoaderService();
       service.getLoader();
-      expect(mockConfigLoader).toHaveBeenCalledWith(
+      expect(mockConfigSubscriptionCache).toHaveBeenCalledWith(
         expect.objectContaining({ keyPrefix: "custom_prefix/" }),
       );
     });
@@ -90,7 +99,6 @@ describe("ConfigLoaderService", () => {
       });
       const service = new ConfigLoaderService();
       service.reset(customClient);
-      // Should not throw and the loader should be available immediately
       expect(() => service.getLoader()).not.toThrow();
     });
 
@@ -101,7 +109,7 @@ describe("ConfigLoaderService", () => {
       });
       const service = new ConfigLoaderService();
       service.reset(customClient);
-      expect(mockConfigLoader).toHaveBeenCalledWith(
+      expect(mockConfigSubscriptionCache).toHaveBeenCalledWith(
         expect.objectContaining({ keyPrefix: "custom_prefix/" }),
       );
     });

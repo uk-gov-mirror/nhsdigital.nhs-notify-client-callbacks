@@ -7,6 +7,7 @@ import {
   commonOptions,
   createRepository,
   runCommand,
+  targetIdOption,
   writeOptions,
 } from "src/entrypoint/cli/helper";
 import { formatClientConfig } from "src/format";
@@ -20,12 +21,8 @@ export const builder = (yargs: Argv) =>
   yargs.options({
     ...commonOptions,
     ...clientIdOption,
+    ...targetIdOption,
     ...writeOptions,
-    "target-id": {
-      type: "string",
-      demandOption: true,
-      description: "Target identifier to delete",
-    },
   });
 
 export const handler: CliCommand<TargetsDelArgs>["handler"] = async (argv) => {

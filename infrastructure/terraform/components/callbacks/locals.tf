@@ -21,7 +21,7 @@ locals {
       targets = [
         for target in try(client.targets, []) :
         merge(target, {
-          invocationEndpoint = try(target.mtls.enabled, false) ? "https://${aws_lb.mock_webhook_mtls[0].dns_name}/${target.targetId}" : "http://${aws_lb.mock_webhook_mtls[0].dns_name}/${target.targetId}"
+          invocationEndpoint = try(target.delivery.mtls.enabled, false) ? "https://${aws_lb.mock_webhook_mtls[0].dns_name}/${target.targetId}" : "http://${aws_lb.mock_webhook_mtls[0].dns_name}/${target.targetId}"
           apiKey             = merge(target.apiKey, { headerValue = random_password.mock_webhook_api_key[0].result })
         })
       ]

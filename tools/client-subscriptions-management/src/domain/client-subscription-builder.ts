@@ -47,7 +47,9 @@ export function buildTarget(args: BuildTargetArgs): CallbackTarget {
   }
 
   if (certPinning.enabled && !certPinning.spkiHash) {
-    warnings.push("Certificate pinning is enabled but no SPKI hash is stored");
+    throw new Error(
+      "Certificate pinning cannot be enabled without an SPKI hash. Run 'targets-set-certificate' first.",
+    );
   }
 
   if (!mtls.enabled && certPinning.enabled) {
@@ -68,8 +70,12 @@ export function buildTarget(args: BuildTargetArgs): CallbackTarget {
       headerName: args.apiKeyHeaderName ?? "x-api-key",
       headerValue: args.apiKey,
     },
-    mtls,
-    certPinning,
+    delivery: {
+      mtls: {
+        ...mtls,
+        certPinning,
+      },
+    },
   };
 }
 

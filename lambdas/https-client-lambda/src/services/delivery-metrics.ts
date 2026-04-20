@@ -61,6 +61,34 @@ export function emitCircuitBreakerOpen(targetId: string): void {
   metrics.putMetric("CircuitBreakerOpen", 1, Unit.Count);
 }
 
+export function emitCircuitBreakerClosed(targetId: string): void {
+  const metrics = getMetrics();
+  metrics.setProperty("targetId", targetId);
+  metrics.putMetric("CircuitBreakerClosed", 1, Unit.Count);
+}
+
+export function emitRetryWindowExhausted(targetId: string): void {
+  const metrics = getMetrics();
+  metrics.setProperty("targetId", targetId);
+  metrics.putMetric("DeliveryRetryWindowExhausted", 1, Unit.Count);
+}
+
+export function emitAdmissionDenied(targetId: string, reason: string): void {
+  const metrics = getMetrics();
+  metrics.setProperty("targetId", targetId);
+  metrics.setProperty("reason", reason);
+  metrics.putMetric("AdmissionDenied", 1, Unit.Count);
+}
+
+export function emitDeliveryDuration(
+  targetId: string,
+  durationMs: number,
+): void {
+  const metrics = getMetrics();
+  metrics.setProperty("targetId", targetId);
+  metrics.putMetric("DeliveryDurationMs", durationMs, Unit.Milliseconds);
+}
+
 export async function flushMetrics(): Promise<void> {
   if (metricsInstance) {
     await metricsInstance.flush();

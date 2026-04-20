@@ -4,15 +4,10 @@ import type { CallbackTarget } from "@nhs-notify-client-callbacks/models";
 import { PERMANENT_TLS_ERROR_CODES } from "services/delivery/tls-agent-factory";
 
 export type DeliveryResult =
-  | { ok: true }
-  | { ok: false; permanent: true }
-  | {
-      ok: false;
-      permanent: false;
-      statusCode: 429;
-      retryAfterHeader: string | undefined;
-    }
-  | { ok: false; permanent: false; statusCode: number };
+  | { outcome: "success" }
+  | { outcome: "permanent_failure" }
+  | { outcome: "rate_limited"; retryAfterHeader: string | undefined }
+  | { outcome: "transient_failure"; statusCode: number };
 
 export function deliverPayload(
   target: CallbackTarget,
@@ -43,27 +38,25 @@ export function deliverPayload(
         const statusCode = res.statusCode ?? 0;
 
         if (statusCode >= 200 && statusCode < 300) {
-          resolve({ ok: true });
+          resolve({ outcome: "success" });
           return;
         }
 
         if (statusCode === 429) {
           const retryAfterHeader = res.headers["retry-after"];
           resolve({
-            ok: false,
-            permanent: false,
-            statusCode: 429,
+            outcome: "rate_limited",
             retryAfterHeader,
           });
           return;
         }
 
         if (statusCode >= 400 && statusCode < 500) {
-          resolve({ ok: false, permanent: true });
+          resolve({ outcome: "permanent_failure" });
           return;
         }
 
-        resolve({ ok: false, permanent: false, statusCode });
+        resolve({ outcome: "transient_failure", statusCode });
       },
     );
 
@@ -73,11 +66,11 @@ export function deliverPayload(
 
     req.on("error", (error: NodeJS.ErrnoException) => {
       if (error.code && PERMANENT_TLS_ERROR_CODES.has(error.code)) {
-        resolve({ ok: false, permanent: true });
+        resolve({ outcome: "permanent_failure" });
         return;
       }
 
-      resolve({ ok: false, permanent: false, statusCode: 0 });
+      resolve({ outcome: "transient_failure", statusCode: 0 });
     });
 
     req.end(signedPayloadJson);

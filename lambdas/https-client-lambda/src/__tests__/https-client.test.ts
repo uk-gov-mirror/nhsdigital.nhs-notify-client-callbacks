@@ -23,8 +23,6 @@ const createTarget = (): CallbackTarget => ({
   invocationMethod: "POST",
   invocationRateLimit: 10,
   apiKey: { headerName: "x-api-key", headerValue: "secret" },
-  mtls: { enabled: false },
-  certPinning: { enabled: false },
 });
 
 const createMockAgent = () => ({}) as Agent;
@@ -113,7 +111,7 @@ describe("deliverPayload", () => {
     jest.restoreAllMocks();
   });
 
-  it("returns ok: true on 2xx", async () => {
+  it("returns success on 2xx", async () => {
     mockHttpsRequest(200);
 
     const result = await deliverPayload(
@@ -123,10 +121,10 @@ describe("deliverPayload", () => {
       createMockAgent(),
     );
 
-    expect(result).toEqual({ ok: true });
+    expect(result).toEqual({ outcome: "success" });
   });
 
-  it("returns permanent: true on 4xx non-429", async () => {
+  it("returns permanent_failure on 4xx non-429", async () => {
     mockHttpsRequest(400);
 
     const result = await deliverPayload(
@@ -136,10 +134,10 @@ describe("deliverPayload", () => {
       createMockAgent(),
     );
 
-    expect(result).toEqual({ ok: false, permanent: true });
+    expect(result).toEqual({ outcome: "permanent_failure" });
   });
 
-  it("returns permanent: true on TLS error CERT_HAS_EXPIRED", async () => {
+  it("returns permanent_failure on TLS error CERT_HAS_EXPIRED", async () => {
     mockHttpsRequestError("CERT_HAS_EXPIRED");
 
     const result = await deliverPayload(
@@ -149,10 +147,10 @@ describe("deliverPayload", () => {
       createMockAgent(),
     );
 
-    expect(result).toEqual({ ok: false, permanent: true });
+    expect(result).toEqual({ outcome: "permanent_failure" });
   });
 
-  it("returns permanent: true on TLS pinning error", async () => {
+  it("returns permanent_failure on TLS pinning error", async () => {
     mockHttpsRequestError("ERR_CERT_PINNING_FAILED");
 
     const result = await deliverPayload(
@@ -162,10 +160,10 @@ describe("deliverPayload", () => {
       createMockAgent(),
     );
 
-    expect(result).toEqual({ ok: false, permanent: true });
+    expect(result).toEqual({ outcome: "permanent_failure" });
   });
 
-  it("returns ok: false, permanent: false on 5xx", async () => {
+  it("returns transient_failure on 5xx", async () => {
     mockHttpsRequest(503);
 
     const result = await deliverPayload(
@@ -175,10 +173,10 @@ describe("deliverPayload", () => {
       createMockAgent(),
     );
 
-    expect(result).toEqual({ ok: false, permanent: false, statusCode: 503 });
+    expect(result).toEqual({ outcome: "transient_failure", statusCode: 503 });
   });
 
-  it("returns 429 with Retry-After header value", async () => {
+  it("returns rate_limited with Retry-After header value", async () => {
     mockHttpsRequest(429, { "retry-after": "60" });
 
     const result = await deliverPayload(
@@ -189,14 +187,12 @@ describe("deliverPayload", () => {
     );
 
     expect(result).toEqual({
-      ok: false,
-      permanent: false,
-      statusCode: 429,
+      outcome: "rate_limited",
       retryAfterHeader: "60",
     });
   });
 
-  it("returns 429 with undefined retryAfterHeader when header is absent", async () => {
+  it("returns rate_limited with undefined retryAfterHeader when header is absent", async () => {
     mockHttpsRequest(429);
 
     const result = await deliverPayload(
@@ -207,14 +203,12 @@ describe("deliverPayload", () => {
     );
 
     expect(result).toEqual({
-      ok: false,
-      permanent: false,
-      statusCode: 429,
+      outcome: "rate_limited",
       retryAfterHeader: undefined,
     });
   });
 
-  it("returns ok: false, permanent: false on TCP error", async () => {
+  it("returns transient_failure on TCP error", async () => {
     mockHttpsRequestError("ECONNREFUSED");
 
     const result = await deliverPayload(
@@ -224,7 +218,7 @@ describe("deliverPayload", () => {
       createMockAgent(),
     );
 
-    expect(result).toEqual({ ok: false, permanent: false, statusCode: 0 });
+    expect(result).toEqual({ outcome: "transient_failure", statusCode: 0 });
   });
 
   it("uses port 443 when URL has no explicit port", async () => {
@@ -239,7 +233,7 @@ describe("deliverPayload", () => {
       createMockAgent(),
     );
 
-    expect(result).toEqual({ ok: true });
+    expect(result).toEqual({ outcome: "success" });
     const callUrl = (https.request as jest.Mock).mock.calls[0][0] as URL;
     expect(callUrl).toBeInstanceOf(URL);
     expect(callUrl.port).toBe("");
@@ -255,6 +249,6 @@ describe("deliverPayload", () => {
       createMockAgent(),
     );
 
-    expect(result).toEqual({ ok: false, permanent: false, statusCode: 0 });
+    expect(result).toEqual({ outcome: "transient_failure", statusCode: 0 });
   });
 });

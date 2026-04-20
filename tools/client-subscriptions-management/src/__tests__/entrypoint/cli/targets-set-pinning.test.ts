@@ -25,7 +25,12 @@ jest.mock("src/format", () => ({
 }));
 
 const target = createTarget({
-  certPinning: { enabled: true, spkiHash: "existing-hash" },
+  delivery: {
+    mtls: {
+      enabled: true,
+      certPinning: { enabled: true, spkiHash: "existing-hash" },
+    },
+  },
 });
 const config = createClientSubscriptionConfig({ targets: [target] });
 const mockCreateRepository = getMockCreateRepository();
@@ -50,7 +55,12 @@ describe("targets-set-pinning CLI", () => {
       createClientSubscriptionConfig({
         targets: [
           createTarget({
-            certPinning: { enabled: true, spkiHash: "existing-hash" },
+            delivery: {
+              mtls: {
+                enabled: true,
+                certPinning: { enabled: true, spkiHash: "existing-hash" },
+              },
+            },
           }),
         ],
       }),
@@ -79,7 +89,11 @@ describe("targets-set-pinning CLI", () => {
       expect.objectContaining({
         targets: [
           expect.objectContaining({
-            certPinning: { enabled: true, spkiHash: "existing-hash" },
+            delivery: expect.objectContaining({
+              mtls: expect.objectContaining({
+                certPinning: { enabled: true, spkiHash: "existing-hash" },
+              }),
+            }),
           }),
         ],
       }),
@@ -87,8 +101,8 @@ describe("targets-set-pinning CLI", () => {
     );
   });
 
-  it("disables pinning with --disable flag and emits ANSI warning", async () => {
-    await cli.main([...baseArgs, "--disable"]);
+  it("disables pinning with --no-enable flag and emits ANSI warning", async () => {
+    await cli.main([...baseArgs, "--no-enable"]);
 
     expect(console.warn).toHaveBeenCalledWith(
       expect.stringContaining("Disabling certificate pinning"),
@@ -98,7 +112,11 @@ describe("targets-set-pinning CLI", () => {
       expect.objectContaining({
         targets: [
           expect.objectContaining({
-            certPinning: { enabled: false, spkiHash: "existing-hash" },
+            delivery: expect.objectContaining({
+              mtls: expect.objectContaining({
+                certPinning: { enabled: false, spkiHash: "existing-hash" },
+              }),
+            }),
           }),
         ],
       }),
@@ -107,11 +125,13 @@ describe("targets-set-pinning CLI", () => {
   });
 
   it("preserves existing spkiHash when disabling", async () => {
-    await cli.main([...baseArgs, "--disable"]);
+    await cli.main([...baseArgs, "--no-enable"]);
 
     const putCall = mockPutClientConfig.mock.calls[0];
     const updatedTarget = putCall[1].targets[0];
-    expect(updatedTarget.certPinning.spkiHash).toBe("existing-hash");
+    expect(updatedTarget.delivery.mtls.certPinning.spkiHash).toBe(
+      "existing-hash",
+    );
   });
 
   it("passes dry-run to putClientConfig", async () => {
@@ -137,7 +157,12 @@ describe("targets-set-pinning CLI", () => {
       createClientSubscriptionConfig({
         targets: [
           createTarget({
-            certPinning: { enabled: false },
+            delivery: {
+              mtls: {
+                enabled: true,
+                certPinning: { enabled: false },
+              },
+            },
           }),
         ],
       }),

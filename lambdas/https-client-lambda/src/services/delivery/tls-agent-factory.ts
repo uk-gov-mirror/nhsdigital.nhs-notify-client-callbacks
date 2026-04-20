@@ -9,7 +9,7 @@ import {
   SecretsManagerClient,
 } from "@aws-sdk/client-secrets-manager";
 import type { CallbackTarget } from "@nhs-notify-client-callbacks/models";
-import { logger } from "services/logger";
+import { logger } from "@nhs-notify-client-callbacks/logger";
 
 const {
   MTLS_CERT_SECRET_ARN,
@@ -18,7 +18,7 @@ const {
   MTLS_TEST_CERT_S3_KEY,
 } = process.env;
 const CERT_EXPIRY_THRESHOLD_MS =
-  Number(process.env.CERT_EXPIRY_THRESHOLD_MS) || 86_400_000;
+  Number(process.env.CERT_EXPIRY_THRESHOLD_MS) || 86_400_000; // 24 hours
 
 const s3Client = new S3Client({});
 const secretsClient = new SecretsManagerClient({});
@@ -142,7 +142,15 @@ export async function buildAgent(target: CallbackTarget): Promise<Agent> {
     keepAlive: false,
   };
 
-  if (target.mtls.enabled) {
+  const certPinning = target.delivery?.mtls?.certPinning;
+
+  if (certPinning?.enabled && !certPinning.spkiHash) {
+    throw new Error(
+      `certPinning.spkiHash is required when certPinning is enabled for target '${target.targetId}'`,
+    );
+  }
+
+  if (target.delivery?.mtls?.enabled) {
     const material = await getMaterial();
     agentOptions.key = material.key;
     agentOptions.cert = material.cert;
@@ -152,14 +160,8 @@ export async function buildAgent(target: CallbackTarget): Promise<Agent> {
     }
   }
 
-  if (target.certPinning.enabled) {
-    const expectedHash = target.certPinning.spkiHash;
-
-    if (!expectedHash) {
-      throw new Error(
-        `certPinning.spkiHash is required when certPinning is enabled for target '${target.targetId}'`,
-      );
-    }
+  if (certPinning?.enabled) {
+    const expectedHash = certPinning.spkiHash!;
 
     /* eslint-disable sonarjs/function-return-type -- checkServerIdentity requires Error|undefined return */
     agentOptions.checkServerIdentity = (

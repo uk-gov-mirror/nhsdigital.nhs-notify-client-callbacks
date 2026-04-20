@@ -74,6 +74,7 @@ async function buildResponse(
   const path = event.path ?? eventWithContextFields.rawPath;
 
   const isAlbInvocation = Boolean(eventWithContextFields.requestContext?.elb);
+  const clientCertPresent = Boolean(headers["x-amzn-mtls-clientcert"]);
   let isMtls = false;
   if (isAlbInvocation) {
     const certResult = verifyClientCertificate(
@@ -88,6 +89,7 @@ async function buildResponse(
     } else {
       logger.info("Mock webhook invoked without mTLS", {
         isMtls: false,
+        clientCertPresent,
         reason: certResult.reason,
       });
     }
@@ -98,6 +100,7 @@ async function buildResponse(
     method: event.httpMethod,
     hasBody: Boolean(event.body),
     isMtls,
+    clientCertPresent,
     "x-api-key": headers["x-api-key"],
     "x-hmac-sha256-signature": headers["x-hmac-sha256-signature"],
     payload: event.body,

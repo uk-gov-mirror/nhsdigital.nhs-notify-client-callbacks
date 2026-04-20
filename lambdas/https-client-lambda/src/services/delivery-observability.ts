@@ -1,11 +1,15 @@
-import { logger } from "services/logger";
+import { logger } from "@nhs-notify-client-callbacks/logger";
 import {
+  emitAdmissionDenied,
+  emitCircuitBreakerClosed,
   emitCircuitBreakerOpen,
   emitDeliveryAttempt,
+  emitDeliveryDuration,
   emitDeliveryFailure,
   emitDeliveryPermanentFailure,
   emitDeliverySuccess,
   emitRateLimited,
+  emitRetryWindowExhausted,
 } from "services/delivery-metrics";
 
 export function recordDeliveryAttempt(
@@ -60,4 +64,37 @@ export function recordDeliveryFailure(
 
 export function recordCircuitBreakerOpen(targetId: string): void {
   emitCircuitBreakerOpen(targetId);
+  logger.warn("Circuit breaker opened", { targetId });
+}
+
+export function recordCircuitBreakerClosed(targetId: string): void {
+  emitCircuitBreakerClosed(targetId);
+  logger.info("Circuit breaker closed", { targetId });
+}
+
+export function recordRetryWindowExhausted(
+  clientId: string,
+  targetId: string,
+): void {
+  emitRetryWindowExhausted(targetId);
+  logger.warn("Retry window exhausted — sending to DLQ", {
+    clientId,
+    targetId,
+  });
+}
+
+export function recordAdmissionDenied(
+  clientId: string,
+  targetId: string,
+  reason: string,
+): void {
+  emitAdmissionDenied(targetId, reason);
+  logger.warn("Admission denied", { clientId, targetId, reason });
+}
+
+export function recordDeliveryDuration(
+  targetId: string,
+  durationMs: number,
+): void {
+  emitDeliveryDuration(targetId, durationMs);
 }

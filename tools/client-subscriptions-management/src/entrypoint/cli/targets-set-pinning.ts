@@ -7,7 +7,10 @@ import {
   clientIdOption,
   commonOptions,
   createRepository,
+  requireClientConfig,
+  requireTargetConfig,
   runCommand,
+  targetIdOption,
   writeOptions,
 } from "src/entrypoint/cli/helper";
 import { formatClientConfig } from "src/format";
@@ -15,72 +18,57 @@ import { formatClientConfig } from "src/format";
 type TargetsSetPinningArgs = ClientCliArgs &
   WriteCliArgs & {
     "target-id": string;
-    enable?: boolean;
-    disable?: boolean;
+    enable: boolean;
   };
 
 export const builder = (yargs: Argv) =>
-  yargs
-    .options({
-      ...commonOptions,
-      ...clientIdOption,
-      ...writeOptions,
-      "target-id": {
-        type: "string",
-        demandOption: true,
-        description: "Target identifier to update",
-      },
-      enable: {
-        type: "boolean",
-        description: "Enable certificate pinning for this target",
-        conflicts: "disable",
-      },
-      disable: {
-        type: "boolean",
-        description: "Disable certificate pinning for this target",
-        conflicts: "enable",
-      },
-    })
-    .check((argv) => {
-      if (!argv.enable && !argv.disable) {
-        throw new Error("Specify either --enable or --disable");
-      }
-      return true;
-    });
+  yargs.options({
+    ...commonOptions,
+    ...clientIdOption,
+    ...targetIdOption,
+    ...writeOptions,
+    enable: {
+      type: "boolean",
+      demandOption: true,
+      description:
+        "Enable or disable certificate pinning for this target (use --no-enable to disable)",
+    },
+  });
 
 export const handler: CliCommand<TargetsSetPinningArgs>["handler"] = async (
   argv,
 ) => {
-  const enabled = argv.enable === true;
+  const enabled = argv.enable;
 
   if (!enabled) {
     console.warn(pc.bold(pc.red("WARNING: Disabling certificate pinning")));
   }
 
   const repository = await createRepository(argv);
-  const config = await repository.getClientConfig(argv["client-id"]);
+  const config = await requireClientConfig(repository, argv["client-id"]);
+  const target = requireTargetConfig(
+    config,
+    argv["client-id"],
+    argv["target-id"],
+  );
 
-  if (!config) {
-    throw new Error(`No configuration found for client: ${argv["client-id"]}`);
-  }
-
-  const target = config.targets.find((t) => t.targetId === argv["target-id"]);
-
-  if (!target) {
-    throw new Error(
-      `Target '${argv["target-id"]}' not found for client '${argv["client-id"]}'`,
-    );
-  }
-
-  if (enabled && !target.certPinning.spkiHash) {
+  if (enabled && !target.delivery?.mtls?.certPinning?.spkiHash) {
     throw new Error(
       `Target '${argv["target-id"]}' has no SPKI hash stored. Run 'targets-set-certificate' first to configure a certificate hash before enabling pinning.`,
     );
   }
 
-  target.certPinning = {
-    ...target.certPinning,
-    enabled,
+  const mtls = target.delivery?.mtls ?? { enabled: false };
+  const certPinning = mtls.certPinning ?? { enabled: false };
+  target.delivery = {
+    ...target.delivery,
+    mtls: {
+      ...mtls,
+      certPinning: {
+        ...certPinning,
+        enabled,
+      },
+    },
   };
 
   const result = await repository.putClientConfig(

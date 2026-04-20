@@ -1,10 +1,19 @@
 import { GetObjectCommand, NoSuchKey, S3Client } from "@aws-sdk/client-s3";
 import { createMessageStatusConfig } from "__tests__/helpers/client-subscription-fixtures";
-import { ConfigCache } from "@nhs-notify-client-callbacks/config-cache";
+import { ConfigSubscriptionCache } from "@nhs-notify-client-callbacks/config-subscription-cache";
 import { ConfigLoader } from "services/config-loader";
 import { ConfigValidationError } from "services/validators/config-validator";
 
 jest.mock("services/logger", () => ({
+  logger: {
+    debug: jest.fn(),
+    info: jest.fn(),
+    warn: jest.fn(),
+    error: jest.fn(),
+  },
+}));
+
+jest.mock("@nhs-notify-client-callbacks/logger", () => ({
   logger: {
     debug: jest.fn(),
     info: jest.fn(),
@@ -20,13 +29,15 @@ const mockBody = (json: string) => ({
 const createValidConfig = (clientId: string) =>
   createMessageStatusConfig(["DELIVERED"], clientId);
 
-const createLoader = (send: jest.Mock) =>
-  new ConfigLoader({
+const createLoader = (send: jest.Mock) => {
+  const cache = new ConfigSubscriptionCache({
+    s3Client: { send } as unknown as S3Client,
     bucketName: "bucket",
     keyPrefix: "client_subscriptions/",
-    s3Client: { send } as unknown as S3Client,
-    cache: new ConfigCache(60_000),
+    ttlMs: 60_000,
   });
+  return new ConfigLoader(cache);
+};
 
 describe("ConfigLoader", () => {
   it("loads and validates client configuration from S3", async () => {

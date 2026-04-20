@@ -13,7 +13,7 @@ jest.mock("@aws-sdk/client-s3", () => {
   };
 });
 
-jest.mock("services/logger", () => ({
+jest.mock("@nhs-notify-client-callbacks/logger", () => ({
   logger: {
     info: jest.fn(),
     warn: jest.fn(),
@@ -33,8 +33,6 @@ const VALID_TARGET = {
   invocationMethod: "POST" as const,
   invocationRateLimit: 10,
   apiKey: { headerName: "x-api-key", headerValue: "secret" },
-  mtls: { enabled: false },
-  certPinning: { enabled: false },
 };
 
 const VALID_CONFIG = {
@@ -75,11 +73,17 @@ describe("loadTargetConfig", () => {
   });
 
   it("rejects config missing required field", async () => {
-    // eslint-disable-next-line @typescript-eslint/naming-convention, sonarjs/no-unused-vars -- destructuring to exclude mtls
-    const { mtls: _unusedMtls, ...targetWithoutMtls } = VALID_TARGET;
     const invalidConfig = {
       ...VALID_CONFIG,
-      targets: [targetWithoutMtls],
+      targets: [
+        {
+          type: VALID_TARGET.type,
+          invocationEndpoint: VALID_TARGET.invocationEndpoint,
+          invocationMethod: VALID_TARGET.invocationMethod,
+          invocationRateLimit: VALID_TARGET.invocationRateLimit,
+          apiKey: VALID_TARGET.apiKey,
+        },
+      ],
     };
     mockS3Send.mockResolvedValue(makeS3Response(invalidConfig));
 

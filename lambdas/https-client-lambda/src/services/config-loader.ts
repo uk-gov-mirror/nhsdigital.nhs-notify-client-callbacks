@@ -1,19 +1,30 @@
-import { GetObjectCommand, S3Client } from "@aws-sdk/client-s3";
-import {
-  type CallbackTarget,
-  parseClientSubscriptionConfiguration,
-} from "@nhs-notify-client-callbacks/models";
-import { ConfigCache } from "@nhs-notify-client-callbacks/config-cache";
-import { logger } from "services/logger";
+import { S3Client } from "@aws-sdk/client-s3";
+import type { CallbackTarget } from "@nhs-notify-client-callbacks/models";
+import { ConfigSubscriptionCache } from "@nhs-notify-client-callbacks/config-subscription-cache";
 
 const s3Client = new S3Client({});
-let cache: ConfigCache | undefined;
+let cache: ConfigSubscriptionCache | undefined;
 
-function getCache(): ConfigCache {
+function getCache(): ConfigSubscriptionCache {
   if (!cache) {
-    const ttlSeconds =
-      Number(process.env.CLIENT_SUBSCRIPTION_CACHE_TTL_SECONDS) || 300;
-    cache = new ConfigCache(ttlSeconds * 1000);
+    const {
+      CLIENT_SUBSCRIPTION_CONFIG_BUCKET,
+      CLIENT_SUBSCRIPTION_CONFIG_PREFIX,
+    } = process.env;
+    if (!CLIENT_SUBSCRIPTION_CONFIG_BUCKET) {
+      throw new Error("CLIENT_SUBSCRIPTION_CONFIG_BUCKET is required");
+    }
+
+    const ttlMs =
+      Number(process.env.CLIENT_SUBSCRIPTION_CACHE_TTL_SECONDS) * 1000 ||
+      300_000;
+
+    cache = new ConfigSubscriptionCache({
+      s3Client,
+      bucketName: CLIENT_SUBSCRIPTION_CONFIG_BUCKET,
+      keyPrefix: CLIENT_SUBSCRIPTION_CONFIG_PREFIX ?? "client_subscriptions/",
+      ttlMs,
+    });
   }
   return cache;
 }
@@ -26,43 +37,10 @@ export async function loadTargetConfig(
   clientId: string,
   targetId: string,
 ): Promise<CallbackTarget> {
-  let clientConfig = getCache().get(clientId);
+  const clientConfig = await getCache().loadClientConfig(clientId);
 
   if (!clientConfig) {
-    const {
-      CLIENT_SUBSCRIPTION_CONFIG_BUCKET,
-      CLIENT_SUBSCRIPTION_CONFIG_PREFIX,
-    } = process.env;
-    if (!CLIENT_SUBSCRIPTION_CONFIG_BUCKET) {
-      throw new Error("CLIENT_SUBSCRIPTION_CONFIG_BUCKET is required");
-    }
-
-    const prefix = CLIENT_SUBSCRIPTION_CONFIG_PREFIX ?? "client_subscriptions/";
-
-    const response = await s3Client.send(
-      new GetObjectCommand({
-        Bucket: CLIENT_SUBSCRIPTION_CONFIG_BUCKET,
-        Key: `${prefix}${clientId}.json`,
-      }),
-    );
-
-    if (!response.Body) {
-      throw new Error(`S3 response body was empty for client '${clientId}'`);
-    }
-
-    const raw = await response.Body.transformToString();
-    const parsed = JSON.parse(raw) as unknown;
-    const result = parseClientSubscriptionConfiguration(parsed);
-
-    if (!result.success) {
-      throw new Error(
-        `Invalid client config for '${clientId}': ${result.error.message}`,
-      );
-    }
-
-    clientConfig = result.data;
-    getCache().set(clientId, clientConfig);
-    logger.info("Client config loaded from S3", { clientId });
+    throw new Error(`No configuration found for client '${clientId}'`);
   }
 
   const target = clientConfig.targets.find((t) => t.targetId === targetId);

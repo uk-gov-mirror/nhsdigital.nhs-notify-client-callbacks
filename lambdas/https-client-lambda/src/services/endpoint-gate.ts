@@ -1,6 +1,6 @@
 import { type RedisClientType, createClient } from "@redis/client";
 import { createHash } from "node:crypto";
-import { logger } from "services/logger";
+import { logger } from "@nhs-notify-client-callbacks/logger";
 import admitLuaSrc from "services/admit.lua";
 import recordResultLuaSrc from "services/record-result.lua";
 
@@ -41,6 +41,32 @@ function computeSha1(script: string): string {
   return createHash("sha1").update(script).digest("hex");
 }
 
+async function evalScript(
+  client: RedisClientType,
+  script: string,
+  sha: string,
+  keys: string[],
+  args: string[],
+): Promise<string> {
+  const keyCount = keys.length.toString();
+  try {
+    return await client.sendCommand([
+      "EVALSHA",
+      sha,
+      keyCount,
+      ...keys,
+      ...args,
+    ]);
+  } catch (error: unknown) {
+    const isNoScript =
+      error instanceof Error && error.message.includes("NOSCRIPT");
+    if (!isNoScript) {
+      throw error;
+    }
+    return client.sendCommand(["EVAL", script, keyCount, ...keys, ...args]);
+  }
+}
+
 export async function admit(
   client: RedisClientType,
   targetId: string,
@@ -63,36 +89,17 @@ export async function admit(
   ];
   /* eslint-enable sonarjs/null-dereference */
 
-  let result: string;
-
   if (!admitSha) {
     admitSha = computeSha1(admitLuaSrc);
   }
 
-  try {
-    result = await client.sendCommand([
-      "EVALSHA",
-      admitSha,
-      "2",
-      rlKey,
-      cbKey,
-      ...args,
-    ]);
-  } catch (error: unknown) {
-    const isNoScript =
-      error instanceof Error && error.message.includes("NOSCRIPT");
-    if (!isNoScript) {
-      throw error;
-    }
-    result = await client.sendCommand([
-      "EVAL",
-      admitLuaSrc,
-      "2",
-      rlKey,
-      cbKey,
-      ...args,
-    ]);
-  }
+  const result = await evalScript(
+    client,
+    admitLuaSrc,
+    admitSha,
+    [rlKey, cbKey],
+    args,
+  );
 
   return JSON.parse(result) as AdmitResult;
 }
@@ -116,34 +123,17 @@ export async function recordResult(
     config.decayPeriodMs.toString(),
   ];
 
-  let result: string;
-
   if (!recordResultSha) {
     recordResultSha = computeSha1(recordResultLuaSrc);
   }
 
-  try {
-    result = await client.sendCommand([
-      "EVALSHA",
-      recordResultSha,
-      "1",
-      cbKey,
-      ...args,
-    ]);
-  } catch (error: unknown) {
-    const isNoScript =
-      error instanceof Error && error.message.includes("NOSCRIPT");
-    if (!isNoScript) {
-      throw error;
-    }
-    result = await client.sendCommand([
-      "EVAL",
-      recordResultLuaSrc,
-      "1",
-      cbKey,
-      ...args,
-    ]);
-  }
+  const result = await evalScript(
+    client,
+    recordResultLuaSrc,
+    recordResultSha,
+    [cbKey],
+    args,
+  );
 
   return JSON.parse(result) as RecordResultOutcome;
 }

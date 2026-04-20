@@ -17,23 +17,23 @@ jest.mock("services/sqs-visibility", () => ({
   changeVisibility: (...args: unknown[]) => mockChangeVisibility(...args),
 }));
 
-jest.mock("services/logger", () => ({
+jest.mock("@nhs-notify-client-callbacks/logger", () => ({
   logger: { info: jest.fn(), warn: jest.fn(), error: jest.fn() },
 }));
 
 describe("jitteredBackoffSeconds", () => {
-  it("produces value in [0, 5) at receiveCount=1", () => {
+  it("produces value in [1, 5) at receiveCount=1", () => {
     for (let i = 0; i < 100; i++) {
       const val = jitteredBackoffSeconds(1);
-      expect(val).toBeGreaterThanOrEqual(0);
+      expect(val).toBeGreaterThanOrEqual(1);
       expect(val).toBeLessThan(5);
     }
   });
 
-  it("produces value in [0, 300) at receiveCount=10 (cap)", () => {
+  it("produces value in [1, 300) at receiveCount=10 (cap)", () => {
     for (let i = 0; i < 100; i++) {
       const val = jitteredBackoffSeconds(10);
-      expect(val).toBeGreaterThanOrEqual(0);
+      expect(val).toBeGreaterThanOrEqual(1);
       expect(val).toBeLessThan(300);
     }
   });

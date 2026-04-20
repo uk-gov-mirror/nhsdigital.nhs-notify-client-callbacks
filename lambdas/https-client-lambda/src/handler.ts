@@ -1,7 +1,7 @@
 import type { SQSBatchItemFailure, SQSRecord } from "aws-lambda";
 import type { ClientCallbackPayload } from "@nhs-notify-client-callbacks/models";
 import pMap from "p-map";
-import { logger } from "services/logger";
+import { logger } from "@nhs-notify-client-callbacks/logger";
 import { loadTargetConfig } from "services/config-loader";
 import { getApplicationId } from "services/ssm-applications-map";
 import { signPayload } from "services/payload-signer";
@@ -22,12 +22,16 @@ import {
   recordResult,
 } from "services/endpoint-gate";
 import {
+  recordAdmissionDenied,
+  recordCircuitBreakerClosed,
   recordCircuitBreakerOpen,
   recordDeliveryAttempt,
+  recordDeliveryDuration,
   recordDeliveryFailure,
   recordDeliveryPermanentFailure,
   recordDeliveryRateLimited,
   recordDeliverySuccess,
+  recordRetryWindowExhausted,
 } from "services/delivery-observability";
 import { flushMetrics } from "services/delivery-metrics";
 
@@ -70,12 +74,7 @@ async function checkAdmission(
 
   if (!gateResult.allowed) {
     const delaySec = Math.ceil(gateResult.retryAfterMs / 1000);
-    logger.warn(`Admission denied: ${gateResult.reason} — requeuing`, {
-      clientId,
-      targetId,
-      reason: gateResult.reason,
-      delaySec,
-    });
+    recordAdmissionDenied(clientId, targetId, gateResult.reason);
     await changeVisibility(record.receiptHandle, delaySec);
     throw new Error(`Admission denied: ${gateResult.reason}`);
   }
@@ -89,23 +88,25 @@ async function handleDeliveryResult(
   targetId: string,
   cbEnabled: boolean,
 ): Promise<void> {
-  if (result.ok) {
+  if (result.outcome === "success") {
     if (cbEnabled) {
-      await recordResult(redis, targetId, true, gateConfig);
+      const cbOutcome = await recordResult(redis, targetId, true, gateConfig);
+      if (cbOutcome.ok && cbOutcome.state === "closed") {
+        recordCircuitBreakerClosed(targetId);
+      }
     }
     recordDeliverySuccess(clientId, targetId);
     return;
   }
 
-  if (result.permanent) {
+  if (result.outcome === "permanent_failure") {
     recordDeliveryPermanentFailure(clientId, targetId);
     await sendToDlq(record.body);
     return;
   }
 
-  const receiveCount = Number(record.attributes.ApproximateReceiveCount);
-
-  if ("retryAfterHeader" in result) {
+  if (result.outcome === "rate_limited") {
+    const receiveCount = Number(record.attributes.ApproximateReceiveCount);
     recordDeliveryRateLimited(clientId, targetId);
     await handleRateLimitedRecord(
       record,
@@ -117,6 +118,7 @@ async function handleDeliveryResult(
     return;
   }
 
+  const receiveCount = Number(record.attributes.ApproximateReceiveCount);
   const backoffSec = jitteredBackoffSeconds(receiveCount);
   if (cbEnabled) {
     const cbOutcome = await recordResult(redis, targetId, false, gateConfig);
@@ -154,10 +156,7 @@ async function processRecord(
   );
 
   if (isWindowExhausted(firstReceivedMs, maxRetryDurationMs)) {
-    logger.warn("Retry window exhausted — sending to DLQ", {
-      clientId: CLIENT_ID,
-      targetId,
-    });
+    recordRetryWindowExhausted(CLIENT_ID, targetId);
     await sendToDlq(record.body);
     return;
   }
@@ -183,7 +182,9 @@ async function processRecord(
   const payloadJson = JSON.stringify(payload);
 
   recordDeliveryAttempt(CLIENT_ID, targetId);
+  const deliveryStart = Date.now();
   const result = await deliverPayload(target, payloadJson, signature, agent);
+  recordDeliveryDuration(targetId, Date.now() - deliveryStart);
 
   await handleDeliveryResult(
     result,

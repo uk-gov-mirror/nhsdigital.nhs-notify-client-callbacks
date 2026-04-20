@@ -1,6 +1,6 @@
 const mockCreateMetricsLogger = jest.fn();
 jest.mock("aws-embedded-metrics", () => ({
-  Unit: { Count: "Count" },
+  Unit: { Count: "Count", Milliseconds: "Milliseconds" },
   createMetricsLogger: () => mockCreateMetricsLogger(),
 }));
 
@@ -151,6 +151,70 @@ describe("delivery-metrics", () => {
       "DeliveryRateLimited",
       1,
       "Count",
+    );
+  });
+
+  it("emitCircuitBreakerClosed emits correct metric", async () => {
+    // @ts-expect-error -- modulePaths resolves at runtime
+    const mod = await import("services/delivery-metrics");
+    const { emitCircuitBreakerClosed } = mod;
+
+    emitCircuitBreakerClosed("target-42");
+
+    expect(mockMetrics.putMetric).toHaveBeenCalledWith(
+      "CircuitBreakerClosed",
+      1,
+      "Count",
+    );
+  });
+
+  it("emitRetryWindowExhausted emits correct metric", async () => {
+    // @ts-expect-error -- modulePaths resolves at runtime
+    const mod = await import("services/delivery-metrics");
+    const { emitRetryWindowExhausted } = mod;
+
+    emitRetryWindowExhausted("target-42");
+
+    expect(mockMetrics.putMetric).toHaveBeenCalledWith(
+      "DeliveryRetryWindowExhausted",
+      1,
+      "Count",
+    );
+  });
+
+  it("emitAdmissionDenied emits correct metric with reason", async () => {
+    // @ts-expect-error -- modulePaths resolves at runtime
+    const mod = await import("services/delivery-metrics");
+    const { emitAdmissionDenied } = mod;
+
+    emitAdmissionDenied("target-42", "rate_limited");
+
+    expect(mockMetrics.setProperty).toHaveBeenCalledWith(
+      "targetId",
+      "target-42",
+    );
+    expect(mockMetrics.setProperty).toHaveBeenCalledWith(
+      "reason",
+      "rate_limited",
+    );
+    expect(mockMetrics.putMetric).toHaveBeenCalledWith(
+      "AdmissionDenied",
+      1,
+      "Count",
+    );
+  });
+
+  it("emitDeliveryDuration emits correct metric", async () => {
+    // @ts-expect-error -- modulePaths resolves at runtime
+    const mod = await import("services/delivery-metrics");
+    const { emitDeliveryDuration } = mod;
+
+    emitDeliveryDuration("target-42", 250);
+
+    expect(mockMetrics.putMetric).toHaveBeenCalledWith(
+      "DeliveryDurationMs",
+      250,
+      "Milliseconds",
     );
   });
 

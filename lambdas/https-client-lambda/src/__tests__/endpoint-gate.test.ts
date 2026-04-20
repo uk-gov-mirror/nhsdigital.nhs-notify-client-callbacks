@@ -7,7 +7,7 @@ import {
   resetRedisClient,
 } from "services/endpoint-gate";
 
-jest.mock("services/logger");
+jest.mock("@nhs-notify-client-callbacks/logger");
 
 const mockSendCommand = jest.fn();
 const mockConnect = jest.fn().mockResolvedValue(undefined);

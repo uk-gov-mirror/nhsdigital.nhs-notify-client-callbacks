@@ -13,7 +13,7 @@ jest.mock("@aws-sdk/client-ssm", () => {
   };
 });
 
-jest.mock("services/logger", () => ({
+jest.mock("@nhs-notify-client-callbacks/logger", () => ({
   logger: {
     info: jest.fn(),
     warn: jest.fn(),

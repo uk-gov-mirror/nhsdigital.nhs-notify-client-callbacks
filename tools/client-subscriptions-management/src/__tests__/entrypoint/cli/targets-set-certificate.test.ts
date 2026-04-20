@@ -74,8 +74,12 @@ describe("targets-set-certificate CLI", () => {
       expect.objectContaining({
         targets: [
           expect.objectContaining({
-            certPinning: expect.objectContaining({
-              spkiHash: EXPECTED_SPKI_HASH,
+            delivery: expect.objectContaining({
+              mtls: expect.objectContaining({
+                certPinning: expect.objectContaining({
+                  spkiHash: EXPECTED_SPKI_HASH,
+                }),
+              }),
             }),
           }),
         ],

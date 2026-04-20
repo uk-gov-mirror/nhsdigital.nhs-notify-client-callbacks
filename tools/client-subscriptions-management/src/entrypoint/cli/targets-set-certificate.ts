@@ -8,7 +8,10 @@ import {
   clientIdOption,
   commonOptions,
   createRepository,
+  requireClientConfig,
+  requireTargetConfig,
   runCommand,
+  targetIdOption,
   writeOptions,
 } from "src/entrypoint/cli/helper";
 import { formatClientConfig } from "src/format";
@@ -23,12 +26,8 @@ export const builder = (yargs: Argv) =>
   yargs.options({
     ...commonOptions,
     ...clientIdOption,
+    ...targetIdOption,
     ...writeOptions,
-    "target-id": {
-      type: "string",
-      demandOption: true,
-      description: "Target identifier to update",
-    },
     "pem-file": {
       type: "string",
       demandOption: true,
@@ -54,23 +53,24 @@ export const handler: CliCommand<TargetsSetCertificateArgs>["handler"] = async (
   console.log(`Extracted SPKI hash: ${spkiHash}`);
 
   const repository = await createRepository(argv);
-  const config = await repository.getClientConfig(argv["client-id"]);
+  const config = await requireClientConfig(repository, argv["client-id"]);
+  const target = requireTargetConfig(
+    config,
+    argv["client-id"],
+    argv["target-id"],
+  );
 
-  if (!config) {
-    throw new Error(`No configuration found for client: ${argv["client-id"]}`);
-  }
-
-  const target = config.targets.find((t) => t.targetId === argv["target-id"]);
-
-  if (!target) {
-    throw new Error(
-      `Target '${argv["target-id"]}' not found for client '${argv["client-id"]}'`,
-    );
-  }
-
-  target.certPinning = {
-    ...target.certPinning,
-    spkiHash,
+  const mtls = target.delivery?.mtls ?? { enabled: false };
+  const certPinning = mtls.certPinning ?? { enabled: false };
+  target.delivery = {
+    ...target.delivery,
+    mtls: {
+      ...mtls,
+      certPinning: {
+        ...certPinning,
+        spkiHash,
+      },
+    },
   };
 
   const result = await repository.putClientConfig(
