@@ -303,4 +303,22 @@ describe("getRedisClient", () => {
     )![1] as (err: Error) => void;
     errorHandler(new Error("test error"));
   });
+
+  it("disconnects existing client when token expires before reconnecting", async () => {
+    jest.useFakeTimers();
+    process.env.ELASTICACHE_ENDPOINT = "cache.example.invalid";
+    process.env.ELASTICACHE_CACHE_NAME = "my-cache";
+    process.env.ELASTICACHE_IAM_USERNAME = "iam-user";
+
+    await getRedisClient();
+
+    jest.advanceTimersByTime(841_000);
+
+    await getRedisClient();
+
+    expect(mockDisconnect).toHaveBeenCalledTimes(1);
+    expect(mockConnect).toHaveBeenCalledTimes(2);
+
+    jest.useRealTimers();
+  });
 });

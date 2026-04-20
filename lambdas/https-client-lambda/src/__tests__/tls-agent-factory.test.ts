@@ -382,4 +382,32 @@ describe("tls-agent-factory", () => {
     );
     expect(mockS3Send).not.toHaveBeenCalled();
   });
+
+  it("uses default CERT_EXPIRY_THRESHOLD_MS when env var is not set", async () => {
+    delete process.env.CERT_EXPIRY_THRESHOLD_MS;
+    jest.resetModules();
+    // @ts-expect-error -- modulePaths resolves at runtime
+    const mod = await import("services/delivery/tls-agent-factory");
+
+    mockS3PemResponse(COMBINED_PEM);
+    const agent = await mod.buildAgent(
+      createTarget({ delivery: { mtls: { enabled: true } } }),
+    );
+
+    expect(agent).toBeDefined();
+  });
+
+  it("handles PEM with no private key or certificate sections", async () => {
+    mockS3Send.mockResolvedValue({
+      Body: {
+        transformToString: jest.fn().mockResolvedValue("no-pem-content"),
+      },
+    });
+
+    const agent = await buildAgent(
+      createTarget({ delivery: { mtls: { enabled: true } } }),
+    );
+
+    expect(agent).toBeDefined();
+  });
 });

@@ -1,4 +1,5 @@
 import { GetObjectCommand } from "@aws-sdk/client-s3";
+import { ConfigSubscriptionCache } from "@nhs-notify-client-callbacks/config-subscription-cache";
 
 import { loadTargetConfig, resetCache } from "services/config-loader";
 
@@ -157,5 +158,44 @@ describe("loadTargetConfig", () => {
     await expect(loadTargetConfig("client-1", "nonexistent")).rejects.toThrow(
       "Target 'nonexistent' not found in config for client 'client-1'",
     );
+  });
+
+  it("uses default prefix when CLIENT_SUBSCRIPTION_CONFIG_PREFIX is not set", async () => {
+    const saved = process.env.CLIENT_SUBSCRIPTION_CONFIG_PREFIX;
+    delete process.env.CLIENT_SUBSCRIPTION_CONFIG_PREFIX;
+    resetCache();
+    mockS3Send.mockResolvedValue(makeS3Response(VALID_CONFIG));
+
+    await loadTargetConfig("client-1", "target-1");
+
+    const command: GetObjectCommand = mockS3Send.mock.calls[0][0];
+    expect(command.input.Key).toBe("client_subscriptions/client-1.json");
+
+    process.env.CLIENT_SUBSCRIPTION_CONFIG_PREFIX = saved;
+  });
+
+  it("uses default TTL when CLIENT_SUBSCRIPTION_CACHE_TTL_SECONDS is not set", async () => {
+    const saved = process.env.CLIENT_SUBSCRIPTION_CACHE_TTL_SECONDS;
+    delete process.env.CLIENT_SUBSCRIPTION_CACHE_TTL_SECONDS;
+    resetCache();
+    mockS3Send.mockResolvedValue(makeS3Response(VALID_CONFIG));
+
+    const result = await loadTargetConfig("client-1", "target-1");
+
+    expect(result).toEqual(VALID_TARGET);
+
+    process.env.CLIENT_SUBSCRIPTION_CACHE_TTL_SECONDS = saved;
+  });
+
+  it("throws when loadClientConfig resolves to undefined", async () => {
+    const spy = jest
+      .spyOn(ConfigSubscriptionCache.prototype, "loadClientConfig")
+      .mockResolvedValueOnce(undefined);
+
+    await expect(loadTargetConfig("client-1", "target-1")).rejects.toThrow(
+      "No configuration found for client 'client-1'",
+    );
+
+    spy.mockRestore();
   });
 });
