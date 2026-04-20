@@ -35,15 +35,17 @@
         "headerName": "x-api-key",
         "headerValue": "REPLACED_BY_TERRAFORM"
       },
-      "certPinning": {
-        "enabled": false
+      "delivery": {
+        "mtls": {
+          "enabled": false,
+          "certPinning": {
+            "enabled": false
+          }
+        }
       },
       "invocationEndpoint": "https://REPLACED_BY_TERRAFORM",
       "invocationMethod": "POST",
       "invocationRateLimit": 10,
-      "mtls": {
-        "enabled": false
-      },
       "targetId": "target-23b2ee2f-8e81-43cd-9bb8-5ea30a09f779",
       "type": "API"
     }

@@ -131,4 +131,21 @@ data "aws_iam_policy_document" "https_client_lambda" {
       ]
     }
   }
+
+  dynamic "statement" {
+    for_each = var.elasticache_endpoint != "" ? [1] : []
+    content {
+      sid    = "ElastiCacheConnect"
+      effect = "Allow"
+
+      actions = [
+        "elasticache:Connect",
+      ]
+
+      resources = [
+        "arn:aws:elasticache:${var.region}:${var.aws_account_id}:serverlesscache:${var.elasticache_cache_name}",
+        "arn:aws:elasticache:${var.region}:${var.aws_account_id}:user:${var.elasticache_iam_username}",
+      ]
+    }
+  }
 }
