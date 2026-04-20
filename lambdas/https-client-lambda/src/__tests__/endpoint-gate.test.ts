@@ -255,6 +255,15 @@ describe("getRedisClient", () => {
     );
   });
 
+  it("throws when ELASTICACHE_CACHE_NAME is not set", async () => {
+    process.env.ELASTICACHE_ENDPOINT = "cache.example.invalid";
+    process.env.ELASTICACHE_IAM_USERNAME = "iam-user";
+
+    await expect(getRedisClient()).rejects.toThrow(
+      "ELASTICACHE_CACHE_NAME, ELASTICACHE_ENDPOINT, and ELASTICACHE_IAM_USERNAME are required",
+    );
+  });
+
   it("creates and connects a Redis client with IAM token", async () => {
     process.env.ELASTICACHE_ENDPOINT = "cache.example.invalid";
     process.env.ELASTICACHE_CACHE_NAME = "my-cache";

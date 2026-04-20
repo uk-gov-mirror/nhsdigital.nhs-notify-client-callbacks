@@ -143,6 +143,14 @@ describe("loadTargetConfig", () => {
     );
   });
 
+  it("throws when client config is not found", async () => {
+    mockS3Send.mockResolvedValue(makeS3Response(null));
+
+    await expect(
+      loadTargetConfig("unknown-client", "target-1"),
+    ).rejects.toThrow("Invalid client config for 'unknown-client'");
+  });
+
   it("throws when target not found in config", async () => {
     mockS3Send.mockResolvedValue(makeS3Response(VALID_CONFIG));
 

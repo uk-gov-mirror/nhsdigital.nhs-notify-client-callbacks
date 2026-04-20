@@ -19,7 +19,7 @@
 | <a name="input_component"></a> [component](#input\_component) | The variable encapsulating the name of this component | `string` | `"callbacks"` | no |
 | <a name="input_default_tags"></a> [default\_tags](#input\_default\_tags) | A map of default tags to apply to all taggable resources within the component | `map(string)` | `{}` | no |
 | <a name="input_deploy_mock_clients"></a> [deploy\_mock\_clients](#input\_deploy\_mock\_clients) | Flag to deploy mock webhook lambda for integration testing (test/dev environments only) | `bool` | `false` | no |
-| <a name="input_elasticache_data_storage_maximum_mb"></a> [elasticache\_data\_storage\_maximum\_mb](#input\_elasticache\_data\_storage\_maximum\_mb) | Maximum data storage in MB for the ElastiCache Serverless delivery state cache | `number` | `1024` | no |
+| <a name="input_elasticache_data_storage_maximum_gb"></a> [elasticache\_data\_storage\_maximum\_gb](#input\_elasticache\_data\_storage\_maximum\_gb) | Maximum data storage in GB for the ElastiCache Serverless delivery state cache | `number` | `1` | no |
 | <a name="input_enable_event_anomaly_detection"></a> [enable\_event\_anomaly\_detection](#input\_enable\_event\_anomaly\_detection) | Enable CloudWatch anomaly detection alarm for inbound event queue message reception | `bool` | `true` | no |
 | <a name="input_enable_xray_tracing"></a> [enable\_xray\_tracing](#input\_enable\_xray\_tracing) | Enable AWS X-Ray active tracing for Lambda functions | `bool` | `false` | no |
 | <a name="input_environment"></a> [environment](#input\_environment) | The name of the tfscaffold environment | `string` | n/a | yes |

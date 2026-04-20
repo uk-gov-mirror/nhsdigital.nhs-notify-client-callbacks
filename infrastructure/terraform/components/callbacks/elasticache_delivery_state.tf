@@ -13,8 +13,8 @@ resource "aws_elasticache_serverless_cache" "delivery_state" {
 
   cache_usage_limits {
     data_storage {
-      maximum = var.elasticache_data_storage_maximum_mb
-      unit    = "MB"
+      maximum = var.elasticache_data_storage_maximum_gb
+      unit    = "GB"
     }
 
     ecpu_per_second {
@@ -94,12 +94,12 @@ resource "aws_cloudwatch_metric_alarm" "elasticache_storage_utilisation" {
   alarm_name = "${local.csi}-elasticache-storage-utilisation"
   alarm_description = join(" ", [
     "CAPACITY: ElastiCache data storage utilisation exceeds 80%.",
-    "Review stored data or increase elasticache_data_storage_maximum_mb.",
+    "Review stored data or increase elasticache_data_storage_maximum_gb.",
   ])
 
   comparison_operator = "GreaterThanThreshold"
   evaluation_periods  = 2
-  threshold           = var.elasticache_data_storage_maximum_mb * 0.8
+  threshold           = var.elasticache_data_storage_maximum_gb * 0.8
   actions_enabled     = true
   treat_missing_data  = "notBreaching"
 
@@ -120,9 +120,9 @@ resource "aws_cloudwatch_metric_alarm" "elasticache_storage_utilisation" {
   }
 
   metric_query {
-    id          = "storage_used_mb"
-    expression  = "storage_used / 1048576"
-    label       = "Storage Used (MB)"
+    id          = "storage_used_gb"
+    expression  = "storage_used / 1073741824"
+    label       = "Storage Used (GB)"
     return_data = true
   }
 
