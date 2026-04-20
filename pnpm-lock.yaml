@@ -40,6 +40,9 @@ catalogs:
       specifier: ^4.3.6
       version: 4.3.6
   aws:
+    '@aws-crypto/sha256-js':
+      specifier: ^5.2.0
+      version: 5.2.0
     '@aws-sdk/client-cloudwatch':
       specifier: ^3.1025.0
       version: 3.1029.0
@@ -64,6 +67,9 @@ catalogs:
     '@aws-sdk/credential-providers':
       specifier: ^3.1023.0
       version: 3.1026.0
+    '@smithy/signature-v4':
+      specifier: ^5.0.0
+      version: 5.3.13
   lint:
     '@eslint/js':
       specifier: ^9.39.4
@@ -328,6 +334,9 @@ importers:
 
   lambdas/https-client-lambda:
     dependencies:
+      '@aws-crypto/sha256-js':
+        specifier: catalog:aws
+        version: 5.2.0
       '@aws-sdk/client-s3':
         specifier: catalog:aws
         version: 3.1029.0
@@ -340,6 +349,9 @@ importers:
       '@aws-sdk/client-ssm':
         specifier: catalog:aws
         version: 3.1029.0
+      '@aws-sdk/credential-providers':
+        specifier: catalog:aws
+        version: 3.1026.0
       '@nhs-notify-client-callbacks/config-subscription-cache':
         specifier: workspace:*
         version: link:../../src/config-subscription-cache
@@ -352,6 +364,9 @@ importers:
       '@redis/client':
         specifier: catalog:app
         version: 1.6.1
+      '@smithy/signature-v4':
+        specifier: catalog:aws
+        version: 5.3.13
       aws-embedded-metrics:
         specifier: catalog:app
         version: 4.2.1

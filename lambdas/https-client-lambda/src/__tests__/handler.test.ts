@@ -397,6 +397,27 @@ describe("processRecords", () => {
     expect(emitCircuitBreakerOpen).toHaveBeenCalledWith("target-1");
   });
 
+  it("does not emit CircuitBreakerOpen when recordResult returns failed", async () => {
+    const targetCb = {
+      ...DEFAULT_TARGET,
+      delivery: { circuitBreaker: { enabled: true } },
+    };
+    mockLoadTargetConfig.mockResolvedValue(targetCb);
+    mockDeliverPayload.mockResolvedValue({
+      outcome: "transient_failure",
+      statusCode: 503,
+    });
+    mockRecordResult.mockResolvedValue({ ok: false, state: "failed" });
+
+    const { emitCircuitBreakerOpen } = jest.requireMock(
+      "services/delivery-metrics",
+    );
+
+    await processRecords([makeRecord()]);
+
+    expect(emitCircuitBreakerOpen).not.toHaveBeenCalled();
+  });
+
   it("does not emit CircuitBreakerOpen when recordResult returns closed", async () => {
     const targetCb = {
       ...DEFAULT_TARGET,

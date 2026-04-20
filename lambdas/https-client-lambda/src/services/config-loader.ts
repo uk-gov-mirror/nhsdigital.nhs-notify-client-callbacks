@@ -16,8 +16,7 @@ function getCache(): ConfigSubscriptionCache {
     }
 
     const ttlMs =
-      Number(process.env.CLIENT_SUBSCRIPTION_CACHE_TTL_SECONDS) * 1000 ||
-      300_000;
+      (Number(process.env.CLIENT_SUBSCRIPTION_CACHE_TTL_SECONDS) || 300) * 1000;
 
     cache = new ConfigSubscriptionCache({
       s3Client,
