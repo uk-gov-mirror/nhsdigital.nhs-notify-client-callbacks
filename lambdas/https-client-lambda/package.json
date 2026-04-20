@@ -4,7 +4,7 @@
     "@aws-sdk/client-secrets-manager": "catalog:aws",
     "@aws-sdk/client-sqs": "catalog:aws",
     "@aws-sdk/client-ssm": "catalog:aws",
-    "@nhs-notify-client-callbacks/config-cache": "workspace:*",
+    "@nhs-notify-client-callbacks/config-subscription-cache": "workspace:*",
     "@nhs-notify-client-callbacks/logger": "workspace:*",
     "@nhs-notify-client-callbacks/models": "workspace:*",
     "@redis/client": "catalog:app",

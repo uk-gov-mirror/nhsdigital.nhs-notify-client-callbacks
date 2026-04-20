@@ -46,16 +46,18 @@ const targetSchema = z.object({
     headerName: z.string(),
     headerValue: z.string(),
   }),
-  mtls: z.object({
-    enabled: z.boolean(),
-  }),
-  certPinning: certPinningSchema,
   delivery: z
     .object({
       maxRetryDurationSeconds: z.number().min(60).max(43_200).optional(),
       circuitBreaker: z
         .object({
           enabled: z.boolean(),
+        })
+        .optional(),
+      mtls: z
+        .object({
+          enabled: z.boolean(),
+          certPinning: certPinningSchema.optional(),
         })
         .optional(),
     })

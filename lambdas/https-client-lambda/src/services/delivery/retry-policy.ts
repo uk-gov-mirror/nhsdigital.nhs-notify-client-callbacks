@@ -1,5 +1,5 @@
 import type { SQSRecord } from "aws-lambda";
-import { logger } from "services/logger";
+import { logger } from "@nhs-notify-client-callbacks/logger";
 import { sendToDlq } from "services/dlq-sender";
 import { changeVisibility } from "services/sqs-visibility";
 
@@ -14,7 +14,7 @@ export function jitteredBackoffSeconds(receiveCount: number): number {
     BACKOFF_CAP_SECONDS,
   );
   // eslint-disable-next-line sonarjs/pseudo-random -- jitter for backoff, not security-sensitive
-  return Math.floor(Math.random() * ceiling);
+  return Math.max(1, Math.floor(Math.random() * ceiling));
 }
 
 export function parseRetryAfter(header: string): number {

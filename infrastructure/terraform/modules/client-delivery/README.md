@@ -55,15 +55,7 @@ No requirements.
 | <a name="module_sqs_delivery"></a> [sqs\_delivery](#module\_sqs\_delivery) | https://github.com/NHSDigital/nhs-notify-shared-modules/releases/download/3.0.9/terraform-sqs.zip | n/a |
 ## Outputs
 
-| Name | Description |
-|------|-------------|
-| <a name="output_delivery_queue_arn"></a> [delivery\_queue\_arn](#output\_delivery\_queue\_arn) | ARN of the per-client delivery SQS queue |
-| <a name="output_delivery_queue_url"></a> [delivery\_queue\_url](#output\_delivery\_queue\_url) | URL of the per-client delivery SQS queue |
-| <a name="output_dlq_arn"></a> [dlq\_arn](#output\_dlq\_arn) | ARN of the per-client delivery DLQ |
-| <a name="output_dlq_url"></a> [dlq\_url](#output\_dlq\_url) | URL of the per-client delivery DLQ |
-| <a name="output_lambda_execution_role_arn"></a> [lambda\_execution\_role\_arn](#output\_lambda\_execution\_role\_arn) | ARN of the Lambda execution IAM role |
-| <a name="output_lambda_function_arn"></a> [lambda\_function\_arn](#output\_lambda\_function\_arn) | ARN of the per-client HTTPS Client Lambda function |
-| <a name="output_lambda_function_name"></a> [lambda\_function\_name](#output\_lambda\_function\_name) | Name of the per-client HTTPS Client Lambda function |
+No outputs.
 <!-- vale on -->
 <!-- markdownlint-enable -->
 <!-- END_TF_DOCS -->

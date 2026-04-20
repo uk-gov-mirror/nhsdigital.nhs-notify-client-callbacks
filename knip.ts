@@ -34,12 +34,14 @@ const config: KnipConfig = {
     },
     "lambdas/https-client-lambda": {
       ignoreDependencies: ["@tsconfig/node22"],
-      entry: ["src/__tests__/**/*.ts"],
     },
     "lambdas/mock-webhook-lambda": {
       ignoreDependencies: ["@tsconfig/node22"],
     },
     "src/config-cache": {
+      ignoreDependencies: ["@tsconfig/node22"],
+    },
+    "src/config-subscription-cache": {
       ignoreDependencies: ["@tsconfig/node22"],
     },
     "src/logger": {

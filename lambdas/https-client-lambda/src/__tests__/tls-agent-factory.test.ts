@@ -20,7 +20,7 @@ jest.mock("@aws-sdk/client-secrets-manager", () => {
   };
 });
 
-jest.mock("services/logger", () => ({
+jest.mock("@nhs-notify-client-callbacks/logger", () => ({
   logger: {
     info: jest.fn(),
     warn: jest.fn(),
@@ -80,8 +80,6 @@ const createTarget = (
   invocationMethod: "POST",
   invocationRateLimit: 10,
   apiKey: { headerName: "x-api-key", headerValue: "secret" },
-  mtls: { enabled: false },
-  certPinning: { enabled: false },
   ...overrides,
 });
 
@@ -115,14 +113,16 @@ describe("tls-agent-factory", () => {
 
   it("builds agent with key and cert when mtls is enabled", async () => {
     mockS3PemResponse(COMBINED_PEM);
-    const agent = await buildAgent(createTarget({ mtls: { enabled: true } }));
+    const agent = await buildAgent(
+      createTarget({ delivery: { mtls: { enabled: true } } }),
+    );
 
     expect(agent).toBeDefined();
     expect(agent.options.keepAlive).toBe(false);
   });
 
   it("builds agent without key and cert when mtls is disabled", async () => {
-    const agent = await buildAgent(createTarget({ mtls: { enabled: false } }));
+    const agent = await buildAgent(createTarget());
 
     expect(agent).toBeDefined();
     expect(mockS3Send).not.toHaveBeenCalled();
@@ -148,7 +148,7 @@ describe("tls-agent-factory", () => {
       });
 
     const agent = await mod.buildAgent(
-      createTarget({ mtls: { enabled: true } }),
+      createTarget({ delivery: { mtls: { enabled: true } } }),
     );
 
     expect(agent).toBeDefined();
@@ -157,7 +157,7 @@ describe("tls-agent-factory", () => {
 
   it("loads cert from S3 in non-production", async () => {
     mockS3PemResponse(COMBINED_PEM);
-    await buildAgent(createTarget({ mtls: { enabled: true } }));
+    await buildAgent(createTarget({ delivery: { mtls: { enabled: true } } }));
 
     expect(mockS3Send).toHaveBeenCalledTimes(1);
     expect(mockSecretsManagerSend).not.toHaveBeenCalled();
@@ -175,7 +175,7 @@ describe("tls-agent-factory", () => {
     });
 
     const agent = await mod.buildAgent(
-      createTarget({ mtls: { enabled: true } }),
+      createTarget({ delivery: { mtls: { enabled: true } } }),
     );
 
     expect(agent).toBeDefined();
@@ -185,7 +185,7 @@ describe("tls-agent-factory", () => {
 
   it("caches cert material on subsequent calls", async () => {
     mockS3PemResponse(COMBINED_PEM);
-    const target = createTarget({ mtls: { enabled: true } });
+    const target = createTarget({ delivery: { mtls: { enabled: true } } });
 
     await buildAgent(target);
     await buildAgent(target);
@@ -203,7 +203,7 @@ describe("tls-agent-factory", () => {
 
   it("resets cached material via resetCache", async () => {
     mockS3PemResponse(COMBINED_PEM);
-    const target = createTarget({ mtls: { enabled: true } });
+    const target = createTarget({ delivery: { mtls: { enabled: true } } });
 
     await buildAgent(target);
     resetCache();
@@ -222,7 +222,7 @@ describe("tls-agent-factory", () => {
     mockSecretsManagerSend.mockResolvedValue({ SecretString: undefined });
 
     await expect(
-      mod.buildAgent(createTarget({ mtls: { enabled: true } })),
+      mod.buildAgent(createTarget({ delivery: { mtls: { enabled: true } } })),
     ).rejects.toThrow("mTLS cert secret has no value");
   });
 
@@ -234,7 +234,7 @@ describe("tls-agent-factory", () => {
     const mod = await import("services/delivery/tls-agent-factory");
 
     await expect(
-      mod.buildAgent(createTarget({ mtls: { enabled: true } })),
+      mod.buildAgent(createTarget({ delivery: { mtls: { enabled: true } } })),
     ).rejects.toThrow(
       "MTLS_TEST_CERT_S3_BUCKET and MTLS_TEST_CERT_S3_KEY are required",
     );
@@ -244,15 +244,19 @@ describe("tls-agent-factory", () => {
     mockS3Send.mockResolvedValue({ Body: undefined });
 
     await expect(
-      buildAgent(createTarget({ mtls: { enabled: true } })),
+      buildAgent(createTarget({ delivery: { mtls: { enabled: true } } })),
     ).rejects.toThrow("has no body");
   });
 
   it("builds agent with checkServerIdentity when certPinning is enabled", async () => {
     mockS3PemResponse(COMBINED_PEM);
     const target = createTarget({
-      mtls: { enabled: true },
-      certPinning: { enabled: true, spkiHash: "abc123" },
+      delivery: {
+        mtls: {
+          enabled: true,
+          certPinning: { enabled: true, spkiHash: "abc123" },
+        },
+      },
     });
 
     const agent = await buildAgent(target);
@@ -264,8 +268,12 @@ describe("tls-agent-factory", () => {
   it("checkServerIdentity returns error when SPKI hash does not match", async () => {
     mockS3PemResponse(COMBINED_PEM);
     const target = createTarget({
-      mtls: { enabled: true },
-      certPinning: { enabled: true, spkiHash: "expected-hash" },
+      delivery: {
+        mtls: {
+          enabled: true,
+          certPinning: { enabled: true, spkiHash: "expected-hash" },
+        },
+      },
     });
 
     const agent = await buildAgent(target);
@@ -297,8 +305,12 @@ describe("tls-agent-factory", () => {
 
     mockS3PemResponse(COMBINED_PEM);
     const target = createTarget({
-      mtls: { enabled: true },
-      certPinning: { enabled: true, spkiHash: expectedHash },
+      delivery: {
+        mtls: {
+          enabled: true,
+          certPinning: { enabled: true, spkiHash: expectedHash },
+        },
+      },
     });
 
     const agent = await buildAgent(target);
@@ -321,8 +333,12 @@ describe("tls-agent-factory", () => {
   it("checkServerIdentity returns default error when hostname does not match", async () => {
     mockS3PemResponse(COMBINED_PEM);
     const target = createTarget({
-      mtls: { enabled: true },
-      certPinning: { enabled: true, spkiHash: "abc" },
+      delivery: {
+        mtls: {
+          enabled: true,
+          certPinning: { enabled: true, spkiHash: "abc" },
+        },
+      },
     });
 
     const agent = await buildAgent(target);
@@ -344,7 +360,7 @@ describe("tls-agent-factory", () => {
   });
 
   it("does not load cert material when mtls is disabled", async () => {
-    const agent = await buildAgent(createTarget({ mtls: { enabled: false } }));
+    const agent = await buildAgent(createTarget());
 
     expect(agent).toBeDefined();
     expect(mockS3Send).not.toHaveBeenCalled();
@@ -353,7 +369,12 @@ describe("tls-agent-factory", () => {
 
   it("throws when certPinning.enabled is true but spkiHash is missing", async () => {
     const target = createTarget({
-      certPinning: { enabled: true },
+      delivery: {
+        mtls: {
+          enabled: true,
+          certPinning: { enabled: true },
+        },
+      },
     });
 
     await expect(buildAgent(target)).rejects.toThrow(

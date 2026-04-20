@@ -32,8 +32,9 @@ describe("buildTarget", () => {
       invocationMethod: "POST",
       invocationRateLimit: 10,
       apiKey: { headerName: "x-api-key", headerValue: "secret" },
-      mtls: { enabled: false },
-      certPinning: { enabled: false },
+      delivery: {
+        mtls: { enabled: false, certPinning: { enabled: false } },
+      },
     });
     expect(result.targetId).toMatch(UUID_REGEX);
   });
@@ -75,18 +76,16 @@ describe("buildTarget", () => {
     );
   });
 
-  it("emits warning when certPinning enabled without spkiHash", () => {
-    buildTarget({
-      apiEndpoint: "https://example.com/webhook",
-      apiKey: "secret",
-      rateLimit: 10,
-      mtls: { enabled: true },
-      certPinning: { enabled: true },
-    });
-
-    expect(warnSpy).toHaveBeenCalledWith(
-      expect.stringContaining("no SPKI hash is stored"),
-    );
+  it("throws when certPinning enabled without spkiHash", () => {
+    expect(() =>
+      buildTarget({
+        apiEndpoint: "https://example.com/webhook",
+        apiKey: "secret",
+        rateLimit: 10,
+        mtls: { enabled: true },
+        certPinning: { enabled: true },
+      }),
+    ).toThrow("Certificate pinning cannot be enabled without an SPKI hash");
   });
 
   it("emits warning when certPinning enabled but mtls disabled", () => {
@@ -95,7 +94,10 @@ describe("buildTarget", () => {
       apiKey: "secret",
       rateLimit: 10,
       mtls: { enabled: false },
-      certPinning: { enabled: true },
+      certPinning: {
+        enabled: true,
+        spkiHash: "dGVzdGhhc2g9PT09PT09PT09PT09PT09PT09PT09PQ==",
+      },
     });
 
     expect(warnSpy).toHaveBeenCalledWith(
@@ -115,7 +117,6 @@ describe("buildTarget", () => {
     expect(warnSpy).not.toHaveBeenCalled();
   });
 });
-
 describe("buildMessageStatusSubscription", () => {
   it("builds message status subscription", () => {
     const result = buildMessageStatusSubscription({

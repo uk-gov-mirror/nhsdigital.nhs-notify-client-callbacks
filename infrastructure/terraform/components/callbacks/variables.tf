@@ -184,8 +184,8 @@ variable "mtls_cert_secret_arn" {
   default     = ""
 }
 
-variable "elasticache_data_storage_maximum_gb" {
+variable "elasticache_data_storage_maximum_mb" {
   type        = number
-  description = "Maximum data storage in GB for the ElastiCache Serverless delivery state cache"
-  default     = 1
+  description = "Maximum data storage in MB for the ElastiCache Serverless delivery state cache"
+  default     = 1024
 }

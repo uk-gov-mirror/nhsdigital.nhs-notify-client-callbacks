@@ -47,8 +47,12 @@ const createValidConfig = (): ClientSubscriptionConfiguration => ({
       invocationMethod: "POST",
       invocationRateLimit: 10,
       apiKey: { headerName: "x-api-key", headerValue: "secret" },
-      mtls: { enabled: true },
-      certPinning: { enabled: true, spkiHash: VALID_SPKI_HASH },
+      delivery: {
+        mtls: {
+          enabled: true,
+          certPinning: { enabled: true, spkiHash: VALID_SPKI_HASH },
+        },
+      },
     },
   ],
 });
@@ -155,6 +159,7 @@ describe("parseClientSubscriptionConfiguration", () => {
   it("parses a valid config with mtls, certPinning, and delivery fields", () => {
     const config = createValidConfig();
     config.targets[0].delivery = {
+      ...config.targets[0].delivery,
       maxRetryDurationSeconds: 7200,
       circuitBreaker: { enabled: true },
     };
@@ -165,10 +170,11 @@ describe("parseClientSubscriptionConfiguration", () => {
     });
   });
 
-  it("returns a failed parse result when mtls field is missing", () => {
+  it("returns a failed parse result when delivery.mtls has invalid shape", () => {
     const config = createValidConfig();
-    const target = config.targets[0] as Record<string, unknown>;
-    delete target.mtls;
+    (config.targets[0] as Record<string, unknown>).delivery = {
+      mtls: { enabled: "not-a-boolean" },
+    };
 
     const result = expectFailedParse(
       parseClientSubscriptionConfiguration(config),
@@ -177,7 +183,7 @@ describe("parseClientSubscriptionConfiguration", () => {
     expect(result.error.issues).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
-          path: expect.arrayContaining(["targets", 0, "mtls"]),
+          path: expect.arrayContaining(["targets", 0, "delivery"]),
         }),
       ]),
     );
@@ -185,7 +191,10 @@ describe("parseClientSubscriptionConfiguration", () => {
 
   it("returns a failed parse result when spkiHash has an invalid pattern", () => {
     const config = createValidConfig();
-    config.targets[0].certPinning.spkiHash = "not-a-valid-hash";
+    config.targets[0].delivery!.mtls!.certPinning = {
+      enabled: true,
+      spkiHash: "not-a-valid-hash",
+    };
 
     const result = expectFailedParse(
       parseClientSubscriptionConfiguration(config),
@@ -202,7 +211,7 @@ describe("parseClientSubscriptionConfiguration", () => {
 
   it("returns a failed parse result when certPinning.enabled is true without spkiHash", () => {
     const config = createValidConfig();
-    config.targets[0].certPinning = { enabled: true };
+    config.targets[0].delivery!.mtls!.certPinning = { enabled: true };
 
     const result = expectFailedParse(
       parseClientSubscriptionConfiguration(config),

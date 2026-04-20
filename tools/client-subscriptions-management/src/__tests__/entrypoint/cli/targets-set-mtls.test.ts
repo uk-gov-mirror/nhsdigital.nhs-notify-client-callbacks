@@ -67,14 +67,20 @@ describe("targets-set-mtls CLI", () => {
     expect(mockPutClientConfig).toHaveBeenCalledWith(
       "client-1",
       expect.objectContaining({
-        targets: [expect.objectContaining({ mtls: { enabled: true } })],
+        targets: [
+          expect.objectContaining({
+            delivery: expect.objectContaining({
+              mtls: expect.objectContaining({ enabled: true }),
+            }),
+          }),
+        ],
       }),
       false,
     );
   });
 
-  it("disables mTLS with --disable flag and emits ANSI warning", async () => {
-    await cli.main([...baseArgs, "--disable"]);
+  it("disables mTLS with --no-enable flag and emits ANSI warning", async () => {
+    await cli.main([...baseArgs, "--no-enable"]);
 
     expect(console.warn).toHaveBeenCalledWith(
       expect.stringContaining("Disabling mTLS"),
@@ -82,7 +88,13 @@ describe("targets-set-mtls CLI", () => {
     expect(mockPutClientConfig).toHaveBeenCalledWith(
       "client-1",
       expect.objectContaining({
-        targets: [expect.objectContaining({ mtls: { enabled: false } })],
+        targets: [
+          expect.objectContaining({
+            delivery: expect.objectContaining({
+              mtls: expect.objectContaining({ enabled: false }),
+            }),
+          }),
+        ],
       }),
       false,
     );

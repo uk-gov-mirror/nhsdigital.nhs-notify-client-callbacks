@@ -4,7 +4,7 @@ import {
   makeRecord,
 } from "__tests__/fixtures/handler-fixtures";
 
-jest.mock("services/logger", () => ({
+jest.mock("@nhs-notify-client-callbacks/logger", () => ({
   logger: {
     info: jest.fn(),
     warn: jest.fn(),
@@ -68,12 +68,16 @@ jest.mock("services/endpoint-gate", () => ({
 }));
 
 jest.mock("services/delivery-metrics", () => ({
+  emitAdmissionDenied: jest.fn(),
+  emitCircuitBreakerClosed: jest.fn(),
+  emitCircuitBreakerOpen: jest.fn(),
   emitDeliveryAttempt: jest.fn(),
-  emitDeliverySuccess: jest.fn(),
+  emitDeliveryDuration: jest.fn(),
   emitDeliveryFailure: jest.fn(),
   emitDeliveryPermanentFailure: jest.fn(),
-  emitCircuitBreakerOpen: jest.fn(),
+  emitDeliverySuccess: jest.fn(),
   emitRateLimited: jest.fn(),
+  emitRetryWindowExhausted: jest.fn(),
   flushMetrics: jest.fn().mockResolvedValue(undefined),
 }));
 
@@ -88,7 +92,7 @@ describe("processRecords", () => {
     mockGetApplicationId.mockResolvedValue("app-id-1");
     mockSignPayload.mockReturnValue("signature-abc");
     mockBuildAgent.mockResolvedValue(mockAgent);
-    mockDeliverPayload.mockResolvedValue({ ok: true });
+    mockDeliverPayload.mockResolvedValue({ outcome: "success" });
     mockSendToDlq.mockResolvedValue(undefined);
     mockChangeVisibility.mockResolvedValue(undefined);
     mockJitteredBackoff.mockReturnValue(5);
@@ -126,7 +130,7 @@ describe("processRecords", () => {
   });
 
   it("sends permanent failure to DLQ and returns no failure", async () => {
-    mockDeliverPayload.mockResolvedValue({ ok: false, permanent: true });
+    mockDeliverPayload.mockResolvedValue({ outcome: "permanent_failure" });
 
     const failures = await processRecords([makeRecord()]);
 
@@ -136,8 +140,7 @@ describe("processRecords", () => {
 
   it("returns failure for transient 5xx errors", async () => {
     mockDeliverPayload.mockResolvedValue({
-      ok: false,
-      permanent: false,
+      outcome: "transient_failure",
       statusCode: 503,
     });
 
@@ -148,9 +151,7 @@ describe("processRecords", () => {
 
   it("returns failure for 429 rate-limited responses", async () => {
     mockDeliverPayload.mockResolvedValue({
-      ok: false,
-      permanent: false,
-      statusCode: 429,
+      outcome: "rate_limited",
       retryAfterHeader: "60",
     });
 
@@ -171,10 +172,9 @@ describe("processRecords", () => {
     const record2 = makeRecord({ messageId: "msg-2" });
 
     mockDeliverPayload
-      .mockResolvedValueOnce({ ok: true })
+      .mockResolvedValueOnce({ outcome: "success" })
       .mockResolvedValueOnce({
-        ok: false,
-        permanent: false,
+        outcome: "transient_failure",
         statusCode: 500,
       });
 
@@ -220,8 +220,7 @@ describe("processRecords", () => {
 
   it("calls changeVisibility with backoff on 5xx then throws", async () => {
     mockDeliverPayload.mockResolvedValue({
-      ok: false,
-      permanent: false,
+      outcome: "transient_failure",
       statusCode: 503,
     });
 
@@ -233,9 +232,7 @@ describe("processRecords", () => {
 
   it("delegates 429 handling to handleRateLimitedRecord", async () => {
     mockDeliverPayload.mockResolvedValue({
-      ok: false,
-      permanent: false,
-      statusCode: 429,
+      outcome: "rate_limited",
       retryAfterHeader: "120",
     });
 
@@ -327,8 +324,7 @@ describe("processRecords", () => {
     };
     mockLoadTargetConfig.mockResolvedValue(targetCb);
     mockDeliverPayload.mockResolvedValue({
-      ok: false,
-      permanent: false,
+      outcome: "transient_failure",
       statusCode: 503,
     });
 
@@ -359,9 +355,7 @@ describe("processRecords", () => {
 
   it("does not call recordResult on 429 path", async () => {
     mockDeliverPayload.mockResolvedValue({
-      ok: false,
-      permanent: false,
-      statusCode: 429,
+      outcome: "rate_limited",
       retryAfterHeader: "60",
     });
 
@@ -389,8 +383,7 @@ describe("processRecords", () => {
     };
     mockLoadTargetConfig.mockResolvedValue(targetCb);
     mockDeliverPayload.mockResolvedValue({
-      ok: false,
-      permanent: false,
+      outcome: "transient_failure",
       statusCode: 503,
     });
     mockRecordResult.mockResolvedValue({ ok: false, state: "opened" });
@@ -411,8 +404,7 @@ describe("processRecords", () => {
     };
     mockLoadTargetConfig.mockResolvedValue(targetCb);
     mockDeliverPayload.mockResolvedValue({
-      ok: false,
-      permanent: false,
+      outcome: "transient_failure",
       statusCode: 503,
     });
     mockRecordResult.mockResolvedValue({ ok: true, state: "closed" });
@@ -428,9 +420,7 @@ describe("processRecords", () => {
 
   it("emits RateLimited metric on 429 response", async () => {
     mockDeliverPayload.mockResolvedValue({
-      ok: false,
-      permanent: false,
-      statusCode: 429,
+      outcome: "rate_limited",
       retryAfterHeader: "60",
     });
 

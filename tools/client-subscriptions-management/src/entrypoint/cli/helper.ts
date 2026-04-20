@@ -1,3 +1,7 @@
+import type {
+  CallbackTarget,
+  ClientSubscriptionConfiguration,
+} from "@nhs-notify-client-callbacks/models";
 import {
   createRepository as createRepositoryFromOptions,
   createSsmApplicationsMapRepository as createSsmApplicationsMapRepositoryFromOptions,
@@ -124,6 +128,14 @@ export const clientIdOption = {
   },
 };
 
+export const targetIdOption = {
+  "target-id": {
+    type: "string" as const,
+    demandOption: true as const,
+    description: "Target identifier",
+  },
+};
+
 export const writeOptions = {
   "dry-run": {
     type: "boolean" as const,
@@ -159,3 +171,30 @@ export const createSsmApplicationsMapRepository = (argv: SsmCliArgs) => {
     profile,
   });
 };
+
+export async function requireClientConfig(
+  repository: {
+    getClientConfig: (
+      clientId: string,
+    ) => Promise<ClientSubscriptionConfiguration | undefined>;
+  },
+  clientId: string,
+): Promise<ClientSubscriptionConfiguration> {
+  const config = await repository.getClientConfig(clientId);
+  if (!config) {
+    throw new Error(`No configuration found for client: ${clientId}`);
+  }
+  return config;
+}
+
+export function requireTargetConfig(
+  config: ClientSubscriptionConfiguration,
+  clientId: string,
+  targetId: string,
+): CallbackTarget {
+  const target = config.targets.find((t) => t.targetId === targetId);
+  if (!target) {
+    throw new Error(`Target '${targetId}' not found for client '${clientId}'`);
+  }
+  return target;
+}

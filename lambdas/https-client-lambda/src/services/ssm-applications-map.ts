@@ -1,12 +1,15 @@
 import { GetParameterCommand, SSMClient } from "@aws-sdk/client-ssm";
-import { logger } from "services/logger";
+import { logger } from "@nhs-notify-client-callbacks/logger";
 
 const ssmClient = new SSMClient({});
 
+const DEFAULT_CACHE_TTL_MS = 300_000; // 5 minutes
+
 let cachedMap: Map<string, string> | undefined;
+let cacheExpiresAt = 0;
 
 async function loadMap(): Promise<Map<string, string>> {
-  if (cachedMap) {
+  if (cachedMap && Date.now() < cacheExpiresAt) {
     return cachedMap;
   }
 
@@ -38,6 +41,9 @@ async function loadMap(): Promise<Map<string, string>> {
   }
 
   cachedMap = new Map(Object.entries(parsed));
+  const ttlMs =
+    Number(process.env.APPLICATIONS_MAP_CACHE_TTL_MS) || DEFAULT_CACHE_TTL_MS;
+  cacheExpiresAt = Date.now() + ttlMs;
   logger.info("Applications map loaded from SSM", {
     parameterName: APPLICATIONS_MAP_PARAMETER,
   });
@@ -59,4 +65,5 @@ export async function getApplicationId(clientId: string): Promise<string> {
 
 export function resetCache(): void {
   cachedMap = undefined;
+  cacheExpiresAt = 0;
 }

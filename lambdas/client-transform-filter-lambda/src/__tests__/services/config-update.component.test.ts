@@ -1,7 +1,16 @@
 import { S3Client } from "@aws-sdk/client-s3";
 import { createMessageStatusConfig } from "__tests__/helpers/client-subscription-fixtures";
-import { ConfigCache } from "@nhs-notify-client-callbacks/config-cache";
+import { ConfigSubscriptionCache } from "@nhs-notify-client-callbacks/config-subscription-cache";
 import { ConfigLoader } from "services/config-loader";
+
+jest.mock("@nhs-notify-client-callbacks/logger", () => ({
+  logger: {
+    debug: jest.fn(),
+    info: jest.fn(),
+    warn: jest.fn(),
+    error: jest.fn(),
+  },
+}));
 
 const makeConfig = (messageStatuses: string[]) =>
   createMessageStatusConfig(messageStatuses as never);
@@ -28,12 +37,13 @@ describe("config update component", () => {
         },
       });
 
-    const loader = new ConfigLoader({
+    const cache = new ConfigSubscriptionCache({
+      s3Client: { send } as unknown as S3Client,
       bucketName: "bucket",
       keyPrefix: "client_subscriptions/",
-      s3Client: { send } as unknown as S3Client,
-      cache: new ConfigCache(1000),
+      ttlMs: 1000,
     });
+    const loader = new ConfigLoader(cache);
 
     const first = await loader.loadClientConfig("client-1");
     const firstMessage = first?.subscriptions.find(

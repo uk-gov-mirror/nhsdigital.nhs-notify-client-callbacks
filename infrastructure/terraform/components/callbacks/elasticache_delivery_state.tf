@@ -13,8 +13,8 @@ resource "aws_elasticache_serverless_cache" "delivery_state" {
 
   cache_usage_limits {
     data_storage {
-      maximum = var.elasticache_data_storage_maximum_gb
-      unit    = "GB"
+      maximum = var.elasticache_data_storage_maximum_mb
+      unit    = "MB"
     }
 
     ecpu_per_second {
@@ -88,6 +88,50 @@ resource "aws_vpc_security_group_egress_rule" "lambda_to_https" {
   description       = "Allow Lambda outbound TCP for HTTPS webhook delivery (port defined per-client in webhook URL)"
 
   tags = local.default_tags
+}
+
+resource "aws_cloudwatch_metric_alarm" "elasticache_storage_utilisation" {
+  alarm_name = "${local.csi}-elasticache-storage-utilisation"
+  alarm_description = join(" ", [
+    "CAPACITY: ElastiCache data storage utilisation exceeds 80%.",
+    "Review stored data or increase elasticache_data_storage_maximum_mb.",
+  ])
+
+  comparison_operator = "GreaterThanThreshold"
+  evaluation_periods  = 2
+  threshold           = var.elasticache_data_storage_maximum_mb * 0.8
+  actions_enabled     = true
+  treat_missing_data  = "notBreaching"
+
+  metric_query {
+    id          = "storage_used"
+    return_data = false
+
+    metric {
+      metric_name = "BytesUsedForCache"
+      namespace   = "AWS/ElastiCache"
+      period      = 300
+      stat        = "Maximum"
+
+      dimensions = {
+        CacheClusterId = aws_elasticache_serverless_cache.delivery_state.name
+      }
+    }
+  }
+
+  metric_query {
+    id          = "storage_used_mb"
+    expression  = "storage_used / 1048576"
+    label       = "Storage Used (MB)"
+    return_data = true
+  }
+
+  tags = merge(
+    local.default_tags,
+    {
+      Name = "${local.csi}-elasticache-storage-utilisation"
+    },
+  )
 }
 
 resource "aws_cloudwatch_metric_alarm" "elasticache_ecpu_utilisation" {

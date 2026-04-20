@@ -7,8 +7,9 @@ export const DEFAULT_TARGET = {
   invocationMethod: "POST" as const,
   invocationRateLimit: 10,
   apiKey: { headerName: "x-api-key", headerValue: "secret-key" },
-  mtls: { enabled: true },
-  certPinning: { enabled: false },
+  delivery: {
+    mtls: { enabled: true },
+  },
 };
 
 export const makeRecord = (overrides: Partial<SQSRecord> = {}): SQSRecord => ({

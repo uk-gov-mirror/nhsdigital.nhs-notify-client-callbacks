@@ -1,0 +1,34 @@
+{
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "default": "./src/index.ts"
+    }
+  },
+  "dependencies": {
+    "@aws-sdk/client-s3": "catalog:aws",
+    "@nhs-notify-client-callbacks/logger": "workspace:*",
+    "@nhs-notify-client-callbacks/models": "workspace:*"
+  },
+  "devDependencies": {
+    "@tsconfig/node22": "catalog:tools",
+    "@types/jest": "catalog:test",
+    "@types/node": "catalog:tools",
+    "eslint": "catalog:lint",
+    "jest": "catalog:test",
+    "ts-jest": "catalog:test",
+    "typescript": "catalog:tools"
+  },
+  "engines": {
+    "node": ">=24.14.1"
+  },
+  "name": "@nhs-notify-client-callbacks/config-subscription-cache",
+  "private": true,
+  "scripts": {
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "test:unit": "jest",
+    "typecheck": "tsc --noEmit"
+  },
+  "version": "0.0.1"
+}

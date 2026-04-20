@@ -7,7 +7,10 @@ import {
   clientIdOption,
   commonOptions,
   createRepository,
+  requireClientConfig,
+  requireTargetConfig,
   runCommand,
+  targetIdOption,
   writeOptions,
 } from "src/entrypoint/cli/helper";
 import { formatClientConfig } from "src/format";
@@ -15,43 +18,27 @@ import { formatClientConfig } from "src/format";
 type TargetsSetMtlsArgs = ClientCliArgs &
   WriteCliArgs & {
     "target-id": string;
-    enable?: boolean;
-    disable?: boolean;
+    enable: boolean;
   };
 
 export const builder = (yargs: Argv) =>
-  yargs
-    .options({
-      ...commonOptions,
-      ...clientIdOption,
-      ...writeOptions,
-      "target-id": {
-        type: "string",
-        demandOption: true,
-        description: "Target identifier to update",
-      },
-      enable: {
-        type: "boolean",
-        description: "Enable mTLS for this target",
-        conflicts: "disable",
-      },
-      disable: {
-        type: "boolean",
-        description: "Disable mTLS for this target",
-        conflicts: "enable",
-      },
-    })
-    .check((argv) => {
-      if (!argv.enable && !argv.disable) {
-        throw new Error("Specify either --enable or --disable");
-      }
-      return true;
-    });
+  yargs.options({
+    ...commonOptions,
+    ...clientIdOption,
+    ...targetIdOption,
+    ...writeOptions,
+    enable: {
+      type: "boolean",
+      demandOption: true,
+      description:
+        "Enable or disable mTLS for this target (use --no-enable to disable)",
+    },
+  });
 
 export const handler: CliCommand<TargetsSetMtlsArgs>["handler"] = async (
   argv,
 ) => {
-  const enabled = argv.enable === true;
+  const enabled = argv.enable;
 
   if (!enabled) {
     console.warn(
@@ -62,21 +49,20 @@ export const handler: CliCommand<TargetsSetMtlsArgs>["handler"] = async (
   }
 
   const repository = await createRepository(argv);
-  const config = await repository.getClientConfig(argv["client-id"]);
+  const config = await requireClientConfig(repository, argv["client-id"]);
+  const target = requireTargetConfig(
+    config,
+    argv["client-id"],
+    argv["target-id"],
+  );
 
-  if (!config) {
-    throw new Error(`No configuration found for client: ${argv["client-id"]}`);
-  }
-
-  const target = config.targets.find((t) => t.targetId === argv["target-id"]);
-
-  if (!target) {
-    throw new Error(
-      `Target '${argv["target-id"]}' not found for client '${argv["client-id"]}'`,
-    );
-  }
-
-  target.mtls = { enabled };
+  target.delivery = {
+    ...target.delivery,
+    mtls: {
+      ...target.delivery?.mtls,
+      enabled,
+    },
+  };
 
   const result = await repository.putClientConfig(
     argv["client-id"],

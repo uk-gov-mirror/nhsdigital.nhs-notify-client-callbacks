@@ -56,7 +56,7 @@ export const handler: CliCommand<ClientsPutArgs>["handler"] = async (argv) => {
     return;
   }
 
-  // eslint-disable-next-line security/detect-non-literal-fs-filename
+  // eslint-disable-next-line security/detect-non-literal-fs-filename -- path is provided directly by the operator via CLI arg
   const rawJson = argv.json ?? readFileSync(argv.file!, "utf8");
 
   let parsed: unknown;

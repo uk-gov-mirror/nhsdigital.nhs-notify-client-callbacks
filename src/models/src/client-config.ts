@@ -15,17 +15,17 @@ export type CallbackTarget = {
     headerName: string;
     headerValue: string;
   };
-  mtls: {
-    enabled: boolean;
-  };
-  certPinning: {
-    enabled: boolean;
-    spkiHash?: string;
-  };
   delivery?: {
     maxRetryDurationSeconds?: number;
     circuitBreaker?: {
       enabled: boolean;
+    };
+    mtls?: {
+      enabled: boolean;
+      certPinning?: {
+        enabled: boolean;
+        spkiHash?: string;
+      };
     };
   };
 };
