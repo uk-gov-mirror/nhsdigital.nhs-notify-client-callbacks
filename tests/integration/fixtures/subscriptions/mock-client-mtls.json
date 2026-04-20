@@ -19,16 +19,18 @@
         "headerName": "x-api-key",
         "headerValue": "REPLACED_BY_TERRAFORM"
       },
-      "certPinning": {
-        "enabled": true,
-        "spkiHash": "REPLACED_BY_TERRAFORM"
+      "delivery": {
+        "mtls": {
+          "enabled": true,
+          "certPinning": {
+            "enabled": true,
+            "spkiHash": "REPLACED_BY_TERRAFORM"
+          }
+        }
       },
       "invocationEndpoint": "https://REPLACED_BY_TERRAFORM",
       "invocationMethod": "POST",
       "invocationRateLimit": 10,
-      "mtls": {
-        "enabled": true
-      },
       "targetId": "target-mtls-001",
       "type": "API"
     }
