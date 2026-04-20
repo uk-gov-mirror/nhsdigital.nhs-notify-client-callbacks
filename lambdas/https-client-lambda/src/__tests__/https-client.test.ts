@@ -251,4 +251,40 @@ describe("deliverPayload", () => {
 
     expect(result).toEqual({ outcome: "transient_failure", statusCode: 0 });
   });
+
+  it("treats undefined statusCode as transient failure with code 0", async () => {
+    const mockReq = new EventEmitter() as EventEmitter & {
+      end: jest.Mock;
+      destroy: jest.Mock;
+    };
+    mockReq.end = jest.fn();
+    mockReq.destroy = jest.fn();
+
+    jest.spyOn(https, "request").mockImplementation((...args: unknown[]) => {
+      const callback = args.find((a) => typeof a === "function") as
+        | ((res: MockResponse) => void)
+        | undefined;
+
+      const res: MockResponse = Object.assign(new EventEmitter(), {
+        statusCode: undefined as unknown as number,
+        headers: {},
+        resume: jest.fn(),
+      });
+
+      if (callback) {
+        process.nextTick(() => callback(res));
+      }
+
+      return mockReq as unknown as ReturnType<typeof https.request>;
+    });
+
+    const result = await deliverPayload(
+      createTarget(),
+      '{"test":true}',
+      "sig-abc",
+      createMockAgent(),
+    );
+
+    expect(result).toEqual({ outcome: "transient_failure", statusCode: 0 });
+  });
 });
