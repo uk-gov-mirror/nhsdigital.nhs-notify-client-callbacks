@@ -364,6 +364,23 @@ describe("processRecords", () => {
     expect(mockRecordResult).not.toHaveBeenCalled();
   });
 
+  it("does not call recordResult when CB is disabled on transient failure", async () => {
+    const targetNoCb = {
+      ...DEFAULT_TARGET,
+      delivery: { circuitBreaker: { enabled: false } },
+    };
+    mockLoadTargetConfig.mockResolvedValue(targetNoCb);
+    mockDeliverPayload.mockResolvedValue({
+      outcome: "transient_failure",
+      statusCode: 503,
+    });
+
+    await processRecords([makeRecord()]);
+
+    expect(mockRecordResult).not.toHaveBeenCalled();
+    expect(mockChangeVisibility).toHaveBeenCalled();
+  });
+
   it("does not call recordResult when CB is disabled on success", async () => {
     const targetNoCb = {
       ...DEFAULT_TARGET,
