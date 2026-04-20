@@ -9,14 +9,30 @@ import {
 
 jest.mock("@nhs-notify-client-callbacks/logger");
 
+const mockPresign = jest.fn().mockResolvedValue({
+  hostname: "cache.example.invalid",
+  path: "/",
+  query: { "X-Amz-Signature": "mock-sig" },
+});
+
+jest.mock("@smithy/signature-v4", () => ({
+  SignatureV4: jest.fn().mockImplementation(() => ({ presign: mockPresign })),
+}));
+
+jest.mock("@aws-sdk/credential-providers", () => ({
+  fromNodeProviderChain: jest.fn(),
+}));
+
 const mockSendCommand = jest.fn();
 const mockConnect = jest.fn().mockResolvedValue(undefined);
+const mockDisconnect = jest.fn().mockResolvedValue(undefined);
 const mockOn = jest.fn();
 
 jest.mock("@redis/client", () => ({
   createClient: jest.fn(() => ({
     sendCommand: mockSendCommand,
     connect: mockConnect,
+    disconnect: mockDisconnect,
     on: mockOn,
     isOpen: true,
   })),
@@ -35,6 +51,7 @@ const defaultConfig: EndpointGateConfig = {
 const mockRedis = {
   sendCommand: mockSendCommand,
   connect: mockConnect,
+  disconnect: mockDisconnect,
   on: mockOn,
   isOpen: true,
 } as never;
@@ -46,9 +63,7 @@ beforeEach(() => {
 
 describe("admit", () => {
   it("returns allowed when tokens available", async () => {
-    mockSendCommand.mockResolvedValueOnce(
-      JSON.stringify({ allowed: true, probe: false, effectiveRate: 10 }),
-    );
+    mockSendCommand.mockResolvedValueOnce([1, "allowed", 0, 10]);
 
     const result = await admit(mockRedis, "target-1", 10, true, defaultConfig);
 
@@ -59,29 +74,20 @@ describe("admit", () => {
   });
 
   it("returns rate_limited when tokens exhausted", async () => {
-    mockSendCommand.mockResolvedValueOnce(
-      JSON.stringify({
-        allowed: false,
-        reason: "rate_limited",
-        retryAfterMs: 500,
-        effectiveRate: 10,
-      }),
-    );
+    mockSendCommand.mockResolvedValueOnce([0, "rate_limited", 1000, 10]);
 
     const result = await admit(mockRedis, "target-1", 10, false, defaultConfig);
 
     expect(result).toEqual({
       allowed: false,
       reason: "rate_limited",
-      retryAfterMs: 500,
+      retryAfterMs: 1000,
       effectiveRate: 10,
     });
   });
 
-  it("returns circuit_open with probe slot available", async () => {
-    mockSendCommand.mockResolvedValueOnce(
-      JSON.stringify({ allowed: true, probe: true, effectiveRate: 0 }),
-    );
+  it("returns allowed with probe flag when circuit is open but probe slot is available", async () => {
+    mockSendCommand.mockResolvedValueOnce([1, "probe", 0, 0]);
 
     const result = await admit(mockRedis, "target-1", 10, true, defaultConfig);
 
@@ -89,14 +95,7 @@ describe("admit", () => {
   });
 
   it("returns circuit_open without probe slot", async () => {
-    mockSendCommand.mockResolvedValueOnce(
-      JSON.stringify({
-        allowed: false,
-        reason: "circuit_open",
-        retryAfterMs: 30_000,
-        effectiveRate: 0,
-      }),
-    );
+    mockSendCommand.mockResolvedValueOnce([0, "circuit_open", 30_000, 0]);
 
     const result = await admit(mockRedis, "target-1", 10, true, defaultConfig);
 
@@ -111,9 +110,7 @@ describe("admit", () => {
   it("falls back to EVAL on NOSCRIPT error", async () => {
     mockSendCommand
       .mockRejectedValueOnce(new Error("NOSCRIPT No matching script"))
-      .mockResolvedValueOnce(
-        JSON.stringify({ allowed: true, probe: false, effectiveRate: 10 }),
-      );
+      .mockResolvedValueOnce([1, "allowed", 0, 10]);
 
     const result = await admit(mockRedis, "target-1", 10, true, defaultConfig);
 
@@ -137,36 +134,31 @@ describe("admit", () => {
     ).rejects.toThrow("Connection refused");
   });
 
-  it("passes cbEnabled=0 when circuit breaker is disabled", async () => {
-    mockSendCommand.mockResolvedValueOnce(
-      JSON.stringify({ allowed: true, probe: false, effectiveRate: 10 }),
-    );
+  it("passes cbProbeIntervalMs=0 when circuit breaker is disabled", async () => {
+    mockSendCommand.mockResolvedValueOnce([1, "allowed", 0, 10]);
 
     await admit(mockRedis, "target-1", 10, false, defaultConfig);
 
+    // EVALSHA layout: [EVALSHA, sha, keyCount, cbKey, rlKey, now, capacity, refillPerSec, cooldownMs, decayPeriodMs, cbWindowPeriodMs, cbProbeIntervalMs]
     const args = mockSendCommand.mock.calls[0]![0] as string[];
-    const cbEnabledArg = args[9];
-    expect(cbEnabledArg).toBe("0");
+    const cbProbeIntervalArg = args[11];
+    expect(cbProbeIntervalArg).toBe("0");
   });
 
-  it("passes correct keys for target-specific hashes", async () => {
-    mockSendCommand.mockResolvedValueOnce(
-      JSON.stringify({ allowed: true, probe: false, effectiveRate: 5 }),
-    );
+  it("passes cbKey first, rlKey second", async () => {
+    mockSendCommand.mockResolvedValueOnce([1, "allowed", 0, 5]);
 
     await admit(mockRedis, "my-target", 5, true, defaultConfig);
 
     const args = mockSendCommand.mock.calls[0]![0] as string[];
-    expect(args[3]).toBe("rl:my-target");
-    expect(args[4]).toBe("cb:my-target");
+    expect(args[3]).toBe("cb:my-target");
+    expect(args[4]).toBe("rl:my-target");
   });
 });
 
 describe("recordResult", () => {
   it("returns closed on success below threshold", async () => {
-    mockSendCommand.mockResolvedValueOnce(
-      JSON.stringify({ ok: true, state: "closed" }),
-    );
+    mockSendCommand.mockResolvedValueOnce([1, "closed"]);
 
     const result = await recordResult(
       mockRedis,
@@ -182,9 +174,7 @@ describe("recordResult", () => {
   });
 
   it("returns opened when failure crosses threshold", async () => {
-    mockSendCommand.mockResolvedValueOnce(
-      JSON.stringify({ ok: false, state: "opened" }),
-    );
+    mockSendCommand.mockResolvedValueOnce([0, "opened"]);
 
     const result = await recordResult(
       mockRedis,
@@ -196,10 +186,23 @@ describe("recordResult", () => {
     expect(result).toEqual({ ok: false, state: "opened" });
   });
 
+  it("returns failed when failure is below threshold", async () => {
+    mockSendCommand.mockResolvedValueOnce([0, "failed"]);
+
+    const result = await recordResult(
+      mockRedis,
+      "target-1",
+      false,
+      defaultConfig,
+    );
+
+    expect(result).toEqual({ ok: false, state: "failed" });
+  });
+
   it("falls back to EVAL on NOSCRIPT error", async () => {
     mockSendCommand
       .mockRejectedValueOnce(new Error("NOSCRIPT No matching script"))
-      .mockResolvedValueOnce(JSON.stringify({ ok: true, state: "closed" }));
+      .mockResolvedValueOnce([1, "closed"]);
 
     const result = await recordResult(
       mockRedis,
@@ -221,9 +224,7 @@ describe("recordResult", () => {
   });
 
   it("passes correct cb key for target", async () => {
-    mockSendCommand.mockResolvedValueOnce(
-      JSON.stringify({ ok: true, state: "closed" }),
-    );
+    mockSendCommand.mockResolvedValueOnce([1, "closed"]);
 
     await recordResult(mockRedis, "my-target", true, defaultConfig);
 
@@ -236,6 +237,8 @@ describe("getRedisClient", () => {
   beforeEach(() => {
     resetRedisClient();
     delete process.env.ELASTICACHE_ENDPOINT;
+    delete process.env.ELASTICACHE_CACHE_NAME;
+    delete process.env.ELASTICACHE_IAM_USERNAME;
   });
 
   it("throws when ELASTICACHE_ENDPOINT is not set", async () => {
@@ -244,27 +247,43 @@ describe("getRedisClient", () => {
     );
   });
 
-  it("creates and connects a Redis client", async () => {
-    process.env.ELASTICACHE_ENDPOINT = "localhost";
+  it("throws when ELASTICACHE_IAM_USERNAME is not set", async () => {
+    process.env.ELASTICACHE_ENDPOINT = "cache.example.invalid";
+
+    await expect(getRedisClient()).rejects.toThrow(
+      "ELASTICACHE_IAM_USERNAME is required",
+    );
+  });
+
+  it("creates and connects a Redis client with IAM token", async () => {
+    process.env.ELASTICACHE_ENDPOINT = "cache.example.invalid";
+    process.env.ELASTICACHE_CACHE_NAME = "my-cache";
+    process.env.ELASTICACHE_IAM_USERNAME = "iam-user";
 
     const client = await getRedisClient();
 
     expect(client).toBeDefined();
+    expect(mockPresign).toHaveBeenCalled();
     expect(mockConnect).toHaveBeenCalled();
   });
 
-  it("returns cached client when already open", async () => {
-    process.env.ELASTICACHE_ENDPOINT = "localhost";
+  it("returns cached client when already open and token is valid", async () => {
+    process.env.ELASTICACHE_ENDPOINT = "cache.example.invalid";
+    process.env.ELASTICACHE_CACHE_NAME = "my-cache";
+    process.env.ELASTICACHE_IAM_USERNAME = "iam-user";
 
     const first = await getRedisClient();
     const second = await getRedisClient();
 
     expect(first).toBe(second);
     expect(mockConnect).toHaveBeenCalledTimes(1);
+    expect(mockPresign).toHaveBeenCalledTimes(1);
   });
 
   it("registers error handler on client", async () => {
-    process.env.ELASTICACHE_ENDPOINT = "localhost";
+    process.env.ELASTICACHE_ENDPOINT = "cache.example.invalid";
+    process.env.ELASTICACHE_CACHE_NAME = "my-cache";
+    process.env.ELASTICACHE_IAM_USERNAME = "iam-user";
 
     await getRedisClient();
 

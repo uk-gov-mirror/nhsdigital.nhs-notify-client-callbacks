@@ -1,9 +1,12 @@
 {
   "dependencies": {
+    "@aws-crypto/sha256-js": "catalog:aws",
     "@aws-sdk/client-s3": "catalog:aws",
     "@aws-sdk/client-secrets-manager": "catalog:aws",
     "@aws-sdk/client-sqs": "catalog:aws",
     "@aws-sdk/client-ssm": "catalog:aws",
+    "@aws-sdk/credential-providers": "catalog:aws",
+    "@smithy/signature-v4": "catalog:aws",
     "@nhs-notify-client-callbacks/config-subscription-cache": "workspace:*",
     "@nhs-notify-client-callbacks/logger": "workspace:*",
     "@nhs-notify-client-callbacks/models": "workspace:*",

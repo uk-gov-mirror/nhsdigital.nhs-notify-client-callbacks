@@ -37,7 +37,7 @@ import { flushMetrics } from "services/delivery-metrics";
 
 type RedisClientType = Awaited<ReturnType<typeof getRedisClient>>;
 
-const DEFAULT_MAX_RETRY_DURATION_MS = 3_600_000;
+const DEFAULT_MAX_RETRY_DURATION_MS = 7_200_000;
 const DEFAULT_CONCURRENCY_LIMIT = 5;
 
 const gateConfig: EndpointGateConfig = {
@@ -122,7 +122,7 @@ async function handleDeliveryResult(
   const backoffSec = jitteredBackoffSeconds(receiveCount);
   if (cbEnabled) {
     const cbOutcome = await recordResult(redis, targetId, false, gateConfig);
-    if (!cbOutcome.ok) {
+    if (cbOutcome.state === "opened") {
       recordCircuitBreakerOpen(targetId);
     }
   }
