@@ -22,11 +22,13 @@ type LogEntry = {
   signature?: string;
   payload?: string;
   path?: string;
+  isMtls?: boolean;
 };
 
 export type SignedCallback = {
   payload: CallbackItem;
   path: string;
+  isMtls: boolean;
   headers: {
     "x-api-key": string;
     "x-hmac-sha256-signature": string;
@@ -62,6 +64,7 @@ async function querySignedCallbacksFromWebhookLogGroup(
           callbacks.push({
             payload: JSON.parse(entry.payload) as CallbackItem,
             path: entry.path ?? "",
+            isMtls: entry.isMtls ?? false,
             headers: {
               "x-api-key": entry.apiKey ?? "",
               "x-hmac-sha256-signature": entry.signature,

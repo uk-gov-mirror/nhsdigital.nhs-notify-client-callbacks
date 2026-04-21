@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
-import type seedConfigJson from "../fixtures/subscriptions/mock-client-1.json";
+import type { DeploymentDetails } from "@nhs-notify-client-callbacks/test-support/helpers";
+import type seedConfigJson from "../fixtures/subscriptions/mock-client-single-target.json";
 
 type ClientFixtureShape = typeof seedConfigJson;
 
@@ -10,15 +11,30 @@ export type MockItClientConfig = ClientFixtureShape & {
 };
 
 export const CLIENT_FIXTURES = {
-  client1: {
-    fixture: "mock-client-1.json",
+  clientSingleTarget: {
+    fixture: "mock-client-single-target.json",
     apiKeyVar: "MOCK_CLIENT_API_KEY",
     applicationIdVar: "MOCK_CLIENT_APPLICATION_ID",
   },
-  client2: {
-    fixture: "mock-client-2.json",
-    apiKeyVar: "MOCK_CLIENT_2_API_KEY",
-    applicationIdVar: "MOCK_CLIENT_2_APPLICATION_ID",
+  clientFanOut: {
+    fixture: "mock-client-fan-out.json",
+    apiKeyVar: "MOCK_CLIENT_FAN_OUT_API_KEY",
+    applicationIdVar: "MOCK_CLIENT_FAN_OUT_APPLICATION_ID",
+  },
+  clientMtls: {
+    fixture: "mock-client-mtls.json",
+    apiKeyVar: "MOCK_CLIENT_MTLS_API_KEY",
+    applicationIdVar: "MOCK_CLIENT_MTLS_APPLICATION_ID",
+  },
+  clientRateLimit: {
+    fixture: "mock-client-rate-limit.json",
+    apiKeyVar: "MOCK_CLIENT_RATE_LIMIT_API_KEY",
+    applicationIdVar: "MOCK_CLIENT_RATE_LIMIT_APPLICATION_ID",
+  },
+  clientCircuitBreaker: {
+    fixture: "mock-client-circuit-breaker.json",
+    apiKeyVar: "MOCK_CLIENT_CIRCUIT_BREAKER_API_KEY",
+    applicationIdVar: "MOCK_CLIENT_CIRCUIT_BREAKER_APPLICATION_ID",
   },
   clientMtls: {
     fixture: "mock-client-mtls.json",
@@ -45,11 +61,11 @@ export function getClientConfig(key: ClientFixtureKey): MockItClientConfig {
 }
 
 export function getMockItClientConfig(): MockItClientConfig {
-  return getClientConfig("client1");
+  return getClientConfig("clientSingleTarget");
 }
 
-export function getMockItClient2Config(): MockItClientConfig {
-  return getClientConfig("client2");
+export function getMockItFanOutClientConfig(): MockItClientConfig {
+  return getClientConfig("clientFanOut");
 }
 
 function buildWebhookTargetPaths(key: ClientFixtureKey): string[] {
@@ -58,7 +74,7 @@ function buildWebhookTargetPaths(key: ClientFixtureKey): string[] {
 }
 
 export function buildMockWebhookTargetPath(
-  key: ClientFixtureKey = "client1",
+  key: ClientFixtureKey = "clientSingleTarget",
 ): string {
   const paths = buildWebhookTargetPaths(key);
 
@@ -70,7 +86,7 @@ export function buildMockWebhookTargetPath(
 }
 
 export function buildMockWebhookTargetPaths(
-  key: ClientFixtureKey = "client1",
+  key: ClientFixtureKey = "clientSingleTarget",
 ): string[] {
   return buildWebhookTargetPaths(key);
 }

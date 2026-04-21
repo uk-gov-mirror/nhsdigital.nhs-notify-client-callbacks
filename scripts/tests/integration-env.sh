@@ -7,8 +7,11 @@ set -euo pipefail
 
 # Add new clients here: "fixture-filename.json:ENV_VAR_PREFIX"
 CLIENTS=(
-  "mock-client-1.json:MOCK_CLIENT"
-  "mock-client-2.json:MOCK_CLIENT_2"
+  "mock-client-single-target.json:MOCK_CLIENT"
+  "mock-client-fan-out.json:MOCK_CLIENT_FAN_OUT"
+  "mock-client-mtls.json:MOCK_CLIENT_MTLS"
+  "mock-client-rate-limit.json:MOCK_CLIENT_RATE_LIMIT"
+  "mock-client-circuit-breaker.json:MOCK_CLIENT_CIRCUIT_BREAKER"
 )
 
 for CLIENT_ENTRY in "${CLIENTS[@]}"; do

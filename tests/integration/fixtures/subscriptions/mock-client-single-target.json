@@ -1,5 +1,5 @@
 {
-  "clientId": "mock-client-1",
+  "clientId": "mock-client-single-target",
   "subscriptions": [
     {
       "messageStatuses": [

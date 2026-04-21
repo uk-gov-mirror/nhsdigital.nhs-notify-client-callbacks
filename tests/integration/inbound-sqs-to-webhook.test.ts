@@ -21,8 +21,9 @@ import {
 import {
   buildMockWebhookTargetPath,
   buildMockWebhookTargetPaths,
-  getMockItClient2Config,
+  getClientConfig,
   getMockItClientConfig,
+  getMockItFanOutClientConfig,
 } from "./helpers/mock-client-config";
 import { assertCallbackHeaders } from "./helpers/signature";
 import {
@@ -124,13 +125,13 @@ describe("SQS to Webhook Integration", () => {
     }, 120_000);
 
     it("should fan out a message status event to subscription with multiple target endpoints", async () => {
-      const client2Config = getMockItClient2Config();
-      const expectedPaths = buildMockWebhookTargetPaths("client2");
+      const fanOutConfig = getMockItFanOutClientConfig();
+      const expectedPaths = buildMockWebhookTargetPaths("clientFanOut");
 
       const messageStatusEvent: StatusPublishEvent<MessageStatusData> =
         createMessageStatusPublishEvent({
           data: {
-            clientId: client2Config.clientId,
+            clientId: fanOutConfig.clientId,
           },
         });
 
@@ -164,8 +165,8 @@ describe("SQS to Webhook Integration", () => {
 
         assertCallbackHeaders(
           callback,
-          client2Config.apiKeyVar,
-          client2Config.applicationIdVar,
+          fanOutConfig.apiKeyVar,
+          fanOutConfig.applicationIdVar,
         );
       }
     }, 120_000);
@@ -265,6 +266,50 @@ describe("SQS to Webhook Integration", () => {
           QueueUrl: inboundEventDlqQueueUrl,
           ReceiptHandle: dlqMessage.ReceiptHandle!,
         }),
+      );
+    }, 120_000);
+  });
+
+  describe("mTLS Delivery", () => {
+    it("should deliver a callback via mTLS to the mTLS-secured mock webhook", async () => {
+      const mtlsConfig = getClientConfig("clientMtls");
+      const mtlsTargetPath = buildMockWebhookTargetPath("clientMtls");
+
+      const messageStatusEvent: StatusPublishEvent<MessageStatusData> =
+        createMessageStatusPublishEvent({
+          data: {
+            clientId: mtlsConfig.clientId,
+          },
+        });
+
+      await sendSqsEvent(sqsClient, callbackEventQueueUrl, messageStatusEvent);
+      await ensureInboundQueueIsEmpty(sqsClient, callbackEventQueueUrl);
+
+      const callbacks = await awaitSignedCallbacksByCountFromWebhookLogGroup(
+        cloudWatchClient,
+        webhookLogGroupName,
+        messageStatusEvent.data.messageId,
+        "MessageStatus",
+        1,
+        startTime,
+      );
+
+      expect(callbacks).toHaveLength(1);
+      expect(callbacks[0].path).toBe(mtlsTargetPath);
+      expect(callbacks[0].isMtls).toBe(true);
+
+      expect(callbacks[0].payload).toMatchObject({
+        type: "MessageStatus",
+        attributes: expect.objectContaining({
+          messageId: messageStatusEvent.data.messageId,
+          messageStatus: "delivered",
+        }),
+      });
+
+      assertCallbackHeaders(
+        callbacks[0],
+        mtlsConfig.apiKeyVar,
+        mtlsConfig.applicationIdVar,
       );
     }, 120_000);
   });
