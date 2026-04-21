@@ -64,6 +64,8 @@ const mockRecordResult = jest.fn();
 jest.mock("services/endpoint-gate", () => ({
   admit: (...args: unknown[]) => mockAdmit(...args),
   recordResult: (...args: unknown[]) => mockRecordResult(...args),
+}));
+jest.mock("services/redis-client", () => ({
   getRedisClient: (...args: unknown[]) => mockGetRedisClient(...args),
 }));
 

@@ -21,11 +21,11 @@
       },
       "delivery": {
         "mtls": {
-          "enabled": true,
           "certPinning": {
             "enabled": true,
             "spkiHash": "REPLACED_BY_TERRAFORM"
-          }
+          },
+          "enabled": true
         }
       },
       "invocationEndpoint": "https://REPLACED_BY_TERRAFORM",

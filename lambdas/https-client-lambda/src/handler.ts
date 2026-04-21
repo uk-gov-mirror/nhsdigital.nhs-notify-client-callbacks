@@ -18,9 +18,9 @@ import {
 import {
   type EndpointGateConfig,
   admit,
-  getRedisClient,
   recordResult,
 } from "services/endpoint-gate";
+import { getRedisClient } from "services/redis-client";
 import {
   recordAdmissionDenied,
   recordCircuitBreakerClosed,
@@ -37,7 +37,7 @@ import { flushMetrics } from "services/delivery-metrics";
 
 type RedisClientType = Awaited<ReturnType<typeof getRedisClient>>;
 
-const DEFAULT_MAX_RETRY_DURATION_MS = 7_200_000;
+const DEFAULT_MAX_RETRY_DURATION_MS = 7_200_000; // 2 hours
 const DEFAULT_CONCURRENCY_LIMIT = 5;
 
 const gateConfig: EndpointGateConfig = {

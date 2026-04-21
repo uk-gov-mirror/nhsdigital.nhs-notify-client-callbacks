@@ -21,10 +21,10 @@
       },
       "delivery": {
         "mtls": {
-          "enabled": false,
           "certPinning": {
             "enabled": false
-          }
+          },
+          "enabled": false
         }
       },
       "invocationEndpoint": "https://REPLACED_BY_TERRAFORM",
