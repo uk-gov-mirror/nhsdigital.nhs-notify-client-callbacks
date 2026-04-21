@@ -40,6 +40,8 @@ type RedisClientType = Awaited<ReturnType<typeof getRedisClient>>;
 const DEFAULT_MAX_RETRY_DURATION_MS = 7_200_000; // 2 hours
 const DEFAULT_CONCURRENCY_LIMIT = 5;
 
+class VisibilityManagedError extends Error {}
+
 const gateConfig: EndpointGateConfig = {
   burstCapacity: Number(process.env.TOKEN_BUCKET_BURST_CAPACITY ?? "10"),
   cbProbeIntervalMs: Number(process.env.CB_PROBE_INTERVAL_MS ?? "60000"),
@@ -76,7 +78,7 @@ async function checkAdmission(
     const delaySec = Math.ceil(gateResult.retryAfterMs / 1000);
     recordAdmissionDenied(clientId, targetId, gateResult.reason);
     await changeVisibility(record.receiptHandle, delaySec);
-    throw new Error(`Admission denied: ${gateResult.reason}`);
+    throw new VisibilityManagedError(`Admission denied: ${gateResult.reason}`);
   }
 }
 
@@ -128,7 +130,7 @@ async function handleDeliveryResult(
   }
   recordDeliveryFailure(clientId, targetId, result.statusCode, backoffSec);
   await changeVisibility(record.receiptHandle, backoffSec);
-  throw new Error(`Transient failure: ${result.statusCode}`);
+  throw new VisibilityManagedError(`Transient failure: ${result.statusCode}`);
 }
 
 async function processRecord(
@@ -211,7 +213,16 @@ export async function processRecords(
       try {
         await processRecord(record, redis);
         return null;
-      } catch {
+      } catch (error) {
+        if (!(error instanceof VisibilityManagedError)) {
+          const receiveCount = Number(
+            record.attributes.ApproximateReceiveCount,
+          );
+          await changeVisibility(
+            record.receiptHandle,
+            jitteredBackoffSeconds(receiveCount),
+          );
+        }
         return { itemIdentifier: record.messageId };
       }
     },

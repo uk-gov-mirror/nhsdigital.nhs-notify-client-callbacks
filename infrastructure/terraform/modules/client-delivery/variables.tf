@@ -147,7 +147,7 @@ variable "sqs_visibility_timeout_seconds" {
 
 variable "sqs_max_receive_count" {
   type        = number
-  description = "Maximum receive count before message moves to DLQ"
+  description = "Safety-net maximum receive count before a message moves to DLQ. Supplements the time-based retry window for cases where the Lambda fails before reaching the window check."
   default     = 100
 }
 
