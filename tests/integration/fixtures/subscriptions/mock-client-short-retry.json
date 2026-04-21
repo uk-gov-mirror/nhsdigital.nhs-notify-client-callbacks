@@ -1,0 +1,38 @@
+{
+  "clientId": "mock-client-short-retry",
+  "subscriptions": [
+    {
+      "messageStatuses": [
+        "DELIVERED",
+        "FAILED"
+      ],
+      "subscriptionId": "sub-sr-msg-001",
+      "subscriptionType": "MessageStatus",
+      "targetIds": [
+        "target-sr-001"
+      ]
+    }
+  ],
+  "targets": [
+    {
+      "apiKey": {
+        "headerName": "x-api-key",
+        "headerValue": "REPLACED_BY_TERRAFORM"
+      },
+      "delivery": {
+        "maxRetryDurationSeconds": 10,
+        "mtls": {
+          "certPinning": {
+            "enabled": false
+          },
+          "enabled": false
+        }
+      },
+      "invocationEndpoint": "https://REPLACED_BY_TERRAFORM",
+      "invocationMethod": "POST",
+      "invocationRateLimit": 10,
+      "targetId": "target-sr-001",
+      "type": "API"
+    }
+  ]
+}

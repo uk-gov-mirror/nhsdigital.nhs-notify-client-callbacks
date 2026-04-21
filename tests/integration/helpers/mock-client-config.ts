@@ -1,6 +1,5 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
-import type { DeploymentDetails } from "@nhs-notify-client-callbacks/test-support/helpers";
 import type seedConfigJson from "../fixtures/subscriptions/mock-client-single-target.json";
 
 type ClientFixtureShape = typeof seedConfigJson;
@@ -36,10 +35,10 @@ export const CLIENT_FIXTURES = {
     apiKeyVar: "MOCK_CLIENT_CIRCUIT_BREAKER_API_KEY",
     applicationIdVar: "MOCK_CLIENT_CIRCUIT_BREAKER_APPLICATION_ID",
   },
-  clientMtls: {
-    fixture: "mock-client-mtls.json",
-    apiKeyVar: "MOCK_CLIENT_MTLS_API_KEY",
-    applicationIdVar: "MOCK_CLIENT_MTLS_APPLICATION_ID",
+  clientShortRetry: {
+    fixture: "mock-client-short-retry.json",
+    apiKeyVar: "MOCK_CLIENT_SHORT_RETRY_API_KEY",
+    applicationIdVar: "MOCK_CLIENT_SHORT_RETRY_APPLICATION_ID",
   },
 } as const;
 

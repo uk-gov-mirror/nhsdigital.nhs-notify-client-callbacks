@@ -272,3 +272,45 @@ export async function awaitAllEmfMetricsInLogGroup(
     },
   );
 }
+
+export async function countForcedStatusInvocations(
+  client: CloudWatchLogsClient,
+  logGroupName: string,
+  messageId: string,
+  startTime: number,
+  minCount: number,
+): Promise<number> {
+  const queryStartTime = Math.max(0, startTime - CLOUDWATCH_QUERY_LOOKBACK_MS);
+  const filterPattern = `{ $.msg = "Forced status code response" && $.messageId = "${messageId}" }`;
+
+  const query = async () => {
+    const response = await client.send(
+      new FilterLogEventsCommand({
+        logGroupName,
+        startTime: queryStartTime,
+        filterPattern,
+      }),
+    );
+    return (response.events ?? []).length;
+  };
+
+  let count = 0;
+  try {
+    await waitUntil(
+      async () => {
+        count = await query();
+        return count >= minCount;
+      },
+      {
+        timeout: CALLBACK_WAIT_TIMEOUT_MS,
+        intervalBetweenAttempts: POLL_INTERVAL_MS,
+      },
+    );
+  } catch (error) {
+    if (!(error instanceof TimeoutError)) {
+      throw error;
+    }
+  }
+
+  return count;
+}

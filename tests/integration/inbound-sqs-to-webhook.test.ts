@@ -13,7 +13,10 @@ import {
   createSqsClient,
   getDeploymentDetails,
 } from "@nhs-notify-client-callbacks/test-support/helpers";
-import { awaitSignedCallbacksByCountFromWebhookLogGroup } from "./helpers/cloudwatch";
+import {
+  awaitSignedCallbacksByCountFromWebhookLogGroup,
+  countForcedStatusInvocations,
+} from "./helpers/cloudwatch";
 import {
   createChannelStatusPublishEvent,
   createMessageStatusPublishEvent,
@@ -312,5 +315,116 @@ describe("SQS to Webhook Integration", () => {
         mtlsConfig.applicationIdVar,
       );
     }, 120_000);
+  });
+
+  describe("Retry & Window Exhaustion", () => {
+    let retryClientDlqQueueUrl: string;
+    let retryClientDeliveryQueueUrl: string;
+
+    beforeAll(async () => {
+      const deploymentDetails = getDeploymentDetails();
+      const { clientId } = getClientConfig("clientShortRetry");
+      retryClientDlqQueueUrl = buildMockClientDlqQueueUrl(
+        deploymentDetails,
+        clientId,
+      );
+      retryClientDeliveryQueueUrl = buildMockClientDeliveryQueueUrl(
+        deploymentDetails,
+        clientId,
+      );
+      await purgeQueues(sqsClient, [
+        retryClientDlqQueueUrl,
+        retryClientDeliveryQueueUrl,
+      ]);
+    });
+
+    afterAll(async () => {
+      await purgeQueues(sqsClient, [
+        retryClientDlqQueueUrl,
+        retryClientDeliveryQueueUrl,
+      ]);
+    });
+
+    it("should exhaust the retry window on persistent 5xx and route to DLQ", async () => {
+      const shortRetryConfig = getClientConfig("clientShortRetry");
+      const messageId = `force-500-${Date.now()}`;
+
+      const event: StatusPublishEvent<MessageStatusData> =
+        createMessageStatusPublishEvent({
+          data: {
+            clientId: shortRetryConfig.clientId,
+            messageId,
+          },
+        });
+
+      await sendSqsEvent(sqsClient, callbackEventQueueUrl, event);
+
+      const dlqMessage = await awaitQueueMessage(
+        sqsClient,
+        retryClientDlqQueueUrl,
+        90_000,
+      );
+
+      expect(dlqMessage.Body).toBeDefined();
+      const dlqPayload = JSON.parse(dlqMessage.Body as string);
+      expect(dlqPayload.payload.data[0].attributes.messageId).toBe(messageId);
+
+      const attemptCount = await countForcedStatusInvocations(
+        cloudWatchClient,
+        webhookLogGroupName,
+        messageId,
+        startTime,
+        2,
+      );
+      expect(attemptCount).toBeGreaterThan(1);
+
+      await sqsClient.send(
+        new DeleteMessageCommand({
+          QueueUrl: retryClientDlqQueueUrl,
+          ReceiptHandle: dlqMessage.ReceiptHandle!,
+        }),
+      );
+    }, 180_000);
+
+    it("should exhaust the retry window on persistent 429 and route to DLQ", async () => {
+      const shortRetryConfig = getClientConfig("clientShortRetry");
+      const messageId = `force-429-${Date.now()}`;
+
+      const event: StatusPublishEvent<MessageStatusData> =
+        createMessageStatusPublishEvent({
+          data: {
+            clientId: shortRetryConfig.clientId,
+            messageId,
+          },
+        });
+
+      await sendSqsEvent(sqsClient, callbackEventQueueUrl, event);
+
+      const dlqMessage = await awaitQueueMessage(
+        sqsClient,
+        retryClientDlqQueueUrl,
+        90_000,
+      );
+
+      expect(dlqMessage.Body).toBeDefined();
+      const dlqPayload = JSON.parse(dlqMessage.Body as string);
+      expect(dlqPayload.payload.data[0].attributes.messageId).toBe(messageId);
+
+      const attemptCount = await countForcedStatusInvocations(
+        cloudWatchClient,
+        webhookLogGroupName,
+        messageId,
+        startTime,
+        2,
+      );
+      expect(attemptCount).toBeGreaterThan(1);
+
+      await sqsClient.send(
+        new DeleteMessageCommand({
+          QueueUrl: retryClientDlqQueueUrl,
+          ReceiptHandle: dlqMessage.ReceiptHandle!,
+        }),
+      );
+    }, 180_000);
   });
 });

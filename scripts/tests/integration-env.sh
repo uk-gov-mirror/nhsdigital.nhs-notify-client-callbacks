@@ -12,6 +12,7 @@ CLIENTS=(
   "mock-client-mtls.json:MOCK_CLIENT_MTLS"
   "mock-client-rate-limit.json:MOCK_CLIENT_RATE_LIMIT"
   "mock-client-circuit-breaker.json:MOCK_CLIENT_CIRCUIT_BREAKER"
+  "mock-client-short-retry.json:MOCK_CLIENT_SHORT_RETRY"
 )
 
 for CLIENT_ENTRY in "${CLIENTS[@]}"; do
