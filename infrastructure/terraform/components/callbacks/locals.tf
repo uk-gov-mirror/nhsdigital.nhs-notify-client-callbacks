@@ -13,6 +13,10 @@ locals {
     }
   ]...)
 
+  # SPKI hash of the mock webhook server certificate for cert-pinning enrichment.
+  # Computed via external data source because Terraform cannot SHA-256 hash raw binary (DER) data natively.
+  mock_server_spki_hash = var.deploy_mock_clients ? data.external.mock_server_spki_hash[0].result.hash : ""
+
   # When deploying mock clients, replace sentinel placeholder values with the mock webhook URL and API key.
   # Only used for S3 object content — must not be used as a for_each source (contains apply-time values).
   enriched_mock_config_clients = var.deploy_mock_clients ? {
@@ -23,6 +27,13 @@ locals {
         merge(target, {
           invocationEndpoint = "https://${aws_lb.mock_webhook_mtls[0].dns_name}/${target.targetId}"
           apiKey             = merge(target.apiKey, { headerValue = random_password.mock_webhook_api_key[0].result })
+          delivery = merge(try(target.delivery, {}), {
+            mtls = merge(try(target.delivery.mtls, {}), {
+              certPinning = merge(try(target.delivery.mtls.certPinning, {}), try(target.delivery.mtls.certPinning.enabled, false) ? {
+                spkiHash = local.mock_server_spki_hash
+              } : {})
+            })
+          })
         })
       ]
     })

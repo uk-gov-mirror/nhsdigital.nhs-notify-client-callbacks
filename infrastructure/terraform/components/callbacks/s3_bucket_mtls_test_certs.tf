@@ -172,3 +172,22 @@ resource "aws_s3_object" "mtls_test_ca" {
   server_side_encryption = "aws:kms"
   content_type           = "application/x-pem-file"
 }
+
+# Compute the base64-encoded SHA-256 hash of the mock server's SPKI (Subject Public Key Info) DER.
+# Used by cert-pinning clients to verify the server certificate during mTLS handshake.
+data "external" "mock_server_spki_hash" {
+  count = var.deploy_mock_clients ? 1 : 0
+  program = ["bash", "-c", <<-EOT
+    HASH=$(jq -r '.pem' \
+      | openssl pkey -pubin -outform DER 2>/dev/null \
+      | openssl dgst -sha256 -binary \
+      | base64 \
+      | tr -d '\n')
+    printf '{"hash":"%s"}' "$HASH"
+  EOT
+  ]
+
+  query = {
+    pem = tls_private_key.mock_server[0].public_key_pem
+  }
+}
