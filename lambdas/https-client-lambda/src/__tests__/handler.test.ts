@@ -197,6 +197,40 @@ describe("processRecords", () => {
 
     expect(failures).toEqual([{ itemIdentifier: "msg-1" }]);
     expect(mockDeliverPayload).toHaveBeenCalledTimes(1);
+    expect(mockChangeVisibility).toHaveBeenCalledWith("receipt-1", 5);
+  });
+
+  it("applies jittered backoff cooldown on unexpected errors", async () => {
+    mockLoadTargetConfig.mockRejectedValue(new Error("Infrastructure error"));
+
+    const failures = await processRecords([makeRecord()]);
+
+    expect(failures).toEqual([{ itemIdentifier: "msg-1" }]);
+    expect(mockChangeVisibility).toHaveBeenCalledWith("receipt-1", 5);
+  });
+
+  it("does not apply a second visibility change for admission-denied (managed path)", async () => {
+    mockAdmit.mockResolvedValue({
+      allowed: false,
+      reason: "rate_limited",
+      retryAfterMs: 2000,
+      effectiveRate: 10,
+    });
+
+    await processRecords([makeRecord()]);
+
+    expect(mockChangeVisibility).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not apply a second visibility change for transient failure (managed path)", async () => {
+    mockDeliverPayload.mockResolvedValue({
+      outcome: "transient_failure",
+      statusCode: 503,
+    });
+
+    await processRecords([makeRecord()]);
+
+    expect(mockChangeVisibility).toHaveBeenCalledTimes(1);
   });
 
   it("returns failure when CLIENT_ID is not set", async () => {
@@ -247,6 +281,18 @@ describe("processRecords", () => {
       "120",
       1,
     );
+  });
+
+  it("returns no failure when handleRateLimitedRecord resolves (e.g. DLQ path)", async () => {
+    mockDeliverPayload.mockResolvedValue({
+      outcome: "rate_limited",
+      retryAfterHeader: "99999",
+    });
+    mockHandleRateLimitedRecord.mockResolvedValue(undefined);
+
+    const failures = await processRecords([makeRecord()]);
+
+    expect(failures).toEqual([]);
   });
 
   it("requeues when rate limited by endpoint gate", async () => {
@@ -469,5 +515,22 @@ describe("processRecords", () => {
     await processRecords([makeRecord()]);
 
     expect(emitRateLimited).toHaveBeenCalledWith("target-1");
+  });
+
+  it("uses configured maxRetryDurationSeconds when set on target", async () => {
+    const targetWithRetry = {
+      ...DEFAULT_TARGET,
+      delivery: { ...DEFAULT_TARGET.delivery, maxRetryDurationSeconds: 3600 },
+    };
+    mockLoadTargetConfig.mockResolvedValue(targetWithRetry);
+    mockIsWindowExhausted.mockReturnValue(false);
+
+    const failures = await processRecords([makeRecord()]);
+
+    expect(failures).toEqual([]);
+    expect(mockIsWindowExhausted).toHaveBeenCalledWith(
+      expect.any(Number),
+      3_600_000,
+    );
   });
 });

@@ -28,12 +28,13 @@ npm
 OAuth
 Octokit
 onboarding
+pnpm
 Podman
 Python
 queryable
 rawContent
 read_file
-repo
+[rR][eE][pP][oO]
 [Rr]unbook
 sed
 Syft

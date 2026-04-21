@@ -1,3 +1,41 @@
+resource "aws_elasticache_user" "delivery_state_default" {
+  user_id       = "${local.csi}-delivery-state-default"
+  user_name     = "default"
+  engine        = "valkey"
+  access_string = "off -@all"
+
+  authentication_mode {
+    type = "no-password-required"
+  }
+
+  tags = local.default_tags
+}
+
+resource "aws_elasticache_user" "delivery_state_iam" {
+  user_id       = "${local.csi}-elasticache-user"
+  user_name     = "${local.csi}-elasticache-user"
+  engine        = "valkey"
+  access_string = "on ~* &* +@all"
+
+  authentication_mode {
+    type = "iam"
+  }
+
+  tags = local.default_tags
+}
+
+resource "aws_elasticache_user_group" "delivery_state" {
+  engine        = "valkey"
+  user_group_id = "${local.csi}-delivery-state"
+
+  user_ids = [
+    aws_elasticache_user.delivery_state_default.user_id,
+    aws_elasticache_user.delivery_state_iam.user_id,
+  ]
+
+  tags = local.default_tags
+}
+
 resource "aws_elasticache_serverless_cache" "delivery_state" {
   name                 = "${local.csi}-delivery-state"
   engine               = "valkey"
@@ -5,6 +43,8 @@ resource "aws_elasticache_serverless_cache" "delivery_state" {
   description          = "Per-target rate limiting and circuit breaker state for callback delivery"
 
   snapshot_retention_limit = 0
+
+  user_group_id = aws_elasticache_user_group.delivery_state.user_group_id
 
   security_group_ids = [aws_security_group.elasticache_delivery_state.id]
   subnet_ids         = try(local.acct.private_subnets[local.bc_name], [])

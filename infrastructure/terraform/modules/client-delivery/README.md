@@ -41,7 +41,7 @@ No requirements.
 | <a name="input_mtls_test_cert_s3_key"></a> [mtls\_test\_cert\_s3\_key](#input\_mtls\_test\_cert\_s3\_key) | S3 key for dev mTLS test certificate bundle | `string` | `""` | no |
 | <a name="input_project"></a> [project](#input\_project) | The name of the tfscaffold project | `string` | n/a | yes |
 | <a name="input_region"></a> [region](#input\_region) | AWS Region | `string` | n/a | yes |
-| <a name="input_sqs_max_receive_count"></a> [sqs\_max\_receive\_count](#input\_sqs\_max\_receive\_count) | Maximum receive count before message moves to DLQ | `number` | `100` | no |
+| <a name="input_sqs_max_receive_count"></a> [sqs\_max\_receive\_count](#input\_sqs\_max\_receive\_count) | Safety-net maximum receive count before a message moves to DLQ. Supplements the time-based retry window for cases where the Lambda fails before reaching the window check. | `number` | `100` | no |
 | <a name="input_sqs_visibility_timeout_seconds"></a> [sqs\_visibility\_timeout\_seconds](#input\_sqs\_visibility\_timeout\_seconds) | Visibility timeout for the per-client delivery queue | `number` | `60` | no |
 | <a name="input_subscription_targets"></a> [subscription\_targets](#input\_subscription\_targets) | Flattened subscription-target fanout map keyed by subscription-target composite key | <pre>map(object({<br/>    subscription_id = string<br/>    target_id       = string<br/>  }))</pre> | n/a | yes |
 | <a name="input_subscriptions"></a> [subscriptions](#input\_subscriptions) | Subscription definitions for this client, keyed by subscription\_id | <pre>map(object({<br/>    subscription_id = string<br/>    target_ids      = list(string)<br/>  }))</pre> | n/a | yes |
