@@ -288,4 +288,95 @@ describe("Delivery Resilience", () => {
       expect(rateLimitedCount).toBeGreaterThanOrEqual(1);
     }, 180_000);
   });
+
+  describe("Circuit Breaker", () => {
+    const CB_BURST_SIZE = 15;
+    let cbClientDlqQueueUrl: string;
+    let cbClientDeliveryQueueUrl: string;
+    let cbHttpsClientLogGroupName: string;
+
+    beforeAll(async () => {
+      const deploymentDetails = getDeploymentDetails();
+      const { clientId } = getClientConfig("clientCircuitBreaker");
+      cbClientDlqQueueUrl = buildMockClientDlqQueueUrl(
+        deploymentDetails,
+        clientId,
+      );
+      cbClientDeliveryQueueUrl = buildMockClientDeliveryQueueUrl(
+        deploymentDetails,
+        clientId,
+      );
+      cbHttpsClientLogGroupName = buildLambdaLogGroupName(
+        deploymentDetails,
+        `https-client-${clientId}`,
+      );
+      await purgeQueues(sqsClient, [
+        cbClientDlqQueueUrl,
+        cbClientDeliveryQueueUrl,
+      ]);
+    });
+
+    afterAll(async () => {
+      await purgeQueues(sqsClient, [
+        cbClientDlqQueueUrl,
+        cbClientDeliveryQueueUrl,
+      ]);
+    });
+
+    it("should open the circuit breaker after repeated failures and not affect other clients", async () => {
+      const cbConfig = getClientConfig("clientCircuitBreaker");
+      const singleTargetConfig = getClientConfig("clientSingleTarget");
+      const singleTargetPath = buildMockWebhookTargetPath("clientSingleTarget");
+
+      const cbEvents = Array.from({ length: CB_BURST_SIZE }, () =>
+        createMessageStatusPublishEvent({
+          data: {
+            clientId: cbConfig.clientId,
+            messageId: `force-500-cb-${crypto.randomUUID()}`,
+          },
+        }),
+      );
+
+      const normalEvent = createMessageStatusPublishEvent({
+        data: {
+          clientId: singleTargetConfig.clientId,
+          messageId: `cb-isolation-${crypto.randomUUID()}`,
+        },
+      });
+
+      await Promise.all([
+        ...cbEvents.map((event) =>
+          sendSqsEvent(sqsClient, callbackEventQueueUrl, event),
+        ),
+        sendSqsEvent(sqsClient, callbackEventQueueUrl, normalEvent),
+      ]);
+
+      const normalCallbacks =
+        await awaitSignedCallbacksByCountFromWebhookLogGroup(
+          cloudWatchClient,
+          webhookLogGroupName,
+          normalEvent.data.messageId,
+          "MessageStatus",
+          1,
+          startTime,
+        );
+
+      expect(normalCallbacks).toHaveLength(1);
+      expect(normalCallbacks[0].path).toBe(singleTargetPath);
+      assertCallbackHeaders(
+        normalCallbacks[0],
+        singleTargetConfig.apiKeyVar,
+        singleTargetConfig.applicationIdVar,
+      );
+
+      const circuitOpenCount = await countLogEntries(
+        cloudWatchClient,
+        cbHttpsClientLogGroupName,
+        `{ $.msg = "Admission denied" && $.reason = "circuit_open" }`,
+        startTime,
+        1,
+      );
+      expect(circuitOpenCount).toBeGreaterThanOrEqual(1);
+    }, 180_000);
+  });
 });
