@@ -39,7 +39,7 @@ import {
   recordDeliverySuccess,
   recordRetryWindowExhausted,
 } from "services/delivery-observability";
-import { flushMetrics } from "services/delivery-metrics";
+import { flushMetrics, resetMetrics } from "services/delivery-metrics";
 
 type RedisClientType = Awaited<ReturnType<typeof getRedisClient>>;
 
@@ -210,6 +210,8 @@ async function processRecord(
 export async function processRecords(
   records: SQSRecord[],
 ): Promise<SQSBatchItemFailure[]> {
+  resetMetrics();
+
   const concurrencyLimit = Number(
     process.env.CONCURRENCY_LIMIT ?? String(DEFAULT_CONCURRENCY_LIMIT),
   );
