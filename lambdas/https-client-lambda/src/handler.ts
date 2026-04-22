@@ -228,6 +228,8 @@ export async function processRecords(
 ): Promise<SQSBatchItemFailure[]> {
   resetMetrics();
 
+  logger.info("Batch received", { batchSize: records.length });
+
   const concurrencyLimit = Number(
     process.env.CONCURRENCY_LIMIT ?? String(DEFAULT_CONCURRENCY_LIMIT),
   );
@@ -261,5 +263,12 @@ export async function processRecords(
   );
 
   await flushMetrics();
-  return results.filter((r): r is SQSBatchItemFailure => r !== null);
+  const failures = results.filter((r): r is SQSBatchItemFailure => r !== null);
+  const successCount = records.length - failures.length;
+  logger.info("Batch complete", {
+    batchSize: records.length,
+    successCount,
+    failureCount: failures.length,
+  });
+  return failures;
 }
