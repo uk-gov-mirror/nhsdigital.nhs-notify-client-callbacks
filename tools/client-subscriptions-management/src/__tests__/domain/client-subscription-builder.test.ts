@@ -116,6 +116,53 @@ describe("buildTarget", () => {
 
     expect(warnSpy).not.toHaveBeenCalled();
   });
+
+  it("emits warning when maxRetryDurationSeconds is below 60", () => {
+    buildTarget({
+      apiEndpoint: "https://example.com/webhook",
+      apiKey: "secret",
+      rateLimit: 10,
+      maxRetryDurationSeconds: 30,
+    });
+
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.stringContaining("maxRetryDurationSeconds is 30s"),
+    );
+  });
+
+  it("does not emit warning when maxRetryDurationSeconds is 60 or above", () => {
+    buildTarget({
+      apiEndpoint: "https://example.com/webhook",
+      apiKey: "secret",
+      rateLimit: 10,
+      maxRetryDurationSeconds: 60,
+      mtls: { enabled: true },
+      certPinning: { enabled: true, spkiHash: "abc123" },
+    });
+
+    expect(warnSpy).not.toHaveBeenCalled();
+  });
+
+  it("includes maxRetryDurationSeconds in delivery when provided", () => {
+    const result = buildTarget({
+      apiEndpoint: "https://example.com/webhook",
+      apiKey: "secret",
+      rateLimit: 10,
+      maxRetryDurationSeconds: 3600,
+    });
+
+    expect(result.delivery?.maxRetryDurationSeconds).toBe(3600);
+  });
+
+  it("omits maxRetryDurationSeconds from delivery when not provided", () => {
+    const result = buildTarget({
+      apiEndpoint: "https://example.com/webhook",
+      apiKey: "secret",
+      rateLimit: 10,
+    });
+
+    expect(result.delivery).not.toHaveProperty("maxRetryDurationSeconds");
+  });
 });
 describe("buildMessageStatusSubscription", () => {
   it("builds message status subscription", () => {
