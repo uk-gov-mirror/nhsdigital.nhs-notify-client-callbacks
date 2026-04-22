@@ -46,13 +46,16 @@ function buildQueueUrl(
 
 export function buildMockClientDlqQueueUrl(
   deploymentDetails: DeploymentDetails,
-  targets: { targetId: string }[],
+  clientId: string,
 ): string {
-  const [firstTarget] = targets;
-  if (!firstTarget) {
-    throw new Error("At least one target is required to build DLQ URL");
-  }
-  return buildQueueUrl(deploymentDetails, `${firstTarget.targetId}-dlq`);
+  return buildQueueUrl(deploymentDetails, `${clientId}-delivery-dlq`);
+}
+
+export function buildMockClientDeliveryQueueUrl(
+  deploymentDetails: DeploymentDetails,
+  clientId: string,
+): string {
+  return buildQueueUrl(deploymentDetails, `${clientId}-delivery`);
 }
 
 export async function sendSqsEvent<T>(

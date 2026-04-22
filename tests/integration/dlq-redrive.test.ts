@@ -19,8 +19,10 @@ import {
   sendSqsEvent,
 } from "./helpers/sqs";
 import {
+  CLIENT_FIXTURES,
+  type ClientFixtureKey,
   buildMockWebhookTargetPath,
-  getAllSubscriptionTargetIds,
+  getClientConfig,
   getMockItClientConfig,
 } from "./helpers/mock-client-config";
 import { awaitSignedCallbacksFromWebhookLogGroup } from "./helpers/cloudwatch";
@@ -37,20 +39,20 @@ describe("DLQ Redrive", () => {
 
   beforeAll(async () => {
     const deploymentDetails = getDeploymentDetails();
-    const mockClient1 = getMockItClientConfig();
-
-    const allSubscriptionTargetIds = getAllSubscriptionTargetIds();
+    const { clientId } = getMockItClientConfig();
 
     sqsClient = createSqsClient(deploymentDetails);
     cloudWatchClient = createCloudWatchLogsClient(deploymentDetails);
 
     inboundQueueUrl = buildInboundEventQueueUrl(deploymentDetails);
-    dlqQueueUrl = buildMockClientDlqQueueUrl(
-      deploymentDetails,
-      mockClient1.targets,
-    );
-    allTargetDlqQueueUrls = allSubscriptionTargetIds.map((targetId) =>
-      buildMockClientDlqQueueUrl(deploymentDetails, [{ targetId }]),
+    dlqQueueUrl = buildMockClientDlqQueueUrl(deploymentDetails, clientId);
+    allTargetDlqQueueUrls = (
+      Object.keys(CLIENT_FIXTURES) as ClientFixtureKey[]
+    ).map((key) =>
+      buildMockClientDlqQueueUrl(
+        deploymentDetails,
+        getClientConfig(key).clientId,
+      ),
     );
     webhookLogGroupName = buildLambdaLogGroupName(
       deploymentDetails,
@@ -67,7 +69,7 @@ describe("DLQ Redrive", () => {
   });
 
   describe("Infrastructure validation", () => {
-    it("should confirm a target DLQ is accessible for all configured subscription targets", async () => {
+    it("should confirm a DLQ is accessible for all configured clients", async () => {
       const responses = await Promise.all(
         allTargetDlqQueueUrls.map((queueUrl) =>
           sqsClient.send(

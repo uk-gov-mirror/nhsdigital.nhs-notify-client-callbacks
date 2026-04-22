@@ -10,9 +10,15 @@ export const OUTCOME_TRANSIENT_FAILURE = "transient_failure" as const;
 
 export type DeliveryResult =
   | { outcome: typeof OUTCOME_SUCCESS }
-  | { outcome: typeof OUTCOME_PERMANENT_FAILURE }
+  | {
+      outcome: typeof OUTCOME_PERMANENT_FAILURE;
+      statusCode?: number;
+      errorCode?: string;
+      responseBody?: string;
+    }
   | {
       outcome: typeof OUTCOME_RATE_LIMITED;
+      statusCode: 429;
       retryAfterHeader: string | undefined;
     }
   | { outcome: typeof OUTCOME_TRANSIENT_FAILURE; statusCode: number };
@@ -41,29 +47,40 @@ export function deliverPayload(
         },
       },
       (res) => {
-        res.resume();
-
         const statusCode = res.statusCode ?? 0;
 
         if (statusCode >= 200 && statusCode < 300) {
+          res.resume();
           resolve({ outcome: OUTCOME_SUCCESS });
           return;
         }
 
         if (statusCode === 429) {
+          res.resume();
           const retryAfterHeader = res.headers["retry-after"];
           resolve({
             outcome: OUTCOME_RATE_LIMITED,
+            statusCode,
             retryAfterHeader,
           });
           return;
         }
 
         if (statusCode >= 400 && statusCode < 500) {
-          resolve({ outcome: OUTCOME_PERMANENT_FAILURE });
+          const chunks: Buffer[] = [];
+          res.on("data", (chunk: Buffer) => chunks.push(chunk));
+          res.on("end", () => {
+            const responseBody = Buffer.concat(chunks).toString("utf8");
+            resolve({
+              outcome: OUTCOME_PERMANENT_FAILURE,
+              statusCode,
+              responseBody,
+            });
+          });
           return;
         }
 
+        res.resume();
         resolve({ outcome: OUTCOME_TRANSIENT_FAILURE, statusCode });
       },
     );
@@ -74,7 +91,7 @@ export function deliverPayload(
 
     req.on("error", (error: NodeJS.ErrnoException) => {
       if (error.code && PERMANENT_TLS_ERROR_CODES.has(error.code)) {
-        resolve({ outcome: OUTCOME_PERMANENT_FAILURE });
+        resolve({ outcome: OUTCOME_PERMANENT_FAILURE, errorCode: error.code });
         return;
       }
 

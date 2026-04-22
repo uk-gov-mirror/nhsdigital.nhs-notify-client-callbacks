@@ -50,30 +50,33 @@ All are run via `make test-integration-debug ACTION=<action>`.
 - [`queue-status`](#queue-status) – SQS queue message counts
 - [`queue-peek`](#queue-peek) – Peek at one message from each SQS queue
 - [`tail-transform`](#tail-transform) – Tail the transform/filter Lambda logs
+- [`tail-https-client`](#tail-https-client) – Tail the https-client Lambda logs
 - [`tail-webhook`](#tail-webhook) – Tail the mock-webhook Lambda logs
 - [`tail-pipe`](#tail-pipe) – Tail the EventBridge pipe logs
 - [`pipe-state`](#pipe-state) – Show EventBridge pipe state and recent metrics
 
-All log-tailing actions (`tail-transform`, `tail-webhook`, `tail-pipe`) accept an optional `LOG_FILTER` to narrow output to a specific message ID or pattern.
+Some actions require `CLIENT_ID` (e.g. `mock-client-single-target`) — see individual actions below.
+
+All log-tailing actions (`tail-transform`, `tail-https-client`, `tail-webhook`, `tail-pipe`) accept an optional `LOG_FILTER` to narrow output to a specific message ID or pattern.
 
 ---
 
 ### `queue-status`
 
-Shows approximate message counts for the inbound event queue, inbound event DLQ, and mock target DLQ.
+Shows approximate message counts for the inbound event queue, inbound event DLQ, client delivery queue, and client delivery DLQ. Requires `CLIENT_ID`.
 
 ```sh
-ENVIRONMENT=<env> AWS_PROFILE=<profile> make test-integration-debug ACTION=queue-status
+CLIENT_ID=<client-id> ENVIRONMENT=<env> AWS_PROFILE=<profile> make test-integration-debug ACTION=queue-status
 ```
 
 ---
 
 ### `queue-peek`
 
-Reads one message (without deleting it) from each of the same three queues, printing body, attributes, and message attributes.
+Reads one message (without deleting it) from each of the same four queues, printing body, attributes, and message attributes. Requires `CLIENT_ID`.
 
 ```sh
-ENVIRONMENT=<env> AWS_PROFILE=<profile> make test-integration-debug ACTION=queue-peek
+CLIENT_ID=<client-id> ENVIRONMENT=<env> AWS_PROFILE=<profile> make test-integration-debug ACTION=queue-peek
 ```
 
 ---
@@ -90,6 +93,22 @@ Filter to a specific message ID:
 
 ```sh
 ENVIRONMENT=<env> AWS_PROFILE=<profile> LOG_FILTER=SOME-MESSAGE-ID make test-integration-debug ACTION=tail-transform
+```
+
+---
+
+### `tail-https-client`
+
+Tails CloudWatch logs for the `https-client` Lambda for the given client, following from the last 30 minutes. Requires `CLIENT_ID`.
+
+```sh
+CLIENT_ID=<client-id> ENVIRONMENT=<env> AWS_PROFILE=<profile> make test-integration-debug ACTION=tail-https-client
+```
+
+Filter to a specific message ID:
+
+```sh
+CLIENT_ID=<client-id> ENVIRONMENT=<env> AWS_PROFILE=<profile> LOG_FILTER=SOME-MESSAGE-ID make test-integration-debug ACTION=tail-https-client
 ```
 
 ---

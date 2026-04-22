@@ -19,18 +19,7 @@ resource "aws_vpc_security_group_ingress_rule" "mock_webhook_alb_https" {
   from_port                    = 443
   to_port                      = 443
   ip_protocol                  = "tcp"
-  description                  = "Allow HTTPS Client Lambda to reach mock webhook via mTLS"
-  tags                         = local.default_tags
-}
-
-resource "aws_vpc_security_group_ingress_rule" "mock_webhook_alb_http" {
-  count                        = var.deploy_mock_clients ? 1 : 0
-  security_group_id            = aws_security_group.mock_webhook_alb[0].id
-  referenced_security_group_id = aws_security_group.https_client_lambda.id
-  from_port                    = 80
-  to_port                      = 80
-  ip_protocol                  = "tcp"
-  description                  = "Allow HTTPS Client Lambda to reach mock webhook without mTLS"
+  description                  = "Allow HTTPS Client Lambda to reach mock webhook (mTLS and non-mTLS)"
   tags                         = local.default_tags
 }
 
@@ -94,20 +83,6 @@ resource "aws_lb_listener" "mock_webhook_mtls" {
   mutual_authentication {
     mode = "passthrough"
   }
-
-  default_action {
-    type             = "forward"
-    target_group_arn = aws_lb_target_group.mock_webhook_mtls[0].arn
-  }
-
-  tags = local.default_tags
-}
-
-resource "aws_lb_listener" "mock_webhook_http" {
-  count             = var.deploy_mock_clients ? 1 : 0
-  load_balancer_arn = aws_lb.mock_webhook_mtls[0].arn
-  port              = 80
-  protocol          = "HTTP"
 
   default_action {
     type             = "forward"

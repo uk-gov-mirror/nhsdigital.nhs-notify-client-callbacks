@@ -142,7 +142,9 @@ describe("processRecords", () => {
     const failures = await processRecords([makeRecord()]);
 
     expect(failures).toEqual([]);
-    expect(mockSendToDlq).toHaveBeenCalledWith(makeRecord().body);
+    expect(mockSendToDlq).toHaveBeenCalledWith(makeRecord().body, {
+      outcome: "permanent_failure",
+    });
   });
 
   it("returns failure for transient 5xx errors", async () => {
@@ -536,6 +538,23 @@ describe("processRecords", () => {
     expect(mockIsWindowExhausted).toHaveBeenCalledWith(
       expect.any(Number),
       3_600_000,
+    );
+  });
+
+  it("returns no failure when handleRateLimitedRecord resolves without throwing", async () => {
+    mockDeliverPayload.mockResolvedValue({
+      outcome: "permanent_failure",
+      statusCode: 429,
+      retryAfterHeader: "60",
+    });
+    mockHandleRateLimitedRecord.mockResolvedValueOnce(undefined);
+
+    const failures = await processRecords([makeRecord()]);
+
+    expect(failures).toEqual([]);
+    expect(mockIsWindowExhausted).toHaveBeenCalledWith(
+      expect.any(Number),
+      7_200_000,
     );
   });
 });

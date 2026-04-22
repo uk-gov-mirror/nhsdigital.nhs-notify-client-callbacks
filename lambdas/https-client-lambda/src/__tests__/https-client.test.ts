@@ -36,6 +36,7 @@ type MockResponse = EventEmitter & {
 function mockHttpsRequest(
   statusCode: number,
   headers: Record<string, string | undefined> = {},
+  body = "",
 ) {
   const mockReq = new EventEmitter() as EventEmitter & {
     end: jest.Mock;
@@ -56,7 +57,13 @@ function mockHttpsRequest(
     });
 
     if (callback) {
-      process.nextTick(() => callback(res));
+      process.nextTick(() => {
+        callback(res);
+        process.nextTick(() => {
+          if (body) res.emit("data", Buffer.from(body));
+          res.emit("end");
+        });
+      });
     }
 
     return mockReq as unknown as ReturnType<typeof https.request>;
@@ -125,7 +132,7 @@ describe("deliverPayload", () => {
   });
 
   it("returns permanent_failure on 4xx non-429", async () => {
-    mockHttpsRequest(400);
+    mockHttpsRequest(400, {}, JSON.stringify({ message: "Bad request" }));
 
     const result = await deliverPayload(
       createTarget(),
@@ -134,7 +141,11 @@ describe("deliverPayload", () => {
       createMockAgent(),
     );
 
-    expect(result).toEqual({ outcome: "permanent_failure" });
+    expect(result).toEqual({
+      outcome: "permanent_failure",
+      statusCode: 400,
+      responseBody: JSON.stringify({ message: "Bad request" }),
+    });
   });
 
   it("returns permanent_failure on TLS error CERT_HAS_EXPIRED", async () => {
@@ -147,7 +158,10 @@ describe("deliverPayload", () => {
       createMockAgent(),
     );
 
-    expect(result).toEqual({ outcome: "permanent_failure" });
+    expect(result).toEqual({
+      outcome: "permanent_failure",
+      errorCode: "CERT_HAS_EXPIRED",
+    });
   });
 
   it("returns permanent_failure on TLS pinning error", async () => {
@@ -160,7 +174,10 @@ describe("deliverPayload", () => {
       createMockAgent(),
     );
 
-    expect(result).toEqual({ outcome: "permanent_failure" });
+    expect(result).toEqual({
+      outcome: "permanent_failure",
+      errorCode: "ERR_CERT_PINNING_FAILED",
+    });
   });
 
   it("returns transient_failure on 5xx", async () => {
@@ -189,6 +206,7 @@ describe("deliverPayload", () => {
     expect(result).toEqual({
       outcome: "rate_limited",
       retryAfterHeader: "60",
+      statusCode: 429,
     });
   });
 
@@ -205,6 +223,7 @@ describe("deliverPayload", () => {
     expect(result).toEqual({
       outcome: "rate_limited",
       retryAfterHeader: undefined,
+      statusCode: 429,
     });
   });
 
@@ -273,6 +292,45 @@ describe("deliverPayload", () => {
 
       if (callback) {
         process.nextTick(() => callback(res));
+      }
+
+      return mockReq as unknown as ReturnType<typeof https.request>;
+    });
+
+    const result = await deliverPayload(
+      createTarget(),
+      '{"test":true}',
+      "sig-abc",
+      createMockAgent(),
+    );
+
+    expect(result).toEqual({ outcome: "transient_failure", statusCode: 0 });
+  });
+
+  it("treats undefined statusCode as 0", async () => {
+    const mockReq = new EventEmitter() as EventEmitter & {
+      end: jest.Mock;
+      destroy: jest.Mock;
+    };
+    mockReq.end = jest.fn();
+    mockReq.destroy = jest.fn();
+
+    jest.spyOn(https, "request").mockImplementation((...args: unknown[]) => {
+      const callback = args.find((a) => typeof a === "function") as
+        | ((res: MockResponse) => void)
+        | undefined;
+
+      const res = Object.assign(new EventEmitter(), {
+        statusCode: undefined as unknown as number,
+        headers: {},
+        resume: jest.fn(),
+      }) as MockResponse;
+
+      if (callback) {
+        process.nextTick(() => {
+          callback(res);
+          process.nextTick(() => (res as EventEmitter).emit("end"));
+        });
       }
 
       return mockReq as unknown as ReturnType<typeof https.request>;

@@ -29,14 +29,6 @@ export const CLIENT_FIXTURES = {
 
 export type ClientFixtureKey = keyof typeof CLIENT_FIXTURES;
 
-const ALL_CLIENT_FIXTURE_KEYS = Object.keys(
-  CLIENT_FIXTURES,
-) as ClientFixtureKey[];
-
-function dedupe(values: string[]): string[] {
-  return [...new Set(values)];
-}
-
 export function getClientConfig(key: ClientFixtureKey): MockItClientConfig {
   // eslint-disable-next-line security/detect-object-injection -- key is constrained to ClientFixtureKey, a keyof the hardcoded as-const CLIENT_FIXTURES object
   const { apiKeyVar, applicationIdVar, fixture } = CLIENT_FIXTURES[key];
@@ -81,19 +73,4 @@ export function buildMockWebhookTargetPaths(
   key: ClientFixtureKey = "client1",
 ): string[] {
   return buildWebhookTargetPaths(key);
-}
-
-export function getSubscriptionTargetIds(
-  key: ClientFixtureKey = "client1",
-): string[] {
-  const config = getClientConfig(key);
-  return dedupe(
-    config.subscriptions.flatMap((subscription) => subscription.targetIds),
-  );
-}
-
-export function getAllSubscriptionTargetIds(
-  keys: ClientFixtureKey[] = ALL_CLIENT_FIXTURE_KEYS,
-): string[] {
-  return dedupe(keys.flatMap((key) => getSubscriptionTargetIds(key)));
 }

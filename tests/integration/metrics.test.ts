@@ -40,12 +40,12 @@ describe("Metrics", () => {
 
   beforeAll(async () => {
     const deploymentDetails = getDeploymentDetails();
-    const { targets } = getMockItClientConfig();
+    const { clientId } = getMockItClientConfig();
 
     sqsClient = createSqsClient(deploymentDetails);
     cloudWatchClient = createCloudWatchLogsClient(deploymentDetails);
     callbackEventQueueUrl = buildInboundEventQueueUrl(deploymentDetails);
-    clientDlqQueueUrl = buildMockClientDlqQueueUrl(deploymentDetails, targets);
+    clientDlqQueueUrl = buildMockClientDlqQueueUrl(deploymentDetails, clientId);
     inboundEventDlqQueueUrl = buildInboundEventDlqQueueUrl(deploymentDetails);
     logGroupName = buildLambdaLogGroupName(
       deploymentDetails,
