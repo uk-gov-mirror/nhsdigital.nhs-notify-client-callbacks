@@ -98,14 +98,6 @@ describe("admit", () => {
     );
   });
 
-  it("propagates non-NOSCRIPT Redis errors", async () => {
-    mockSendCommand.mockRejectedValueOnce(new Error("Connection refused"));
-
-    await expect(
-      admit(mockRedis, "target-1", 10, true, defaultConfig),
-    ).rejects.toThrow("Connection refused");
-  });
-
   it("passes cbProbeIntervalMs=0 when circuit breaker is disabled", async () => {
     mockSendCommand.mockResolvedValueOnce([1, "allowed", 0, 10]);
 
@@ -123,8 +115,46 @@ describe("admit", () => {
     await admit(mockRedis, "my-target", 5, true, defaultConfig);
 
     const args = mockSendCommand.mock.calls[0]![0] as string[];
-    expect(args[3]).toBe("cb:my-target");
-    expect(args[4]).toBe("rl:my-target");
+    expect(args[3]).toBe("cb:{my-target}");
+    expect(args[4]).toBe("rl:{my-target}");
+  });
+});
+
+describe("evalScript", () => {
+  it("throws a wrapped error including the original message when EVALSHA fails with a non-NOSCRIPT Error", async () => {
+    const redisError = new Error("WRONGTYPE Operation against a key");
+    mockSendCommand.mockRejectedValueOnce(redisError);
+
+    const thrown = await admit(
+      mockRedis,
+      "target-1",
+      10,
+      true,
+      defaultConfig,
+    ).catch((error: unknown) => error);
+
+    expect(thrown).toBeInstanceOf(Error);
+    expect((thrown as Error).message).toContain("Redis error in script");
+    expect((thrown as Error).message).toContain(
+      "WRONGTYPE Operation against a key",
+    );
+    expect((thrown as Error & { cause: unknown }).cause).toBe(redisError);
+  });
+
+  it("throws a wrapped error using String() when EVALSHA rejects with a non-Error value", async () => {
+    mockSendCommand.mockRejectedValueOnce("connection refused");
+
+    const thrown = await admit(
+      mockRedis,
+      "target-1",
+      10,
+      true,
+      defaultConfig,
+    ).catch((error: unknown) => error);
+
+    expect(thrown).toBeInstanceOf(Error);
+    expect((thrown as Error).message).toContain("Redis error in script");
+    expect((thrown as Error).message).toContain("connection refused");
   });
 });
 
@@ -187,20 +217,12 @@ describe("recordResult", () => {
     expect(mockSendCommand).toHaveBeenCalledTimes(2);
   });
 
-  it("propagates non-NOSCRIPT Redis errors", async () => {
-    mockSendCommand.mockRejectedValueOnce(new Error("Connection refused"));
-
-    await expect(
-      recordResult(mockRedis, "target-1", false, defaultConfig),
-    ).rejects.toThrow("Connection refused");
-  });
-
   it("passes correct cb key for target", async () => {
     mockSendCommand.mockResolvedValueOnce([1, "closed"]);
 
     await recordResult(mockRedis, "my-target", true, defaultConfig);
 
     const args = mockSendCommand.mock.calls[0]![0] as string[];
-    expect(args[3]).toBe("cb:my-target");
+    expect(args[3]).toBe("cb:{my-target}");
   });
 });

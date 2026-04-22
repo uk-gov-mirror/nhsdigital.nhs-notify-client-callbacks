@@ -38,7 +38,7 @@ test-integration-local: # Run integration tests locally against a remoptely depl
 test-integration-debug: # Debug a live environment - inspect queues, tail logs, check pipe state (requires ENVIRONMENT, AWS_PROFILE, ACTION) @Testing
 	make _test name="integration-debug" ACTION="$(or $(ACTION),$(word 2,$(MAKECMDGOALS)))"
 
-queue-status queue-peek tail-transform tail-webhook tail-pipe pipe-state:
+queue-status queue-peek tail-transform tail-https-client tail-webhook tail-pipe pipe-state:
 	@:
 
 test-load: # Run all your load tests @Testing

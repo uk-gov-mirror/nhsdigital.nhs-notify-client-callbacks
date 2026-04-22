@@ -54,4 +54,81 @@ describe("sendToDlq", () => {
 
     process.env.DLQ_URL = saved;
   });
+
+  it("includes ERROR_CODE and ERROR_MESSAGE for HTTP error with JSON body", async () => {
+    mockSend.mockResolvedValue({});
+
+    await sendToDlq('{"test":"message"}', {
+      statusCode: 400,
+      responseBody: JSON.stringify({ message: "Bad request" }),
+    });
+
+    const command = mockSend.mock.calls[0][0];
+    expect(command).toBeInstanceOf(SendMessageCommand);
+    expect(command.input.MessageAttributes).toEqual({
+      ERROR_CODE: { DataType: "String", StringValue: "HTTP_CLIENT_ERROR" },
+      ERROR_MESSAGE: { DataType: "String", StringValue: "Bad request" },
+    });
+  });
+
+  it("uses raw response body as ERROR_MESSAGE when not valid JSON", async () => {
+    mockSend.mockResolvedValue({});
+
+    await sendToDlq('{"test":"message"}', {
+      statusCode: 400,
+      responseBody: "Bad request",
+    });
+
+    const command = mockSend.mock.calls[0][0];
+    expect(command.input.MessageAttributes).toEqual({
+      ERROR_CODE: { DataType: "String", StringValue: "HTTP_CLIENT_ERROR" },
+      ERROR_MESSAGE: { DataType: "String", StringValue: "Bad request" },
+    });
+  });
+
+  it("uses errorCode as ERROR_CODE when provided", async () => {
+    mockSend.mockResolvedValue({});
+
+    await sendToDlq('{"test":"message"}', {
+      errorCode: "CERT_HAS_EXPIRED",
+    });
+
+    const command = mockSend.mock.calls[0][0];
+    expect(command.input.MessageAttributes).toEqual({
+      ERROR_CODE: { DataType: "String", StringValue: "CERT_HAS_EXPIRED" },
+    });
+  });
+
+  it("sends empty MessageAttributes when errorInfo has no relevant fields", async () => {
+    mockSend.mockResolvedValue({});
+
+    await sendToDlq('{"test":"message"}', {});
+
+    const command = mockSend.mock.calls[0][0];
+    expect(command.input.MessageAttributes).toEqual({});
+  });
+
+  it("sends no MessageAttributes when errorInfo is omitted", async () => {
+    mockSend.mockResolvedValue({});
+
+    await sendToDlq('{"test":"message"}');
+
+    const command = mockSend.mock.calls[0][0];
+    expect(command.input.MessageAttributes).toBeUndefined();
+  });
+
+  it("uses JSON body message field when present in responseBody", async () => {
+    mockSend.mockResolvedValue({});
+
+    await sendToDlq('{"test":"message"}', {
+      statusCode: 422,
+      responseBody: JSON.stringify({ message: "Validation failed", code: 42 }),
+    });
+
+    const command = mockSend.mock.calls[0][0];
+    expect(command.input.MessageAttributes?.ERROR_MESSAGE).toEqual({
+      DataType: "String",
+      StringValue: "Validation failed",
+    });
+  });
 });

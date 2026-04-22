@@ -5,14 +5,18 @@ import {
 } from "@aws-sdk/client-cloudwatch";
 import type { DeploymentDetails } from "@nhs-notify-client-callbacks/test-support/helpers";
 import { getDeploymentDetails } from "@nhs-notify-client-callbacks/test-support/helpers";
-import { getAllSubscriptionTargetIds } from "./helpers/mock-client-config";
+import {
+  CLIENT_FIXTURES,
+  type ClientFixtureKey,
+  getClientConfig,
+} from "./helpers/mock-client-config";
 import { buildMockClientDlqQueueUrl } from "./helpers/sqs";
 
 function buildDlqDepthAlarmName(
   { component, environment, project }: DeploymentDetails,
-  targetId: string,
+  clientId: string,
 ): string {
-  return `${project}-${environment}-${component}-${targetId}-dlq-depth`;
+  return `${project}-${environment}-${component}-${clientId}-dlq-depth`;
 }
 
 function getQueueNameFromUrl(queueUrl: string): string {
@@ -27,7 +31,7 @@ function getQueueNameFromUrl(queueUrl: string): string {
 describe("DLQ alarms", () => {
   let cloudWatchClient: CloudWatchClient;
   let deploymentDetails: DeploymentDetails;
-  let targetIds: string[];
+  let clientIds: string[];
 
   beforeAll(() => {
     deploymentDetails = getDeploymentDetails();
@@ -35,22 +39,25 @@ describe("DLQ alarms", () => {
       region: deploymentDetails.region,
     });
 
-    targetIds = getAllSubscriptionTargetIds();
+    clientIds = (Object.keys(CLIENT_FIXTURES) as ClientFixtureKey[]).map(
+      (key) => getClientConfig(key).clientId,
+    );
   });
 
   afterAll(() => {
     cloudWatchClient.destroy();
   });
 
-  it("should create a DLQ depth alarm for every target DLQ", async () => {
-    expect(targetIds.length).toBeGreaterThan(0);
+  it("should create a DLQ depth alarm for every client DLQ", async () => {
+    expect(clientIds.length).toBeGreaterThan(0);
 
-    for (const targetId of targetIds) {
-      const alarmName = buildDlqDepthAlarmName(deploymentDetails, targetId);
-      const targetDlqQueueUrl = buildMockClientDlqQueueUrl(deploymentDetails, [
-        { targetId },
-      ]);
-      const targetDlqQueueName = getQueueNameFromUrl(targetDlqQueueUrl);
+    for (const clientId of clientIds) {
+      const alarmName = buildDlqDepthAlarmName(deploymentDetails, clientId);
+      const clientDlqQueueUrl = buildMockClientDlqQueueUrl(
+        deploymentDetails,
+        clientId,
+      );
+      const clientDlqQueueName = getQueueNameFromUrl(clientDlqQueueUrl);
       const response = await cloudWatchClient.send(
         new DescribeAlarmsCommand({
           AlarmNames: [alarmName],
@@ -67,7 +74,7 @@ describe("DLQ alarms", () => {
         expect.arrayContaining([
           expect.objectContaining({
             Name: "QueueName",
-            Value: targetDlqQueueName,
+            Value: clientDlqQueueName,
           }),
         ]),
       );

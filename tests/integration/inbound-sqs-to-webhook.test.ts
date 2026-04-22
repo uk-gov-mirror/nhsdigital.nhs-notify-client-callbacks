@@ -28,6 +28,7 @@ import { assertCallbackHeaders } from "./helpers/signature";
 import {
   awaitQueueMessage,
   awaitQueueMessageByMessageId,
+  buildMockClientDeliveryQueueUrl,
   buildMockClientDlqQueueUrl,
   ensureInboundQueueIsEmpty,
   purgeQueues,
@@ -49,6 +50,7 @@ describe("SQS to Webhook Integration", () => {
   let cloudWatchClient: CloudWatchLogsClient;
   let callbackEventQueueUrl: string;
   let clientDlqQueueUrl: string;
+  let clientDeliveryQueueUrl: string;
   let inboundEventDlqQueueUrl: string;
   let webhookLogGroupName: string;
   let webhookTargetPath: string;
@@ -56,12 +58,16 @@ describe("SQS to Webhook Integration", () => {
 
   beforeAll(async () => {
     const deploymentDetails = getDeploymentDetails();
-    const { targets } = getMockItClientConfig();
+    const { clientId } = getMockItClientConfig();
 
     sqsClient = createSqsClient(deploymentDetails);
     cloudWatchClient = createCloudWatchLogsClient(deploymentDetails);
     callbackEventQueueUrl = buildInboundEventQueueUrl(deploymentDetails);
-    clientDlqQueueUrl = buildMockClientDlqQueueUrl(deploymentDetails, targets);
+    clientDlqQueueUrl = buildMockClientDlqQueueUrl(deploymentDetails, clientId);
+    clientDeliveryQueueUrl = buildMockClientDeliveryQueueUrl(
+      deploymentDetails,
+      clientId,
+    );
     inboundEventDlqQueueUrl = buildInboundEventDlqQueueUrl(deploymentDetails);
     webhookLogGroupName = buildLambdaLogGroupName(
       deploymentDetails,
@@ -72,6 +78,7 @@ describe("SQS to Webhook Integration", () => {
     await purgeQueues(sqsClient, [
       inboundEventDlqQueueUrl,
       clientDlqQueueUrl,
+      clientDeliveryQueueUrl,
       callbackEventQueueUrl,
     ]);
   });
@@ -80,6 +87,7 @@ describe("SQS to Webhook Integration", () => {
     await purgeQueues(sqsClient, [
       inboundEventDlqQueueUrl,
       clientDlqQueueUrl,
+      clientDeliveryQueueUrl,
       callbackEventQueueUrl,
     ]);
 
@@ -195,7 +203,7 @@ describe("SQS to Webhook Integration", () => {
   });
 
   describe("Client Webhook DLQ", () => {
-    it("should route a non-retriable (4xx) webhook response to the per-target DLQ", async () => {
+    it("should route a non-retriable (4xx) webhook response to the per-client DLQ", async () => {
       const event: StatusPublishEvent<MessageStatusData> =
         createMessageStatusPublishEvent({
           data: {
@@ -209,7 +217,7 @@ describe("SQS to Webhook Integration", () => {
 
       expect(dlqMessage.Body).toBeDefined();
       expect(dlqMessage.MessageAttributes?.ERROR_CODE?.StringValue).toBe(
-        "INVALID_PARAMETER",
+        "HTTP_CLIENT_ERROR",
       );
       expect(
         dlqMessage.MessageAttributes?.ERROR_MESSAGE?.StringValue,

@@ -31,11 +31,15 @@ export function recordDeliverySuccess(
 export function recordDeliveryPermanentFailure(
   clientId: string,
   targetId: string,
+  statusCode?: number,
+  errorCode?: string,
 ): void {
   emitDeliveryPermanentFailure(targetId);
   logger.warn("Permanent delivery failure — sending to DLQ", {
     clientId,
     targetId,
+    ...(statusCode !== undefined && { statusCode }),
+    ...(errorCode !== undefined && { errorCode }),
   });
 }
 

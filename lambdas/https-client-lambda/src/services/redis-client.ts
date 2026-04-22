@@ -34,20 +34,28 @@ async function generateElastiCacheIamToken(): Promise<string> {
     {
       protocol: "https:",
       method: "GET",
-      hostname: endpoint,
+      hostname: cacheName,
       path: "/",
       query: { Action: "connect", User: username },
-      headers: { host: endpoint },
+      headers: { host: cacheName },
     },
     { expiresIn: TOKEN_EXPIRY_SECONDS },
   );
 
   tokenExpiry = Date.now() + TOKEN_EXPIRY_SECONDS * 1000;
 
+  logger.info("ElastiCache IAM token generated", {
+    cacheName,
+    username,
+    region,
+    signingAlgorithm: signed.query?.["X-Amz-Algorithm"],
+    tokenExpiresAt: new Date(tokenExpiry).toISOString(),
+  });
+
   const qs = new URLSearchParams(
     signed.query as Record<string, string>,
   ).toString();
-  return `https://${signed.hostname}${signed.path}?${qs}`;
+  return `${cacheName}/?${qs}`;
 }
 
 export async function getRedisClient(): Promise<RedisClientType> {
@@ -55,6 +63,7 @@ export async function getRedisClient(): Promise<RedisClientType> {
     tokenExpiry > Date.now() + TOKEN_REFRESH_BUFFER_SECONDS * 1000;
 
   if (redisClient?.isOpen && isTokenValid) {
+    logger.info("Reusing existing Redis client");
     return redisClient;
   }
 
@@ -69,10 +78,13 @@ export async function getRedisClient(): Promise<RedisClientType> {
   }
 
   if (redisClient?.isOpen) {
+    logger.info("Disconnecting Redis client for token refresh");
     await redisClient.disconnect();
   }
 
   const token = await generateElastiCacheIamToken();
+
+  logger.info("Connecting to ElastiCache", { endpoint, username });
 
   redisClient = createClient({
     url: `rediss://${endpoint}:6379`,

@@ -150,13 +150,19 @@ export async function buildAgent(target: CallbackTarget): Promise<Agent> {
     );
   }
 
-  if (target.delivery?.mtls?.enabled) {
+  // Always load the CA in test environments (MTLS_TEST_CA_S3_KEY set) so that
+  // targets with mtls.enabled: false can still verify the server's cert chain.
+  // In production the CA comes from SecretsManager only when mTLS is in use.
+  if (target.delivery?.mtls?.enabled || MTLS_TEST_CA_S3_KEY) {
     const material = await getMaterial();
-    agentOptions.key = material.key;
-    agentOptions.cert = material.cert;
 
     if (material.ca) {
       agentOptions.ca = material.ca;
+    }
+
+    if (target.delivery?.mtls?.enabled) {
+      agentOptions.key = material.key;
+      agentOptions.cert = material.cert;
     }
   }
 

@@ -60,7 +60,12 @@ async function evalScript(
     const isNoScript =
       error instanceof Error && error.message.includes("NOSCRIPT");
     if (!isNoScript) {
-      throw error;
+      throw new Error(
+        `Redis error in script ${script}: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+        { cause: error },
+      );
     }
     return client.sendCommand(["EVAL", script, keyCount, ...keys, ...args]);
   }
@@ -73,8 +78,8 @@ export async function admit(
   cbEnabled: boolean,
   config: EndpointGateConfig,
 ): Promise<AdmitResult> {
-  const cbKey = `cb:${targetId}`;
-  const rlKey = `rl:${targetId}`;
+  const cbKey = `cb:{${targetId}}`;
+  const rlKey = `rl:{${targetId}}`;
   const now = Date.now().toString();
   const probeIntervalMs = cbEnabled ? config.cbProbeIntervalMs.toString() : "0";
 
@@ -125,7 +130,7 @@ export async function recordResult(
   success: boolean,
   config: EndpointGateConfig,
 ): Promise<RecordResultOutcome> {
-  const cbKey = `cb:${targetId}`;
+  const cbKey = `cb:{${targetId}}`;
   const now = Date.now().toString();
 
   const args = [

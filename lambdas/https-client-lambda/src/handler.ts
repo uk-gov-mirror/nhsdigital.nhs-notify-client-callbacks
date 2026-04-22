@@ -106,8 +106,13 @@ async function handleDeliveryResult(
   }
 
   if (result.outcome === OUTCOME_PERMANENT_FAILURE) {
-    recordDeliveryPermanentFailure(clientId, targetId);
-    await sendToDlq(record.body);
+    recordDeliveryPermanentFailure(
+      clientId,
+      targetId,
+      result.statusCode,
+      result.errorCode,
+    );
+    await sendToDlq(record.body, result);
     return;
   }
 
@@ -219,6 +224,10 @@ export async function processRecords(
         return null;
       } catch (error) {
         if (!(error instanceof VisibilityManagedError)) {
+          logger.error("Failed to process record", {
+            messageId: record.messageId,
+            err: error,
+          });
           const receiveCount = Number(
             record.attributes.ApproximateReceiveCount,
           );

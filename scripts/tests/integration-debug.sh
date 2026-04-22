@@ -12,15 +12,19 @@ set -euo pipefail
 # Actions:
 #   queue-status    Show SQS queue message counts
 #   queue-peek      Peek one message from each SQS queue
-#   tail-transform  Tail client-transform-filter lambda logs
-#   tail-webhook    Tail mock-webhook lambda logs
-#   tail-pipe       Tail EventBridge pipe log group
-#   pipe-state      Show EventBridge pipe state and recent metrics
+#   tail-transform      Tail client-transform-filter lambda logs
+#   tail-https-client   Tail https-client lambda logs (requires CLIENT_ID)
+#   tail-webhook        Tail mock-webhook lambda logs
+#   tail-pipe           Tail EventBridge pipe log group
+#   pipe-state          Show EventBridge pipe state and recent metrics
 #
 # Required:
 #   ENVIRONMENT
 #   AWS_PROFILE
 #   ACTION
+#
+# Required for queue-status, queue-peek:
+#   CLIENT_ID       Client ID (e.g. mock-client-1)
 #
 # Optional:
 #   LOG_FILTER      CloudWatch Logs filter pattern / text
@@ -45,7 +49,7 @@ fi
 
 REGION="${AWS_REGION:-eu-west-2}"
 LOG_FILTER="${LOG_FILTER:-}"
-SUBSCRIPTION_FIXTURE_PATH="${SUBSCRIPTION_FIXTURE_PATH:-tests/integration/fixtures/subscriptions/mock-client-1.json}"
+CLIENT_ID="${CLIENT_ID:-}"
 
 if ! aws sts get-caller-identity --profile "$AWS_PROFILE" >/dev/null 2>&1; then
   echo "No active AWS SSO session for profile '$AWS_PROFILE'. Running aws sso login..."
@@ -72,22 +76,12 @@ queue_url() {
   return 0
 }
 
-target_dlq_queue_name() {
-  local target_id
-
-  if [[ ! -f "$SUBSCRIPTION_FIXTURE_PATH" ]]; then
-    echo "Error: subscription fixture not found: $SUBSCRIPTION_FIXTURE_PATH" >&2
+require_client_id() {
+  if [ -z "$CLIENT_ID" ]; then
+    echo "Error: CLIENT_ID must be set for this action." >&2
+    echo "Example: CLIENT_ID=mock-client-1 ENVIRONMENT=<env> AWS_PROFILE=<profile> make test-integration-debug ACTION=queue-status" >&2
     exit 1
   fi
-
-  target_id="$(jq -r '.targets[0].targetId // empty' "$SUBSCRIPTION_FIXTURE_PATH")"
-  if [[ -z "$target_id" ]]; then
-    echo "Error: unable to read targets[0].targetId from $SUBSCRIPTION_FIXTURE_PATH" >&2
-    exit 1
-  fi
-
-  echo "${PREFIX}-${target_id}-dlq-queue"
-  return 0
 }
 
 show_queue_counts() {
@@ -106,10 +100,11 @@ show_queue_counts() {
 }
 
 action_queue_status() {
-  show_queue_counts "Mock Target DLQ - Queue Message Counts" "$(target_dlq_queue_name)"
-  show_queue_counts "Inbound Event Queue - Queue Message Counts" "${PREFIX}-inbound-event-queue"
-  show_queue_counts "Inbound Event DLQ - Queue Message Counts" "${PREFIX}-inbound-event-dlq"
-  return 0
+  require_client_id
+  show_queue_counts "Client Delivery Queue - Message Counts" "${PREFIX}-${CLIENT_ID}-delivery-queue"
+  show_queue_counts "Client Delivery DLQ - Message Counts" "${PREFIX}-${CLIENT_ID}-delivery-dlq-queue"
+  show_queue_counts "Inbound Event Queue - Message Counts" "${PREFIX}-inbound-event-queue"
+  show_queue_counts "Inbound Event DLQ - Message Counts" "${PREFIX}-inbound-event-dlq"
 }
 
 peek_queue_message() {
@@ -135,19 +130,19 @@ peek_queue_message() {
 }
 
 action_queue_peek() {
-  peek_queue_message "Mock Target DLQ - Message Peek" "$(target_dlq_queue_name)"
+  require_client_id
+  peek_queue_message "Client Delivery Queue - Message Peek" "${PREFIX}-${CLIENT_ID}-delivery-queue"
+  peek_queue_message "Client Delivery DLQ - Message Peek" "${PREFIX}-${CLIENT_ID}-delivery-dlq-queue"
   peek_queue_message "Inbound Event Queue - Message Peek" "${PREFIX}-inbound-event-queue"
   peek_queue_message "Inbound Event DLQ - Message Peek" "${PREFIX}-inbound-event-dlq"
   return 0
 }
 
 log_filter_args() {
-  local -a args=()
-  local escaped_log_filter
   if [[ -n "$LOG_FILTER" ]]; then
-    escaped_log_filter="${LOG_FILTER//\"/\\\"}"
+    local escaped_log_filter="${LOG_FILTER//\"/\\\"}"
     # CloudWatch filter patterns treat quoted strings as exact phrases.
-    args+=(--filter-pattern "\"$escaped_log_filter\"")
+    printf '%s\n' --filter-pattern "\"$escaped_log_filter\""
   fi
 
   printf '%s\n' "${args[@]}"
@@ -168,6 +163,22 @@ action_tail_transform() {
     --format short \
     "${filter_args[@]}"
   return 0
+}
+
+action_tail_https_client() {
+  require_client_id
+  local -a filter_args=()
+  mapfile -t filter_args < <(log_filter_args)
+
+  print_section "HTTPS Client Lambda Logs"
+  aws logs tail \
+    "/aws/lambda/${PREFIX}-https-client-${CLIENT_ID}" \
+    --region "$REGION" \
+    --profile "$AWS_PROFILE" \
+    --since 30m \
+    --follow \
+    --format short \
+    "${filter_args[@]}"
 }
 
 action_tail_webhook() {
@@ -280,6 +291,9 @@ case "$ACTION" in
   tail-transform)
     action_tail_transform
     ;;
+  tail-https-client)
+    action_tail_https_client
+    ;;
   tail-webhook)
     action_tail_webhook
     ;;
@@ -291,7 +305,7 @@ case "$ACTION" in
     ;;
   *)
     echo "Unknown action: $ACTION" >&2
-    echo "Actions: queue-status, queue-peek, tail-transform, tail-webhook, tail-pipe, pipe-state" >&2
+    echo "Actions: queue-status, queue-peek, tail-transform, tail-https-client, tail-webhook, tail-pipe, pipe-state" >&2
     exit 1
     ;;
 esac

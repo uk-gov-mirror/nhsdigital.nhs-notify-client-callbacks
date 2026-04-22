@@ -129,6 +129,34 @@ describe("tls-agent-factory", () => {
     expect(mockSecretsManagerSend).not.toHaveBeenCalled();
   });
 
+  it("loads test CA for server trust when MTLS_TEST_CA_S3_KEY is set and mtls is disabled", async () => {
+    process.env.MTLS_TEST_CA_S3_KEY = "test-ca.pem";
+    jest.resetModules();
+    // @ts-expect-error -- modulePaths resolves at runtime
+    const mod = await import("services/delivery/tls-agent-factory");
+
+    const caPem =
+      "-----BEGIN CERTIFICATE-----\ntest-ca\n-----END CERTIFICATE-----";
+    mockS3Send
+      .mockResolvedValueOnce({
+        Body: {
+          transformToString: jest.fn().mockResolvedValue(COMBINED_PEM),
+        },
+      })
+      .mockResolvedValueOnce({
+        Body: { transformToString: jest.fn().mockResolvedValue(caPem) },
+      });
+
+    const agent = await mod.buildAgent(
+      createTarget({ delivery: { mtls: { enabled: false } } }),
+    );
+
+    expect(agent).toBeDefined();
+    expect(agent.options.ca).toBe(caPem);
+    expect(agent.options.key).toBeUndefined();
+    expect(agent.options.cert).toBeUndefined();
+  });
+
   it("loads test CA when MTLS_TEST_CA_S3_KEY is set", async () => {
     process.env.MTLS_TEST_CA_S3_KEY = "test-ca.pem";
     jest.resetModules();

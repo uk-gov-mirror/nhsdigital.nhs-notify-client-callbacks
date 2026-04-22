@@ -1,11 +1,17 @@
+resource "random_password" "elasticache_default_user" {
+  length  = 32
+  special = false
+}
+
 resource "aws_elasticache_user" "delivery_state_default" {
-  user_id       = "${local.csi}-delivery-state-default"
+  user_id       = "${local.csi}-valkey-default"
   user_name     = "default"
   engine        = "valkey"
   access_string = "off -@all"
 
   authentication_mode {
-    type = "no-password-required"
+    type      = "password"
+    passwords = [random_password.elasticache_default_user.result]
   }
 
   tags = local.default_tags
