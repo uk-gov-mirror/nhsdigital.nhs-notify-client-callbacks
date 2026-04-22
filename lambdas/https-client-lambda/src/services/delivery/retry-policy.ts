@@ -2,6 +2,7 @@ import type { SQSRecord } from "aws-lambda";
 import { logger } from "@nhs-notify-client-callbacks/logger";
 import { sendToDlq } from "services/dlq-sender";
 import { changeVisibility } from "services/sqs-visibility";
+import { VisibilityManagedError } from "services/visibility-managed-error";
 
 const BACKOFF_CAP_SECONDS = 300;
 const SQS_MAX_VISIBILITY_SECONDS = 43_200;
@@ -75,5 +76,5 @@ export async function handleRateLimitedRecord(
     delaySec,
   });
   await changeVisibility(record.receiptHandle, delaySec);
-  throw new Error("Rate limited — requeue");
+  throw new VisibilityManagedError("Rate limited — requeue");
 }

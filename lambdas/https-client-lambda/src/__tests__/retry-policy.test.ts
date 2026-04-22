@@ -6,6 +6,7 @@ import {
   jitteredBackoffSeconds,
   parseRetryAfter,
 } from "services/delivery/retry-policy";
+import { VisibilityManagedError } from "services/visibility-managed-error";
 
 const mockSendToDlq = jest.fn();
 jest.mock("services/dlq-sender", () => ({
@@ -170,6 +171,6 @@ describe("handleRateLimitedRecord", () => {
   it("throws after requeuing so SQS marks the record as failed", async () => {
     await expect(
       handleRateLimitedRecord(makeRecord(), "client-1", "target-1", "30", 1),
-    ).rejects.toThrow("Rate limited — requeue");
+    ).rejects.toThrow(VisibilityManagedError);
   });
 });

@@ -6,7 +6,12 @@ import { loadTargetConfig } from "services/config-loader";
 import { getApplicationId } from "services/ssm-applications-map";
 import { signPayload } from "services/payload-signer";
 import { buildAgent } from "services/delivery/tls-agent-factory";
-import { deliverPayload } from "services/delivery/https-client";
+import {
+  OUTCOME_PERMANENT_FAILURE,
+  OUTCOME_RATE_LIMITED,
+  OUTCOME_SUCCESS,
+  deliverPayload,
+} from "services/delivery/https-client";
 import type { DeliveryResult } from "services/delivery/https-client";
 import { sendToDlq } from "services/dlq-sender";
 import { changeVisibility } from "services/sqs-visibility";
@@ -21,6 +26,7 @@ import {
   recordResult,
 } from "services/endpoint-gate";
 import { getRedisClient } from "services/redis-client";
+import { VisibilityManagedError } from "services/visibility-managed-error";
 import {
   recordAdmissionDenied,
   recordCircuitBreakerClosed,
@@ -39,8 +45,6 @@ type RedisClientType = Awaited<ReturnType<typeof getRedisClient>>;
 
 const DEFAULT_MAX_RETRY_DURATION_MS = 7_200_000; // 2 hours
 const DEFAULT_CONCURRENCY_LIMIT = 5;
-
-class VisibilityManagedError extends Error {}
 
 const gateConfig: EndpointGateConfig = {
   burstCapacity: Number(process.env.TOKEN_BUCKET_BURST_CAPACITY ?? "10"),
@@ -90,7 +94,7 @@ async function handleDeliveryResult(
   targetId: string,
   cbEnabled: boolean,
 ): Promise<void> {
-  if (result.outcome === "success") {
+  if (result.outcome === OUTCOME_SUCCESS) {
     if (cbEnabled) {
       const cbOutcome = await recordResult(redis, targetId, true, gateConfig);
       if (cbOutcome.ok && cbOutcome.state === "closed") {
@@ -101,13 +105,13 @@ async function handleDeliveryResult(
     return;
   }
 
-  if (result.outcome === "permanent_failure") {
+  if (result.outcome === OUTCOME_PERMANENT_FAILURE) {
     recordDeliveryPermanentFailure(clientId, targetId);
     await sendToDlq(record.body);
     return;
   }
 
-  if (result.outcome === "rate_limited") {
+  if (result.outcome === OUTCOME_RATE_LIMITED) {
     const receiveCount = Number(record.attributes.ApproximateReceiveCount);
     recordDeliveryRateLimited(clientId, targetId);
     await handleRateLimitedRecord(

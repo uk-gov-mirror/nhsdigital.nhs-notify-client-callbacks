@@ -3,6 +3,7 @@ import {
   DEFAULT_TARGET,
   makeRecord,
 } from "__tests__/fixtures/handler-fixtures";
+import { VisibilityManagedError } from "services/visibility-managed-error";
 
 jest.mock("@nhs-notify-client-callbacks/logger", () => ({
   logger: {
@@ -36,6 +37,10 @@ jest.mock("services/delivery/tls-agent-factory", () => ({
 const mockDeliverPayload = jest.fn();
 jest.mock("services/delivery/https-client", () => ({
   deliverPayload: (...args: unknown[]) => mockDeliverPayload(...args),
+  OUTCOME_SUCCESS: "success",
+  OUTCOME_PERMANENT_FAILURE: "permanent_failure",
+  OUTCOME_RATE_LIMITED: "rate_limited",
+  OUTCOME_TRANSIENT_FAILURE: "transient_failure",
 }));
 
 const mockSendToDlq = jest.fn();
@@ -100,7 +105,7 @@ describe("processRecords", () => {
     mockJitteredBackoff.mockReturnValue(5);
     mockIsWindowExhausted.mockReturnValue(false);
     mockHandleRateLimitedRecord.mockRejectedValue(
-      new Error("Rate limited — requeue"),
+      new VisibilityManagedError("Rate limited — requeue"),
     );
     mockGetRedisClient.mockResolvedValue({});
     mockAdmit.mockResolvedValue({
