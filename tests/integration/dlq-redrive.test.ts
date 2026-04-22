@@ -1,4 +1,8 @@
-import { GetQueueAttributesCommand, SQSClient } from "@aws-sdk/client-sqs";
+import {
+  DeleteMessageCommand,
+  GetQueueAttributesCommand,
+  SQSClient,
+} from "@aws-sdk/client-sqs";
 import { CloudWatchLogsClient } from "@aws-sdk/client-cloudwatch-logs";
 import type {
   MessageStatusData,
@@ -13,6 +17,8 @@ import {
 } from "@nhs-notify-client-callbacks/test-support/helpers";
 import { assertCallbackHeaders } from "./helpers/signature";
 import {
+  awaitQueueMessage,
+  buildMockClientDeliveryQueueUrl,
   buildMockClientDlqQueueUrl,
   ensureInboundQueueIsEmpty,
   purgeQueues,
@@ -25,7 +31,10 @@ import {
   getClientConfig,
   getMockItClientConfig,
 } from "./helpers/mock-client-config";
-import { awaitSignedCallbacksFromWebhookLogGroup } from "./helpers/cloudwatch";
+import {
+  awaitSignedCallbacksByCountFromWebhookLogGroup,
+  awaitSignedCallbacksFromWebhookLogGroup,
+} from "./helpers/cloudwatch";
 import { createMessageStatusPublishEvent } from "./helpers/event-factories";
 import sendEventToDlqAndRedrive from "./helpers/redrive";
 
@@ -33,6 +42,7 @@ describe("DLQ Redrive", () => {
   let sqsClient: SQSClient;
   let cloudWatchClient: CloudWatchLogsClient;
   let dlqQueueUrl!: string;
+  let deliveryQueueUrl!: string;
   let allTargetDlqQueueUrls: string[];
   let inboundQueueUrl: string;
   let webhookLogGroupName: string;
@@ -46,6 +56,10 @@ describe("DLQ Redrive", () => {
 
     inboundQueueUrl = buildInboundEventQueueUrl(deploymentDetails);
     dlqQueueUrl = buildMockClientDlqQueueUrl(deploymentDetails, clientId);
+    deliveryQueueUrl = buildMockClientDeliveryQueueUrl(
+      deploymentDetails,
+      clientId,
+    );
     allTargetDlqQueueUrls = (
       Object.keys(CLIENT_FIXTURES) as ClientFixtureKey[]
     ).map((key) =>
@@ -59,11 +73,19 @@ describe("DLQ Redrive", () => {
       "mock-webhook",
     );
 
-    await purgeQueues(sqsClient, [inboundQueueUrl, ...allTargetDlqQueueUrls]);
+    await purgeQueues(sqsClient, [
+      inboundQueueUrl,
+      deliveryQueueUrl,
+      ...allTargetDlqQueueUrls,
+    ]);
   });
 
   afterAll(async () => {
-    await purgeQueues(sqsClient, [inboundQueueUrl, ...allTargetDlqQueueUrls]);
+    await purgeQueues(sqsClient, [
+      inboundQueueUrl,
+      deliveryQueueUrl,
+      ...allTargetDlqQueueUrls,
+    ]);
     sqsClient.destroy();
     cloudWatchClient.destroy();
   });
@@ -197,5 +219,67 @@ describe("DLQ Redrive", () => {
       });
       assertCallbackHeaders(redriveCallbacks[0]);
     }, 120_000);
+  });
+
+  describe("Delivery DLQ redrive", () => {
+    it("should redrive a 4xx-failed message from the delivery DLQ back through the delivery queue", async () => {
+      const redriveStartTime = Date.now();
+      const forceMessageId = `force-400-redrive-${Date.now()}`;
+
+      const failingEvent: StatusPublishEvent<MessageStatusData> =
+        createMessageStatusPublishEvent({
+          data: { messageId: forceMessageId },
+        });
+
+      await sendSqsEvent(sqsClient, inboundQueueUrl, failingEvent);
+
+      const dlqMessage = await awaitQueueMessage(
+        sqsClient,
+        dlqQueueUrl,
+        90_000,
+      );
+
+      expect(dlqMessage.Body).toBeDefined();
+      expect(dlqMessage.MessageAttributes?.ERROR_CODE?.StringValue).toBe(
+        "HTTP_CLIENT_ERROR",
+      );
+
+      const dlqBody = JSON.parse(dlqMessage.Body as string) as {
+        payload: { data: { attributes: { messageId: string } }[] };
+        subscriptionId: string;
+        targetId: string;
+      };
+
+      const redriveMessageId = `redriven-dlq-${Date.now()}`;
+      dlqBody.payload.data[0].attributes.messageId = redriveMessageId;
+
+      await sendSqsEvent(sqsClient, deliveryQueueUrl, dlqBody);
+
+      await sqsClient.send(
+        new DeleteMessageCommand({
+          QueueUrl: dlqQueueUrl,
+          ReceiptHandle: dlqMessage.ReceiptHandle!,
+        }),
+      );
+
+      const callbacks = await awaitSignedCallbacksByCountFromWebhookLogGroup(
+        cloudWatchClient,
+        webhookLogGroupName,
+        redriveMessageId,
+        "MessageStatus",
+        1,
+        redriveStartTime,
+      );
+
+      expect(callbacks).toHaveLength(1);
+      expect(callbacks[0].payload).toMatchObject({
+        type: "MessageStatus",
+        attributes: expect.objectContaining({
+          messageId: redriveMessageId,
+          messageStatus: "delivered",
+        }),
+      });
+      assertCallbackHeaders(callbacks[0]);
+    }, 180_000);
   });
 });
