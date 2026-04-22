@@ -14,6 +14,7 @@ export type BuildTargetArgs = {
   apiKey: string;
   apiKeyHeaderName?: string;
   rateLimit: number;
+  maxRetryDurationSeconds?: number;
   mtls?: { enabled: boolean };
   certPinning?: { enabled: boolean; spkiHash?: string };
 };
@@ -56,6 +57,15 @@ export function buildTarget(args: BuildTargetArgs): CallbackTarget {
     warnings.push("Certificate pinning is enabled but mTLS is disabled");
   }
 
+  if (
+    args.maxRetryDurationSeconds !== undefined &&
+    args.maxRetryDurationSeconds < 60
+  ) {
+    warnings.push(
+      `maxRetryDurationSeconds is ${args.maxRetryDurationSeconds}s — values below 60s may exhaust the retry window before a single delivery attempt completes`,
+    );
+  }
+
   for (const warning of warnings) {
     console.warn(pc.bold(pc.red(`WARNING: ${warning}`)));
   }
@@ -71,6 +81,9 @@ export function buildTarget(args: BuildTargetArgs): CallbackTarget {
       headerValue: args.apiKey,
     },
     delivery: {
+      ...(args.maxRetryDurationSeconds !== undefined && {
+        maxRetryDurationSeconds: args.maxRetryDurationSeconds,
+      }),
       mtls: {
         ...mtls,
         certPinning,

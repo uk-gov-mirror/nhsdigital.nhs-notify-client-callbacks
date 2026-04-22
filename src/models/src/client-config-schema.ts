@@ -48,7 +48,7 @@ const targetSchema = z.object({
   }),
   delivery: z
     .object({
-      maxRetryDurationSeconds: z.number().min(60).max(43_200).optional(),
+      maxRetryDurationSeconds: z.number().positive().max(43_200).optional(),
       circuitBreaker: z
         .object({
           enabled: z.boolean(),

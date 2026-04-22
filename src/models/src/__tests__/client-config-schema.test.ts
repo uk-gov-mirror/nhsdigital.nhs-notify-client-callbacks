@@ -226,9 +226,20 @@ describe("parseClientSubscriptionConfiguration", () => {
     );
   });
 
-  it("returns a failed parse result when maxRetryDurationSeconds is below 60", () => {
+  it("returns a failed parse result when maxRetryDurationSeconds is zero", () => {
     const config = createValidConfig();
-    config.targets[0].delivery = { maxRetryDurationSeconds: 59 };
+    config.targets[0].delivery = { maxRetryDurationSeconds: 0 };
+
+    const result = expectFailedParse(
+      parseClientSubscriptionConfiguration(config),
+    );
+
+    expect(result.success).toBe(false);
+  });
+
+  it("returns a failed parse result when maxRetryDurationSeconds is negative", () => {
+    const config = createValidConfig();
+    config.targets[0].delivery = { maxRetryDurationSeconds: -1 };
 
     const result = expectFailedParse(
       parseClientSubscriptionConfiguration(config),
@@ -248,9 +259,16 @@ describe("parseClientSubscriptionConfiguration", () => {
     expect(result.success).toBe(false);
   });
 
-  it("accepts maxRetryDurationSeconds at boundary value 60", () => {
+  it("accepts maxRetryDurationSeconds below 60", () => {
     const config = createValidConfig();
-    config.targets[0].delivery = { maxRetryDurationSeconds: 60 };
+    config.targets[0].delivery = { maxRetryDurationSeconds: 10 };
+
+    expect(parseClientSubscriptionConfiguration(config).success).toBe(true);
+  });
+
+  it("accepts maxRetryDurationSeconds at boundary value 1", () => {
+    const config = createValidConfig();
+    config.targets[0].delivery = { maxRetryDurationSeconds: 1 };
 
     expect(parseClientSubscriptionConfiguration(config).success).toBe(true);
   });
