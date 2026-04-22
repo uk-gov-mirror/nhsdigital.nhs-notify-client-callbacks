@@ -150,28 +150,65 @@ export async function awaitSignedCallbacksFromWebhookLogGroup(
 export async function awaitSignedCallbacksByCountFromWebhookLogGroup(
   client: CloudWatchLogsClient,
   logGroupName: string,
-  messageId: string,
+  messageIds: string | string[],
   callbackType: CallbackItem["type"],
-  expectedCount: number,
+  expectedCountPerMessage: number,
   startTime: number,
 ): Promise<SignedCallback[]> {
+  const ids = Array.isArray(messageIds) ? messageIds : [messageIds];
+  const messageIdSet = new Set(ids);
+  const expectedTotal = ids.length * expectedCountPerMessage;
+  const queryStartTime = Math.max(0, startTime - CLOUDWATCH_QUERY_LOOKBACK_MS);
+  const filterPattern = `{ $.msg = "Callback received" && $.callbackType = "${callbackType}" }`;
+
   logger.debug(
-    `Waiting for callbacks in webhook CloudWatch log group (messageId=${messageId}, callbackType=${callbackType}, expectedCount=${expectedCount}, logGroup=${logGroupName})`,
+    `Waiting for ${expectedTotal} callbacks in webhook CloudWatch log group (callbackType=${callbackType}, messageCount=${ids.length}, logGroup=${logGroupName})`,
   );
 
-  let callbacks: SignedCallback[] = [];
+  let matched: SignedCallback[] = [];
 
   try {
     await waitUntil(
       async () => {
-        callbacks = await querySignedCallbacksFromWebhookLogGroup(
-          client,
-          logGroupName,
-          messageId,
-          callbackType,
-          startTime,
+        const response = await client.send(
+          new FilterLogEventsCommand({
+            logGroupName,
+            startTime: queryStartTime,
+            filterPattern,
+          }),
         );
-        return callbacks.length === expectedCount;
+
+        matched = (response.events ?? []).flatMap((event) => {
+          if (!event.message) return [];
+          try {
+            const entry = JSON.parse(event.message) as LogEntry & {
+              messageId?: string;
+            };
+            if (
+              !entry.messageId ||
+              !messageIdSet.has(entry.messageId) ||
+              entry.signature === undefined ||
+              !entry.payload
+            )
+              return [];
+
+            return [
+              {
+                payload: JSON.parse(entry.payload) as CallbackItem,
+                path: entry.path ?? "",
+                isMtls: entry.isMtls ?? false,
+                headers: {
+                  "x-api-key": entry.apiKey ?? "",
+                  "x-hmac-sha256-signature": entry.signature,
+                },
+              },
+            ];
+          } catch {
+            return [];
+          }
+        });
+
+        return matched.length >= expectedTotal;
       },
       {
         timeout: CALLBACK_WAIT_TIMEOUT_MS,
@@ -181,20 +218,20 @@ export async function awaitSignedCallbacksByCountFromWebhookLogGroup(
   } catch (error) {
     if (error instanceof TimeoutError) {
       logger.warn(
-        `Timed out waiting for callbacks in webhook CloudWatch log group (messageId=${messageId}, callbackType=${callbackType}, expectedCount=${expectedCount}, timeoutMs=${CALLBACK_WAIT_TIMEOUT_MS})`,
+        `Timed out waiting for callbacks (expected=${expectedTotal}, found=${matched.length}, callbackType=${callbackType}, timeoutMs=${CALLBACK_WAIT_TIMEOUT_MS})`,
       );
     } else {
       throw error;
     }
   }
 
-  if (callbacks.length !== expectedCount) {
+  if (matched.length !== expectedTotal) {
     throw new Error(
-      `Expected exactly ${expectedCount} callbacks for messageId="${messageId}" callbackType="${callbackType}", but found ${callbacks.length}`,
+      `Expected ${expectedTotal} callbacks for callbackType="${callbackType}", but found ${matched.length}`,
     );
   }
 
-  return callbacks;
+  return matched;
 }
 
 type EmfEntry = Record<string, unknown>;
@@ -299,6 +336,43 @@ export async function countForcedStatusInvocations(
     await waitUntil(
       async () => {
         count = await query();
+        return count >= minCount;
+      },
+      {
+        timeout: CALLBACK_WAIT_TIMEOUT_MS,
+        intervalBetweenAttempts: POLL_INTERVAL_MS,
+      },
+    );
+  } catch (error) {
+    if (!(error instanceof TimeoutError)) {
+      throw error;
+    }
+  }
+
+  return count;
+}
+
+export async function countLogEntries(
+  client: CloudWatchLogsClient,
+  logGroupName: string,
+  filterPattern: string,
+  startTime: number,
+  minCount: number,
+): Promise<number> {
+  const queryStartTime = Math.max(0, startTime - CLOUDWATCH_QUERY_LOOKBACK_MS);
+
+  let count = 0;
+  try {
+    await waitUntil(
+      async () => {
+        const response = await client.send(
+          new FilterLogEventsCommand({
+            logGroupName,
+            startTime: queryStartTime,
+            filterPattern,
+          }),
+        );
+        count = (response.events ?? []).length;
         return count >= minCount;
       },
       {
