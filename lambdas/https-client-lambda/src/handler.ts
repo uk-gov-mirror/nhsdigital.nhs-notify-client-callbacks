@@ -69,6 +69,7 @@ async function checkAdmission(
   cbEnabled: boolean,
   clientId: string,
   record: SQSRecord,
+  correlationId?: string,
 ): Promise<void> {
   const gateResult = await admit(
     redis,
@@ -80,7 +81,7 @@ async function checkAdmission(
 
   if (!gateResult.allowed) {
     const delaySec = Math.ceil(gateResult.retryAfterMs / 1000);
-    recordAdmissionDenied(clientId, targetId, gateResult.reason);
+    recordAdmissionDenied(clientId, targetId, gateResult.reason, correlationId);
     await changeVisibility(record.receiptHandle, delaySec);
     throw new VisibilityManagedError(`Admission denied: ${gateResult.reason}`);
   }
@@ -93,15 +94,16 @@ async function handleDeliveryResult(
   clientId: string,
   targetId: string,
   cbEnabled: boolean,
+  correlationId?: string,
 ): Promise<void> {
   if (result.outcome === OUTCOME_SUCCESS) {
     if (cbEnabled) {
       const cbOutcome = await recordResult(redis, targetId, true, gateConfig);
       if (cbOutcome.ok && cbOutcome.state === "closed") {
-        recordCircuitBreakerClosed(targetId);
+        recordCircuitBreakerClosed(targetId, correlationId);
       }
     }
-    recordDeliverySuccess(clientId, targetId);
+    recordDeliverySuccess(clientId, targetId, correlationId);
     return;
   }
 
@@ -111,6 +113,7 @@ async function handleDeliveryResult(
       targetId,
       result.statusCode,
       result.errorCode,
+      correlationId,
     );
     await sendToDlq(record.body, result);
     return;
@@ -118,7 +121,7 @@ async function handleDeliveryResult(
 
   if (result.outcome === OUTCOME_RATE_LIMITED) {
     const receiveCount = Number(record.attributes.ApproximateReceiveCount);
-    recordDeliveryRateLimited(clientId, targetId);
+    recordDeliveryRateLimited(clientId, targetId, correlationId);
     await handleRateLimitedRecord(
       record,
       clientId,
@@ -134,10 +137,16 @@ async function handleDeliveryResult(
   if (cbEnabled) {
     const cbOutcome = await recordResult(redis, targetId, false, gateConfig);
     if (cbOutcome.state === "opened") {
-      recordCircuitBreakerOpen(targetId);
+      recordCircuitBreakerOpen(targetId, correlationId);
     }
   }
-  recordDeliveryFailure(clientId, targetId, result.statusCode, backoffSec);
+  recordDeliveryFailure(
+    clientId,
+    targetId,
+    result.statusCode,
+    backoffSec,
+    correlationId,
+  );
   await changeVisibility(record.receiptHandle, backoffSec);
   throw new VisibilityManagedError(`Transient failure: ${result.statusCode}`);
 }
@@ -153,8 +162,13 @@ async function processRecord(
 
   const message: CallbackDeliveryMessage = JSON.parse(record.body);
   const { payload, targetId } = message;
+  const messageId = payload.data[0]?.attributes?.messageId;
 
-  logger.info("Processing delivery", { clientId: CLIENT_ID, targetId });
+  logger.info("Processing delivery", {
+    clientId: CLIENT_ID,
+    targetId,
+    messageId,
+  });
 
   const target = await loadTargetConfig(CLIENT_ID, targetId);
   const maxRetryDurationMs =
@@ -167,7 +181,7 @@ async function processRecord(
   );
 
   if (isWindowExhausted(firstReceivedMs, maxRetryDurationMs)) {
-    recordRetryWindowExhausted(CLIENT_ID, targetId);
+    recordRetryWindowExhausted(CLIENT_ID, targetId, messageId);
     await sendToDlq(record.body);
     return;
   }
@@ -182,6 +196,7 @@ async function processRecord(
     cbEnabled,
     CLIENT_ID,
     record,
+    messageId,
   );
 
   const agent = await buildAgent(target);
@@ -192,7 +207,7 @@ async function processRecord(
   );
   const payloadJson = JSON.stringify(payload);
 
-  recordDeliveryAttempt(CLIENT_ID, targetId);
+  recordDeliveryAttempt(CLIENT_ID, targetId, messageId);
   const deliveryStart = Date.now();
   const result = await deliverPayload(target, payloadJson, signature, agent);
   recordDeliveryDuration(targetId, Date.now() - deliveryStart);
@@ -204,6 +219,7 @@ async function processRecord(
     CLIENT_ID,
     targetId,
     cbEnabled,
+    messageId,
   );
 }
 

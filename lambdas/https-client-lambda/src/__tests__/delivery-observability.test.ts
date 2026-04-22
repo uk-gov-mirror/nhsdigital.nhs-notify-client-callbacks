@@ -39,12 +39,16 @@ describe("delivery-observability", () => {
     );
     const { logger } = jest.requireMock("@nhs-notify-client-callbacks/logger");
 
-    recordDeliveryAttempt("client-1", "target-1");
+    recordDeliveryAttempt("client-1", "target-1", "msg-123");
 
     expect(emitDeliveryAttempt).toHaveBeenCalledWith("target-1");
     expect(logger.info).toHaveBeenCalledWith(
       "Attempting delivery",
-      expect.objectContaining({ clientId: "client-1", targetId: "target-1" }),
+      expect.objectContaining({
+        clientId: "client-1",
+        targetId: "target-1",
+        correlationId: "msg-123",
+      }),
     );
   });
 
@@ -54,12 +58,16 @@ describe("delivery-observability", () => {
     );
     const { logger } = jest.requireMock("@nhs-notify-client-callbacks/logger");
 
-    recordDeliverySuccess("client-1", "target-1");
+    recordDeliverySuccess("client-1", "target-1", "msg-123");
 
     expect(emitDeliverySuccess).toHaveBeenCalledWith("target-1");
     expect(logger.info).toHaveBeenCalledWith(
       "Delivery succeeded",
-      expect.objectContaining({ clientId: "client-1", targetId: "target-1" }),
+      expect.objectContaining({
+        clientId: "client-1",
+        targetId: "target-1",
+        correlationId: "msg-123",
+      }),
     );
   });
 
@@ -69,12 +77,22 @@ describe("delivery-observability", () => {
     );
     const { logger } = jest.requireMock("@nhs-notify-client-callbacks/logger");
 
-    recordDeliveryPermanentFailure("client-1", "target-1");
+    recordDeliveryPermanentFailure(
+      "client-1",
+      "target-1",
+      undefined,
+      undefined,
+      "msg-123",
+    );
 
     expect(emitDeliveryPermanentFailure).toHaveBeenCalledWith("target-1");
     expect(logger.warn).toHaveBeenCalledWith(
-      "Permanent delivery failure — sending to DLQ",
-      expect.objectContaining({ clientId: "client-1", targetId: "target-1" }),
+      "Permanent delivery failure \u2014 sending to DLQ",
+      expect.objectContaining({
+        clientId: "client-1",
+        targetId: "target-1",
+        correlationId: "msg-123",
+      }),
     );
   });
 
@@ -82,12 +100,16 @@ describe("delivery-observability", () => {
     const { emitRateLimited } = jest.requireMock("services/delivery-metrics");
     const { logger } = jest.requireMock("@nhs-notify-client-callbacks/logger");
 
-    recordDeliveryRateLimited("client-1", "target-1");
+    recordDeliveryRateLimited("client-1", "target-1", "msg-123");
 
     expect(emitRateLimited).toHaveBeenCalledWith("target-1");
     expect(logger.info).toHaveBeenCalledWith(
       "Rate limited (429)",
-      expect.objectContaining({ clientId: "client-1", targetId: "target-1" }),
+      expect.objectContaining({
+        clientId: "client-1",
+        targetId: "target-1",
+        correlationId: "msg-123",
+      }),
     );
   });
 
@@ -97,14 +119,15 @@ describe("delivery-observability", () => {
     );
     const { logger } = jest.requireMock("@nhs-notify-client-callbacks/logger");
 
-    recordDeliveryFailure("client-1", "target-1", 503, 30);
+    recordDeliveryFailure("client-1", "target-1", 503, 30, "msg-123");
 
     expect(emitDeliveryFailure).toHaveBeenCalledWith("target-1");
     expect(logger.warn).toHaveBeenCalledWith(
-      "Transient delivery failure — requeuing",
+      "Transient delivery failure \u2014 requeuing",
       expect.objectContaining({
         clientId: "client-1",
         targetId: "target-1",
+        correlationId: "msg-123",
         statusCode: 503,
         backoffSec: 30,
       }),
@@ -117,12 +140,15 @@ describe("delivery-observability", () => {
     );
     const { logger } = jest.requireMock("@nhs-notify-client-callbacks/logger");
 
-    recordCircuitBreakerOpen("target-1");
+    recordCircuitBreakerOpen("target-1", "msg-123");
 
     expect(emitCircuitBreakerOpen).toHaveBeenCalledWith("target-1");
     expect(logger.warn).toHaveBeenCalledWith(
       "Circuit breaker opened",
-      expect.objectContaining({ targetId: "target-1" }),
+      expect.objectContaining({
+        targetId: "target-1",
+        correlationId: "msg-123",
+      }),
     );
   });
 
@@ -132,12 +158,15 @@ describe("delivery-observability", () => {
     );
     const { logger } = jest.requireMock("@nhs-notify-client-callbacks/logger");
 
-    recordCircuitBreakerClosed("target-1");
+    recordCircuitBreakerClosed("target-1", "msg-123");
 
     expect(emitCircuitBreakerClosed).toHaveBeenCalledWith("target-1");
     expect(logger.info).toHaveBeenCalledWith(
       "Circuit breaker closed",
-      expect.objectContaining({ targetId: "target-1" }),
+      expect.objectContaining({
+        targetId: "target-1",
+        correlationId: "msg-123",
+      }),
     );
   });
 
@@ -147,12 +176,16 @@ describe("delivery-observability", () => {
     );
     const { logger } = jest.requireMock("@nhs-notify-client-callbacks/logger");
 
-    recordRetryWindowExhausted("client-1", "target-1");
+    recordRetryWindowExhausted("client-1", "target-1", "msg-123");
 
     expect(emitRetryWindowExhausted).toHaveBeenCalledWith("target-1");
     expect(logger.warn).toHaveBeenCalledWith(
-      "Retry window exhausted — sending to DLQ",
-      expect.objectContaining({ clientId: "client-1", targetId: "target-1" }),
+      "Retry window exhausted \u2014 sending to DLQ",
+      expect.objectContaining({
+        clientId: "client-1",
+        targetId: "target-1",
+        correlationId: "msg-123",
+      }),
     );
   });
 
@@ -162,7 +195,7 @@ describe("delivery-observability", () => {
     );
     const { logger } = jest.requireMock("@nhs-notify-client-callbacks/logger");
 
-    recordAdmissionDenied("client-1", "target-1", "rate_limited");
+    recordAdmissionDenied("client-1", "target-1", "rate_limited", "msg-123");
 
     expect(emitAdmissionDenied).toHaveBeenCalledWith(
       "target-1",
@@ -173,6 +206,7 @@ describe("delivery-observability", () => {
       expect.objectContaining({
         clientId: "client-1",
         targetId: "target-1",
+        correlationId: "msg-123",
         reason: "rate_limited",
       }),
     );
