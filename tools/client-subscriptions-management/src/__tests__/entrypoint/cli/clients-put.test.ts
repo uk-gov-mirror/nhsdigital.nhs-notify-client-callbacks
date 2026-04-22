@@ -179,7 +179,7 @@ describe("clients-put CLI", () => {
       if (targetPath === configPath && options === "utf8") {
         return JSON.stringify(validConfig);
       }
-      return actualFs.readFileSync(...args);
+      return actualFs.readFileSync(...args) as string;
     });
     mockPutClientConfig.mockResolvedValue(validConfig);
 
