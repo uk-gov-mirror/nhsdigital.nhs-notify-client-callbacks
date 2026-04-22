@@ -13,6 +13,7 @@ import {
   getDeploymentDetails,
 } from "@nhs-notify-client-callbacks/test-support/helpers";
 import {
+  awaitQueueMessage,
   awaitQueueMessageByMessageId,
   buildMockClientDlqQueueUrl,
   ensureInboundQueueIsEmpty,
@@ -144,6 +145,79 @@ describe("Metrics", () => {
         cloudWatchClient,
         logGroupName,
         ["EventsReceived", "ValidationErrors"],
+        startTime,
+      );
+    }, 120_000);
+  });
+
+  describe("HTTPS Client Lambda metrics", () => {
+    let httpsClientLogGroupName: string;
+
+    beforeAll(async () => {
+      const deploymentDetails = getDeploymentDetails();
+      const { clientId } = getMockItClientConfig();
+      httpsClientLogGroupName = buildLambdaLogGroupName(
+        deploymentDetails,
+        `https-client-${clientId}`,
+      );
+    });
+
+    it("should emit DeliveryAttempt, DeliverySuccess and DeliveryDurationMs on successful delivery", async () => {
+      const startTime = Date.now();
+      const event = createMessageStatusPublishEvent();
+
+      await sendSqsEvent(sqsClient, callbackEventQueueUrl, event);
+      await ensureInboundQueueIsEmpty(sqsClient, callbackEventQueueUrl);
+
+      const callbacks = await awaitSignedCallbacksFromWebhookLogGroup(
+        cloudWatchClient,
+        webhookLogGroupName,
+        event.data.messageId,
+        "MessageStatus",
+        startTime,
+        buildMockWebhookTargetPath(),
+      );
+
+      expect(callbacks.length).toBeGreaterThan(0);
+
+      await awaitAllEmfMetricsInLogGroup(
+        cloudWatchClient,
+        httpsClientLogGroupName,
+        ["DeliveryAttempt", "DeliverySuccess", "DeliveryDurationMs"],
+        startTime,
+      );
+    }, 120_000);
+
+    it("should emit DeliveryAttempt, DeliveryPermanentFailure and DeliveryDurationMs on 4xx response", async () => {
+      const startTime = Date.now();
+      const messageId = `force-400-metrics-${Date.now()}`;
+
+      const event: StatusPublishEvent<MessageStatusData> =
+        createMessageStatusPublishEvent({
+          data: { messageId },
+        });
+
+      await sendSqsEvent(sqsClient, callbackEventQueueUrl, event);
+
+      const dlqMessage = await awaitQueueMessage(
+        sqsClient,
+        clientDlqQueueUrl,
+        90_000,
+      );
+
+      expect(dlqMessage.Body).toBeDefined();
+
+      await sqsClient.send(
+        new DeleteMessageCommand({
+          QueueUrl: clientDlqQueueUrl,
+          ReceiptHandle: dlqMessage.ReceiptHandle!,
+        }),
+      );
+
+      await awaitAllEmfMetricsInLogGroup(
+        cloudWatchClient,
+        httpsClientLogGroupName,
+        ["DeliveryAttempt", "DeliveryPermanentFailure", "DeliveryDurationMs"],
         startTime,
       );
     }, 120_000);
