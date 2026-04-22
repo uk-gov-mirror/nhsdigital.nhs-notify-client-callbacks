@@ -224,7 +224,7 @@ describe("DLQ Redrive", () => {
   describe("Delivery DLQ redrive", () => {
     it("should redrive a 4xx-failed message from the delivery DLQ back through the delivery queue", async () => {
       const redriveStartTime = Date.now();
-      const forceMessageId = `force-400-redrive-${Date.now()}`;
+      const forceMessageId = `force-400-redrive-${crypto.randomUUID()}`;
 
       const failingEvent: StatusPublishEvent<MessageStatusData> =
         createMessageStatusPublishEvent({
@@ -250,7 +250,7 @@ describe("DLQ Redrive", () => {
         targetId: string;
       };
 
-      const redriveMessageId = `redriven-dlq-${Date.now()}`;
+      const redriveMessageId = `redriven-dlq-${crypto.randomUUID()}`;
       dlqBody.payload.data[0].attributes.messageId = redriveMessageId;
 
       await sendSqsEvent(sqsClient, deliveryQueueUrl, dlqBody);

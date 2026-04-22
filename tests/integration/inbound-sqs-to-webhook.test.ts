@@ -208,7 +208,7 @@ describe("SQS to Webhook Integration", () => {
       const event: StatusPublishEvent<MessageStatusData> =
         createMessageStatusPublishEvent({
           data: {
-            messageId: `force-400-${Date.now()}`,
+            messageId: `force-400-${crypto.randomUUID()}`,
           },
         });
 
@@ -235,7 +235,7 @@ describe("SQS to Webhook Integration", () => {
 
   describe("Inbound Event DLQ", () => {
     it("should move an invalid inbound event to the inbound-event DLQ when schema validation fails", async () => {
-      const messageId = `invalid-schema-${Date.now()}`;
+      const messageId = `invalid-schema-${crypto.randomUUID()}`;
       const invalidEvent = createMessageStatusPublishEvent({
         data: {
           messageId,

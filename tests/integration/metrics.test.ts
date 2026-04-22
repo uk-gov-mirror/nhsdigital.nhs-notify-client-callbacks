@@ -113,7 +113,7 @@ describe("Metrics", () => {
   describe("Validation error", () => {
     it("should emit ValidationErrors metric when an invalid event fails schema validation", async () => {
       const startTime = Date.now();
-      const messageId = `invalid-schema-metrics-${Date.now()}`;
+      const messageId = `invalid-schema-metrics-${crypto.randomUUID()}`;
       const invalidEvent: StatusPublishEvent<MessageStatusData> =
         createMessageStatusPublishEvent({
           data: {
@@ -190,7 +190,7 @@ describe("Metrics", () => {
 
     it("should emit DeliveryAttempt, DeliveryPermanentFailure and DeliveryDurationMs on 4xx response", async () => {
       const startTime = Date.now();
-      const messageId = `force-400-metrics-${Date.now()}`;
+      const messageId = `force-400-metrics-${crypto.randomUUID()}`;
 
       const event: StatusPublishEvent<MessageStatusData> =
         createMessageStatusPublishEvent({

@@ -95,7 +95,7 @@ describe("Delivery Resilience", () => {
 
     it("should exhaust the retry window on persistent 5xx and route to DLQ", async () => {
       const shortRetryConfig = getClientConfig("clientShortRetry");
-      const messageId = `force-500-${Date.now()}`;
+      const messageId = `force-500-${crypto.randomUUID()}`;
 
       const event: StatusPublishEvent<MessageStatusData> =
         createMessageStatusPublishEvent({
@@ -136,7 +136,7 @@ describe("Delivery Resilience", () => {
 
     it("should exhaust the retry window on persistent 429 and route to DLQ", async () => {
       const shortRetryConfig = getClientConfig("clientShortRetry");
-      const messageId = `force-429-${Date.now()}`;
+      const messageId = `force-429-${crypto.randomUUID()}`;
 
       const event: StatusPublishEvent<MessageStatusData> =
         createMessageStatusPublishEvent({
@@ -214,11 +214,11 @@ describe("Delivery Resilience", () => {
       const rateLimitConfig = getClientConfig("clientRateLimit");
       const rateLimitTargetPath = buildMockWebhookTargetPath("clientRateLimit");
 
-      const events = Array.from({ length: BURST_SIZE }, (_, i) =>
+      const events = Array.from({ length: BURST_SIZE }, () =>
         createMessageStatusPublishEvent({
           data: {
             clientId: rateLimitConfig.clientId,
-            messageId: `rate-limit-burst-${Date.now()}-${i}`,
+            messageId: `rate-limit-burst-${crypto.randomUUID()}`,
           },
         }),
       );
