@@ -1,0 +1,54 @@
+{
+  "clientId": "perf-client-2",
+  "subscriptions": [
+    {
+      "channelStatuses": [
+        "DELIVERED",
+        "FAILED",
+        "RETRY",
+        "SKIPPED",
+        "SENDING",
+        "CREATED"
+      ],
+      "channelType": "NHSAPP",
+      "subscriptionId": "sub-ace58855-9f6b-4491-8cee-abb99d997ced",
+      "subscriptionType": "ChannelStatus",
+      "supplierStatuses": [
+        "delivered",
+        "permanent_failure",
+        "temporary_failure",
+        "pending",
+        "sending",
+        "sent"
+      ],
+      "targetIds": [
+        "target-e3ccc2c2-7b19-4475-80d5-51a1182d239a"
+      ]
+    }
+  ],
+  "targets": [
+    {
+      "apiKey": {
+        "headerName": "x-api-key",
+        "headerValue": "REPLACED_BY_TERRAFORM"
+      },
+      "delivery": {
+        "circuitBreaker": {
+          "enabled": true
+        },
+        "maxRetryDurationSeconds": 7200,
+        "mtls": {
+          "certPinning": {
+            "enabled": false
+          },
+          "enabled": false
+        }
+      },
+      "invocationEndpoint": "https://REPLACED_BY_TERRAFORM",
+      "invocationMethod": "POST",
+      "invocationRateLimit": 300,
+      "targetId": "target-e3ccc2c2-7b19-4475-80d5-51a1182d239a",
+      "type": "API"
+    }
+  ]
+}

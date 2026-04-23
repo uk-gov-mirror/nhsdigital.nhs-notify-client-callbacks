@@ -1,30 +1,32 @@
 {
+  "name": "nhs-notify-perf-runner-lambda",
+  "version": "0.0.1",
+  "private": true,
   "engines": {
     "node": ">=24.14.1"
   },
-  "name": "nhs-notify-client-callbacks-performance-tests",
-  "version": "0.0.1",
-  "private": true,
   "scripts": {
-    "test:performance": "jest",
-    "test:unit": "echo 'No unit tests in performance workspace - skipping'",
+    "lambda-build": "rm -rf dist && pnpm exec esbuild --bundle --minify --sourcemap --target=es2020 --platform=node --entry-names=[name] --outdir=dist src/index.ts",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
+    "test:unit": "jest",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@aws-sdk/client-cloudwatch-logs": "catalog:aws",
     "@aws-sdk/client-sqs": "catalog:aws",
+    "@nhs-notify-client-callbacks/logger": "workspace:*",
     "@nhs-notify-client-callbacks/models": "workspace:*",
-    "@nhs-notify-client-callbacks/test-support": "workspace:*",
-    "async-wait-until": "catalog:app"
+    "esbuild": "catalog:tools"
   },
   "devDependencies": {
     "@tsconfig/node22": "catalog:tools",
+    "@types/aws-lambda": "catalog:tools",
     "@types/jest": "catalog:test",
     "@types/node": "catalog:tools",
     "eslint": "catalog:lint",
     "jest": "catalog:test",
+    "ts-jest": "catalog:test",
     "typescript": "catalog:tools"
   }
 }

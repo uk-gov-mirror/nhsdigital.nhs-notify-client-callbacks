@@ -1,0 +1,44 @@
+{
+  "clientId": "perf-client-1",
+  "subscriptions": [
+    {
+      "messageStatuses": [
+        "DELIVERED",
+        "FAILED",
+        "SENDING",
+        "PENDING_ENRICHMENT",
+        "ENRICHED"
+      ],
+      "subscriptionId": "sub-451afe55-2c8f-4103-a5f7-7bcf79e8e476",
+      "subscriptionType": "MessageStatus",
+      "targetIds": [
+        "target-39dbd795-5909-40ab-95b2-4e88b11a2813"
+      ]
+    }
+  ],
+  "targets": [
+    {
+      "apiKey": {
+        "headerName": "x-api-key",
+        "headerValue": "REPLACED_BY_TERRAFORM"
+      },
+      "delivery": {
+        "circuitBreaker": {
+          "enabled": true
+        },
+        "maxRetryDurationSeconds": 7200,
+        "mtls": {
+          "certPinning": {
+            "enabled": false
+          },
+          "enabled": false
+        }
+      },
+      "invocationEndpoint": "https://REPLACED_BY_TERRAFORM",
+      "invocationMethod": "POST",
+      "invocationRateLimit": 300,
+      "targetId": "target-39dbd795-5909-40ab-95b2-4e88b11a2813",
+      "type": "API"
+    }
+  ]
+}

@@ -32,15 +32,6 @@
     "typescript-eslint": "catalog:lint"
   },
   "name": "nhs-notify-client-callbacks",
-  "pnpm": {
-    "overrides": {
-      "collect-v8-coverage": "^1.0.3",
-      "pretty-format>react-is": "19.0.0",
-      "flatted": "^3.4.0",
-      "fast-xml-parser": "^5.5.6",
-      "ts-jest>handlebars": "^4.7.9"
-    }
-  },
   "scripts": {
     "generate-dependencies": "pnpm -r run --if-present generate-dependencies || true",
     "lint": "pnpm -r run lint",

@@ -1,0 +1,57 @@
+{
+  "clientId": "perf-client-4",
+  "subscriptions": [
+    {
+      "messageStatuses": [
+        "DELIVERED",
+        "FAILED"
+      ],
+      "subscriptionId": "sub-31908329-f6ce-4655-94a0-1ceb42073f13",
+      "subscriptionType": "MessageStatus",
+      "targetIds": [
+        "target-11c2d19e-e8c9-4058-8175-546eabd1def2"
+      ]
+    },
+    {
+      "channelStatuses": [
+        "DELIVERED",
+        "FAILED"
+      ],
+      "channelType": "NHSAPP",
+      "subscriptionId": "sub-4f8a6b2c-d193-47e5-b860-7a9f3c1d2e4b",
+      "subscriptionType": "ChannelStatus",
+      "supplierStatuses": [
+        "delivered",
+        "permanent_failure"
+      ],
+      "targetIds": [
+        "target-11c2d19e-e8c9-4058-8175-546eabd1def2"
+      ]
+    }
+  ],
+  "targets": [
+    {
+      "apiKey": {
+        "headerName": "x-api-key",
+        "headerValue": "REPLACED_BY_TERRAFORM"
+      },
+      "delivery": {
+        "circuitBreaker": {
+          "enabled": true
+        },
+        "maxRetryDurationSeconds": 7200,
+        "mtls": {
+          "certPinning": {
+            "enabled": false
+          },
+          "enabled": false
+        }
+      },
+      "invocationEndpoint": "https://REPLACED_BY_TERRAFORM",
+      "invocationMethod": "POST",
+      "invocationRateLimit": 300,
+      "targetId": "target-11c2d19e-e8c9-4058-8175-546eabd1def2",
+      "type": "API"
+    }
+  ]
+}

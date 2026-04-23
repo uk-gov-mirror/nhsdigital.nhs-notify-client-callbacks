@@ -131,7 +131,7 @@ export class ClientSubscriptionRepository {
     const updated: ClientSubscriptionConfiguration = {
       ...config,
       subscriptions: config.subscriptions.map(
-        // eslint-disable-next-line sonarjs/function-return-type -- false positive: complex conditional spread returns are all SubscriptionConfiguration subtypes
+        // eslint-disable-next-line sonarjs/function-return-type
         (sub): SubscriptionConfiguration => {
           if (sub.subscriptionId !== subscriptionId) return sub;
           if (sub.subscriptionType === "MessageStatus") {
