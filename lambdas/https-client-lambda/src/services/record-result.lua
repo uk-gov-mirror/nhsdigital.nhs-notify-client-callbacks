@@ -1,144 +1,149 @@
--- record-result.lua — Records the outcome of a delivery attempt.
+-- record-result.lua — Post-processing: updates sampling and circuit breaker.
 --
--- Updates the circuit breaker's error-rate window counters and opens the
--- circuit if the failure rate exceeds the configured threshold.
---
--- On success:
---   Window counters are left intact.  The openedUntil timestamp is preserved
---   while the decay period is still active so that admit.lua can continue
---   computing the linear ramp-up rate.  Once the decay period elapses it
---   is zeroed, returning the circuit to a fully clean closed state.
---
--- On failure:
---   The failure and attempt counters are incremented.  A two-window sliding
---   blend is computed before evaluating the trip condition:
---     slidingAttempts = cbAttempts + cbPrevAttempts * prevWeight
---     slidingFailures = cbFailures + cbPrevFailures * prevWeight
---   where prevWeight decays linearly from 1.0 → 0.0 as the current window ages,
---   so previous-window failures fade out gradually rather than dropping off a cliff.
---   The circuit opens when:
---     • the endpoint is not already open (prevents double-tripping and
---       resetting the cooldown timer prematurely), AND
---     • slidingAttempts >= cbMinAttempts (avoids tripping on statistically
---       insignificant data at cold start or just after a window roll), AND
---     • slidingFailures / slidingAttempts exceeds cbErrorThreshold.
---   On open, all counters (current and previous) are reset to zero so the
---   fresh cooldown window begins with a clean slate ready for recovery.
+-- After processing a batch, this script:
+--   1. Manages the sliding window (rolling forward as necessary)
+--   2. Records new attempts and failures (unless fully open)
+--   3. Interpolates attempt/failure rates using the sliding window
+--   4. Checks whether to close the circuit (half-open + successes)
+--   5. Checks whether to open the circuit (closed + threshold exceeded)
 --
 -- Returns: { ok (0|1), state }
 --   state: "closed" | "opened" | "failed"
 
+-- Return state constants
+local OPENED = "opened"
+local CLOSED = "closed"
+local FAILED = "failed"
+
 -- Keys
-local cbKey            = KEYS[1] -- cb:{endpoint}  circuit breaker state hash
+local epKey              = KEYS[1] -- ep:{targetId}  combined endpoint state hash
 
 -- Arguments
-local now              = tonumber(ARGV[1]) or 0 -- current wall-clock time (ms)
-local success          = tonumber(ARGV[2]) or 0 -- 1 = success, 0 = failure
-local cooldownMs       = tonumber(ARGV[3]) or 0 -- how long the circuit stays open (ms)
-local decayPeriodMs    = tonumber(ARGV[4]) or 0 -- ramp-up window after circuit closes (ms)
-local cbErrorThreshold = tonumber(ARGV[5]) or 0 -- error-rate fraction that trips the circuit (e.g. 0.5)
-local cbMinAttempts    = tonumber(ARGV[6]) or 0 -- minimum samples before the circuit can trip
-local cbWindowPeriodMs = tonumber(ARGV[7]) or 0 -- error-rate sliding window duration (ms)
-
--- TTL policy: keep circuit breaker state alive for at least the cooldown
--- duration plus a buffer so the decay period remains visible after a close.
-local cbTtlSeconds     = math.ceil(cooldownMs / 1000) + 60
-
-local function refreshCbExpiry()
-  redis.call("EXPIRE", cbKey, cbTtlSeconds)
-end
+local now                = tonumber(ARGV[1]) or 0
+local consumedTokens     = tonumber(ARGV[2]) or 0
+local processingFailures = tonumber(ARGV[3]) or 0
+local cooldownPeriodMs   = tonumber(ARGV[4]) or 0
+local _recoveryPeriodMs  = tonumber(ARGV[5]) or 0 -- luacheck: ignore
+local failureThreshold   = tonumber(ARGV[6]) or 0
+local minAttempts        = tonumber(ARGV[7]) or 0
+local samplePeriodMs     = tonumber(ARGV[8]) or 0
 
 --------------------------------------------------------------------------------
 -- LOAD CURRENT STATE
 --------------------------------------------------------------------------------
 
-local cb             = redis.call("HMGET", cbKey,
-  "opened_until_ms", "cb_window_from", "cb_failures", "cb_attempts",
-  "cb_prev_failures", "cb_prev_attempts")
-local openedUntil    = tonumber(cb[1] or "0")
-local cbWindowFrom   = tonumber(cb[2] or "0")
-local cbFailures     = tonumber(cb[3] or "0")
-local cbAttempts     = tonumber(cb[4] or "0")
-local cbPrevFailures = tonumber(cb[5] or "0")
-local cbPrevAttempts = tonumber(cb[6] or "0")
-
--- Every outcome (success or failure) contributes to the error-rate window
-cbAttempts           = cbAttempts + 1
+local state          = redis.call("HMGET", epKey,
+  "is_open", "switched_at",
+  "cur_attempts", "prev_attempts", "cur_failures", "prev_failures",
+  "sample_till")
+local isOpen         = tonumber(state[1] or "0") == 1
+local switchedAt     = tonumber(state[2] or tostring(now))
+local curAttempts    = tonumber(state[3] or "0")
+local prevAttempts   = tonumber(state[4] or "0")
+local curFailures    = tonumber(state[5] or "0")
+local prevFailures   = tonumber(state[6] or "0")
+local sampleTill     = tonumber(state[7] or "0")
 
 --------------------------------------------------------------------------------
--- SUCCESS — preserve openedUntil during decay, then zero it
---
--- admit.lua uses openedUntil to calculate the linear ramp-up rate while the
--- decay period is active.  That timestamp must survive in Redis until the
--- decay period ends.  Clearing it prematurely would snap the fill rate back
--- to full immediately rather than ramping gradually.
+-- 1. DETERMINE CIRCUIT SUB-STATE
 --------------------------------------------------------------------------------
 
-if success == 1 then
-  -- Keep openedUntil only if we are still within the decay window
-  local inDecayWindow        = openedUntil > 0 and now > openedUntil and (now - openedUntil) < decayPeriodMs
-  local preservedOpenedUntil = inDecayWindow and openedUntil or 0
+local isHalfOpen  = isOpen and now > switchedAt + cooldownPeriodMs
+local isFullyOpen = isOpen and not isHalfOpen
 
-  redis.call("HSET", cbKey,
-    "opened_until_ms", preservedOpenedUntil,
-    "cb_window_from", cbWindowFrom,
-    "cb_failures", cbFailures,
-    "cb_attempts", cbAttempts,
-    "cb_prev_failures", cbPrevFailures,
-    "cb_prev_attempts", cbPrevAttempts
-  )
-  refreshCbExpiry()
-  return { 1, "closed" }
+--------------------------------------------------------------------------------
+-- 2. MANAGE SLIDING WINDOW
+--------------------------------------------------------------------------------
+
+if sampleTill < now then
+  if sampleTill + samplePeriodMs < now then
+    -- Complete reset — window is too old
+    prevAttempts = 0
+    prevFailures = 0
+    sampleTill   = now + samplePeriodMs
+  else
+    -- Promote current to previous
+    prevAttempts = curAttempts
+    prevFailures = curFailures
+    sampleTill   = sampleTill + samplePeriodMs
+  end
+  curAttempts = 0
+  curFailures = 0
 end
 
 --------------------------------------------------------------------------------
--- FAILURE — increment counter and evaluate whether to open the circuit
---
--- The trip condition is evaluated against a sliding blend of current and
--- previous window counts, not the raw current-window counts alone.  This
--- prevents a burst of failures from escaping detection simply because it
--- straddles a window boundary and gets partially discarded by a reset.
+-- 3. RECORD NEW ATTEMPTS/FAILURES (unless fully open)
 --------------------------------------------------------------------------------
 
-cbFailures               = cbFailures + 1
-
--- The circuit is already open when openedUntil is set and has not yet elapsed.
--- Guard against double-tripping, which would reset the cooldown timer early.
-local circuitAlreadyOpen = openedUntil > 0 and now < openedUntil
-
--- Blend current and previous window counts.
--- prevWeight decays linearly from 1.0 → 0.0 as the current window ages,
--- so previous-window failures fade out gradually rather than dropping off a cliff.
-local windowElapsed      = cbWindowFrom > 0 and (now - cbWindowFrom) or 0
-local hasWindow          = cbWindowPeriodMs > 0
-local prevWeight         = hasWindow and math.max(0, (cbWindowPeriodMs - windowElapsed) / cbWindowPeriodMs) or 0
-local slidingFailures    = cbFailures + cbPrevFailures * prevWeight
-local slidingAttempts    = cbAttempts + cbPrevAttempts * prevWeight
-
-if not circuitAlreadyOpen
-    and slidingAttempts >= cbMinAttempts -- enough data to be statistically meaningful
-    and (slidingFailures / slidingAttempts) > cbErrorThreshold then
-  -- Trip the circuit — reset all counters so recovery starts from a clean slate
-  redis.call("HSET", cbKey,
-    "opened_until_ms", now + cooldownMs,
-    "cb_window_from", 0,
-    "cb_failures", 0,
-    "cb_attempts", 0,
-    "cb_prev_failures", 0,
-    "cb_prev_attempts", 0
-  )
-  refreshCbExpiry()
-  return { 0, "opened" }
+if not isFullyOpen then
+  curAttempts = curAttempts + consumedTokens
+  curFailures = curFailures + processingFailures
 end
 
--- Below the threshold — record the failure but keep the circuit closed
-redis.call("HSET", cbKey,
-  "opened_until_ms", openedUntil,
-  "cb_window_from", cbWindowFrom,
-  "cb_failures", cbFailures,
-  "cb_attempts", cbAttempts,
-  "cb_prev_failures", cbPrevFailures,
-  "cb_prev_attempts", cbPrevAttempts
+--------------------------------------------------------------------------------
+-- 4. INTERPOLATE VALUES
+--------------------------------------------------------------------------------
+
+local weight   = (sampleTill - now) / samplePeriodMs
+local attempts = prevAttempts * weight + curAttempts
+local failures = prevFailures * weight + curFailures
+
+--------------------------------------------------------------------------------
+-- 5. CIRCUIT BREAKER LOGIC
+--------------------------------------------------------------------------------
+
+local processingSuccesses = consumedTokens - processingFailures
+local stateChanged        = false
+
+-- Close circuit when half-open and there are successes
+if isHalfOpen and processingSuccesses > 0 then
+  isOpen       = false
+  switchedAt   = now
+  stateChanged = true
+end
+
+-- Open circuit when closed, enough samples, and threshold exceeded
+local hasSampledEnough = attempts >= minAttempts
+if not isOpen and hasSampledEnough and (failures / attempts) > failureThreshold then
+  isOpen       = true
+  switchedAt   = now
+  curAttempts  = 0
+  curFailures  = 0
+  prevAttempts = 0
+  prevFailures = 0
+  sampleTill   = now + samplePeriodMs
+  stateChanged = true
+end
+
+--------------------------------------------------------------------------------
+-- 6. PERSIST STATE
+--------------------------------------------------------------------------------
+
+redis.call("HSET", epKey,
+  "cur_attempts", curAttempts,
+  "prev_attempts", prevAttempts,
+  "cur_failures", curFailures,
+  "prev_failures", prevFailures,
+  "sample_till", sampleTill
 )
-refreshCbExpiry()
-return { 0, "failed" }
+
+if stateChanged then
+  redis.call("HSET", epKey,
+    "is_open", isOpen and 1 or 0,
+    "switched_at", switchedAt
+  )
+end
+
+if stateChanged and isOpen then
+  return { 0, OPENED }
+end
+
+if stateChanged and not isOpen then
+  return { 1, CLOSED }
+end
+
+if isOpen or processingFailures > 0 then
+  return { 0, FAILED }
+end
+
+return { 1, CLOSED }

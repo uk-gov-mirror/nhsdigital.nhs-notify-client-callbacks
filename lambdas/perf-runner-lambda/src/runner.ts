@@ -1,13 +1,20 @@
 import type {
+  CircuitBreakerSnapshot,
   DeliveryMetricsSnapshot,
   MetricsSnapshot,
+  PerClientRateTimeline,
   PerformanceResult,
   PhaseResult,
   RunnerDeps,
   Scenario,
 } from "types";
 import { generatePhaseLoad } from "sqs";
-import { queryDeliveryMetricsSnapshot, queryMetricsSnapshot } from "cloudwatch";
+import {
+  queryCircuitBreakerSnapshot,
+  queryDeliveryMetricsSnapshot,
+  queryMetricsSnapshot,
+  queryPerClientRateTimeline,
+} from "cloudwatch";
 
 const CLOUDWATCH_SETTLING_MS = 60_000;
 
@@ -23,6 +30,50 @@ function buildDeliveryLogGroupNames(
   if (!prefix) return [];
   const clientIds = new Set(scenario.eventMix.map((e) => e.clientId));
   return [...clientIds].map((id) => `${prefix}${id}`);
+}
+
+async function collectSnapshots(
+  deps: RunnerDeps,
+  deliveryLogGroupNames: string[],
+  startSec: number,
+  endSec: number,
+  cbStartSec: number,
+  out: {
+    snapshots: MetricsSnapshot[];
+    deliverySnapshots: DeliveryMetricsSnapshot[];
+    cbSnapshots: CircuitBreakerSnapshot[];
+  },
+): Promise<number> {
+  const snap = await queryMetricsSnapshot(
+    deps.cloudWatchClient,
+    deps.logGroupName,
+    startSec,
+    endSec,
+  );
+  if (snap !== null) out.snapshots.push(snap);
+
+  if (deliveryLogGroupNames.length > 0) {
+    const deliverySnap = await queryDeliveryMetricsSnapshot(
+      deps.cloudWatchClient,
+      deliveryLogGroupNames,
+      startSec,
+      endSec,
+    );
+    if (deliverySnap !== null) out.deliverySnapshots.push(deliverySnap);
+
+    const cbSnap = await queryCircuitBreakerSnapshot(
+      deps.cloudWatchClient,
+      deliveryLogGroupNames,
+      cbStartSec,
+      endSec,
+    );
+    if (cbSnap !== null) {
+      out.cbSnapshots.push(cbSnap);
+      return endSec;
+    }
+  }
+
+  return cbStartSec;
 }
 
 export async function runPerformanceTest(
@@ -53,6 +104,8 @@ export async function runPerformanceTest(
   const phaseResults: PhaseResult[] = [];
   const snapshots: MetricsSnapshot[] = [];
   const deliverySnapshots: DeliveryMetricsSnapshot[] = [];
+  const cbSnapshots: CircuitBreakerSnapshot[] = [];
+  let lastCbSnapshotSec = Math.floor(testStartMs / 1000);
   let stopPolling = false;
 
   const deliveryLogGroupNames = buildDeliveryLogGroupNames(
@@ -60,29 +113,22 @@ export async function runPerformanceTest(
     scenario,
   );
 
+  const out = { snapshots, deliverySnapshots, cbSnapshots };
+
   const pollLoop = async (): Promise<void> => {
     await sleepFn(scenario.metricsIntervalSecs * 1000);
     while (!stopPolling) {
       const startSec = Math.floor(testStartMs / 1000);
       const endSec = Math.floor(Date.now() / 1000);
 
-      const snap = await queryMetricsSnapshot(
-        deps.cloudWatchClient,
-        deps.logGroupName,
+      lastCbSnapshotSec = await collectSnapshots(
+        deps,
+        deliveryLogGroupNames,
         startSec,
         endSec,
+        lastCbSnapshotSec,
+        out,
       );
-      if (snap !== null) snapshots.push(snap);
-
-      if (deliveryLogGroupNames.length > 0) {
-        const deliverySnap = await queryDeliveryMetricsSnapshot(
-          deps.cloudWatchClient,
-          deliveryLogGroupNames,
-          startSec,
-          endSec,
-        );
-        if (deliverySnap !== null) deliverySnapshots.push(deliverySnap);
-      }
 
       if (!stopPolling) {
         await sleepFn(scenario.metricsIntervalSecs * 1000);
@@ -110,22 +156,33 @@ export async function runPerformanceTest(
   const finalStartSec = Math.floor(testStartMs / 1000);
   const finalEndSec = Math.floor(Date.now() / 1000);
 
-  const finalSnap = await queryMetricsSnapshot(
-    deps.cloudWatchClient,
-    deps.logGroupName,
+  await collectSnapshots(
+    deps,
+    deliveryLogGroupNames,
     finalStartSec,
     finalEndSec,
+    lastCbSnapshotSec,
+    out,
   );
-  if (finalSnap !== null) snapshots.push(finalSnap);
 
-  if (deliveryLogGroupNames.length > 0) {
-    const finalDeliverySnap = await queryDeliveryMetricsSnapshot(
-      deps.cloudWatchClient,
-      deliveryLogGroupNames,
-      finalStartSec,
-      finalEndSec,
+  const perClientRateTimelines: PerClientRateTimeline[] = [];
+
+  if (deps.deliveryLogGroupPrefix) {
+    const clientIds = [...new Set(scenario.eventMix.map((e) => e.clientId))];
+    const timelinePromises = clientIds.map(async (clientId) => {
+      const logGroupName = `${deps.deliveryLogGroupPrefix}${clientId}`;
+      const entries = await queryPerClientRateTimeline(
+        deps.cloudWatchClient,
+        logGroupName,
+        finalStartSec,
+        finalEndSec,
+      );
+      return { clientId, entries };
+    });
+    const timelines = await Promise.all(timelinePromises);
+    perClientRateTimelines.push(
+      ...timelines.filter((t) => t.entries.length > 0),
     );
-    if (finalDeliverySnap !== null) deliverySnapshots.push(finalDeliverySnap);
   }
 
   return {
@@ -136,5 +193,7 @@ export async function runPerformanceTest(
     phases: phaseResults,
     metrics: snapshots,
     deliveryMetrics: deliverySnapshots,
+    circuitBreakerMetrics: cbSnapshots,
+    perClientRateTimelines,
   };
 }

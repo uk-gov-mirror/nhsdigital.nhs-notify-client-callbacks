@@ -11,13 +11,13 @@ const mockDisconnect = jest.fn().mockResolvedValue(undefined);
 const mockOn = jest.fn();
 
 const defaultConfig: EndpointGateConfig = {
-  burstCapacity: 10,
-  cbProbeIntervalMs: 60_000,
-  decayPeriodMs: 300_000,
-  cbWindowPeriodMs: 60_000,
-  cbErrorThreshold: 0.5,
-  cbMinAttempts: 10,
-  cbCooldownMs: 60_000,
+  burstCapacity: 2250,
+  probeRateLimit: 1 / 60,
+  recoveryPeriodMs: 600_000,
+  samplePeriodMs: 300_000,
+  failureThreshold: 0.3,
+  minAttempts: 5,
+  cooldownPeriodMs: 120_000,
 };
 
 const mockRedis = {
@@ -34,12 +34,23 @@ beforeEach(() => {
 });
 
 describe("admit", () => {
-  it("returns allowed when tokens available", async () => {
-    mockSendCommand.mockResolvedValueOnce([1, "allowed", 0, 10]);
+  it("returns allowed with consumedTokens when tokens available", async () => {
+    mockSendCommand.mockResolvedValueOnce([5, "allowed", 0, 10]);
 
-    const result = await admit(mockRedis, "target-1", 10, true, defaultConfig);
+    const result = await admit(
+      mockRedis,
+      "target-1",
+      10,
+      true,
+      5,
+      defaultConfig,
+    );
 
-    expect(result).toEqual({ allowed: true, probe: false, effectiveRate: 10 });
+    expect(result).toEqual({
+      allowed: true,
+      consumedTokens: 5,
+      effectiveRate: 10,
+    });
     expect(mockSendCommand).toHaveBeenCalledWith(
       expect.arrayContaining(["EVALSHA"]),
     );
@@ -48,7 +59,14 @@ describe("admit", () => {
   it("returns rate_limited when tokens exhausted", async () => {
     mockSendCommand.mockResolvedValueOnce([0, "rate_limited", 1000, 10]);
 
-    const result = await admit(mockRedis, "target-1", 10, false, defaultConfig);
+    const result = await admit(
+      mockRedis,
+      "target-1",
+      10,
+      false,
+      5,
+      defaultConfig,
+    );
 
     expect(result).toEqual({
       allowed: false,
@@ -58,18 +76,17 @@ describe("admit", () => {
     });
   });
 
-  it("returns allowed with probe flag when circuit is open but probe slot is available", async () => {
-    mockSendCommand.mockResolvedValueOnce([1, "probe", 0, 0]);
-
-    const result = await admit(mockRedis, "target-1", 10, true, defaultConfig);
-
-    expect(result).toEqual({ allowed: true, probe: true, effectiveRate: 0 });
-  });
-
-  it("returns circuit_open without probe slot", async () => {
+  it("returns circuit_open when circuit is fully open", async () => {
     mockSendCommand.mockResolvedValueOnce([0, "circuit_open", 30_000, 0]);
 
-    const result = await admit(mockRedis, "target-1", 10, true, defaultConfig);
+    const result = await admit(
+      mockRedis,
+      "target-1",
+      10,
+      true,
+      5,
+      defaultConfig,
+    );
 
     expect(result).toEqual({
       allowed: false,
@@ -84,9 +101,20 @@ describe("admit", () => {
       .mockRejectedValueOnce(new Error("NOSCRIPT No matching script"))
       .mockResolvedValueOnce([1, "allowed", 0, 10]);
 
-    const result = await admit(mockRedis, "target-1", 10, true, defaultConfig);
+    const result = await admit(
+      mockRedis,
+      "target-1",
+      10,
+      true,
+      1,
+      defaultConfig,
+    );
 
-    expect(result).toEqual({ allowed: true, probe: false, effectiveRate: 10 });
+    expect(result).toEqual({
+      allowed: true,
+      consumedTokens: 1,
+      effectiveRate: 10,
+    });
     expect(mockSendCommand).toHaveBeenCalledTimes(2);
     expect(mockSendCommand).toHaveBeenNthCalledWith(
       1,
@@ -98,25 +126,33 @@ describe("admit", () => {
     );
   });
 
-  it("passes cbProbeIntervalMs=0 when circuit breaker is disabled", async () => {
+  it("passes probeRateLimit=0 when circuit breaker is disabled", async () => {
     mockSendCommand.mockResolvedValueOnce([1, "allowed", 0, 10]);
 
-    await admit(mockRedis, "target-1", 10, false, defaultConfig);
+    await admit(mockRedis, "target-1", 10, false, 1, defaultConfig);
 
-    // EVALSHA layout: [EVALSHA, sha, keyCount, cbKey, rlKey, now, capacity, refillPerSec, cooldownMs, decayPeriodMs, cbWindowPeriodMs, cbProbeIntervalMs]
     const args = mockSendCommand.mock.calls[0]![0] as string[];
-    const cbProbeIntervalArg = args[11];
-    expect(cbProbeIntervalArg).toBe("0");
+    const probeRateArg = args[9];
+    expect(probeRateArg).toBe("0");
   });
 
-  it("passes cbKey first, rlKey second", async () => {
+  it("passes single epKey", async () => {
     mockSendCommand.mockResolvedValueOnce([1, "allowed", 0, 5]);
 
-    await admit(mockRedis, "my-target", 5, true, defaultConfig);
+    await admit(mockRedis, "my-target", 5, true, 1, defaultConfig);
 
     const args = mockSendCommand.mock.calls[0]![0] as string[];
-    expect(args[3]).toBe("cb:{my-target}");
-    expect(args[4]).toBe("rl:{my-target}");
+    expect(args[3]).toBe("ep:{my-target}");
+  });
+
+  it("passes targetBatchSize as ARGV", async () => {
+    mockSendCommand.mockResolvedValueOnce([3, "allowed", 0, 10]);
+
+    await admit(mockRedis, "target-1", 10, true, 7, defaultConfig);
+
+    const args = mockSendCommand.mock.calls[0]![0] as string[];
+    const batchSizeArg = args[10];
+    expect(batchSizeArg).toBe("7");
   });
 });
 
@@ -130,6 +166,7 @@ describe("evalScript", () => {
       "target-1",
       10,
       true,
+      1,
       defaultConfig,
     ).catch((error: unknown) => error);
 
@@ -149,6 +186,7 @@ describe("evalScript", () => {
       "target-1",
       10,
       true,
+      1,
       defaultConfig,
     ).catch((error: unknown) => error);
 
@@ -165,7 +203,8 @@ describe("recordResult", () => {
     const result = await recordResult(
       mockRedis,
       "target-1",
-      true,
+      5,
+      0,
       defaultConfig,
     );
 
@@ -181,7 +220,8 @@ describe("recordResult", () => {
     const result = await recordResult(
       mockRedis,
       "target-1",
-      false,
+      5,
+      5,
       defaultConfig,
     );
 
@@ -194,7 +234,8 @@ describe("recordResult", () => {
     const result = await recordResult(
       mockRedis,
       "target-1",
-      false,
+      5,
+      1,
       defaultConfig,
     );
 
@@ -209,7 +250,8 @@ describe("recordResult", () => {
     const result = await recordResult(
       mockRedis,
       "target-1",
-      true,
+      1,
+      0,
       defaultConfig,
     );
 
@@ -217,12 +259,22 @@ describe("recordResult", () => {
     expect(mockSendCommand).toHaveBeenCalledTimes(2);
   });
 
-  it("passes correct cb key for target", async () => {
+  it("passes correct ep key for target", async () => {
     mockSendCommand.mockResolvedValueOnce([1, "closed"]);
 
-    await recordResult(mockRedis, "my-target", true, defaultConfig);
+    await recordResult(mockRedis, "my-target", 1, 0, defaultConfig);
 
     const args = mockSendCommand.mock.calls[0]![0] as string[];
-    expect(args[3]).toBe("cb:{my-target}");
+    expect(args[3]).toBe("ep:{my-target}");
+  });
+
+  it("passes consumedTokens and processingFailures as ARGV", async () => {
+    mockSendCommand.mockResolvedValueOnce([1, "closed"]);
+
+    await recordResult(mockRedis, "target-1", 8, 3, defaultConfig);
+
+    const args = mockSendCommand.mock.calls[0]![0] as string[];
+    expect(args[5]).toBe("8");
+    expect(args[6]).toBe("3");
   });
 });

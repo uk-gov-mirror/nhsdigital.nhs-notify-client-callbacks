@@ -55,6 +55,30 @@ export type DeliveryMetricsSnapshot = {
   p99Ms: number;
 };
 
+export type CircuitBreakerSnapshot = {
+  snapshotAt: number;
+  intervalStartSec: number;
+  intervalEndSec: number;
+  circuitOpenEvents: number;
+  circuitCloseEvents: number;
+  admissionDeniedCircuitOpen: number;
+  admissionDeniedRateLimited: number;
+  deliveryAttempts: number;
+  deliverySuccesses: number;
+  deliveryFailures: number;
+  deliveryRateLimited: number;
+};
+
+export type PerClientRateEntry = {
+  timestampSec: number;
+  deliveryAttempts: number;
+};
+
+export type PerClientRateTimeline = {
+  clientId: string;
+  entries: PerClientRateEntry[];
+};
+
 export type PerformanceResult = {
   testId: string;
   scenario: Scenario;
@@ -63,6 +87,8 @@ export type PerformanceResult = {
   phases: PhaseResult[];
   metrics: MetricsSnapshot[];
   deliveryMetrics: DeliveryMetricsSnapshot[];
+  circuitBreakerMetrics: CircuitBreakerSnapshot[];
+  perClientRateTimelines?: PerClientRateTimeline[];
 };
 
 export type PerfRunnerPayload = {

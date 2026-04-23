@@ -32,6 +32,7 @@ const mockResult: PerformanceResult = {
   phases: [],
   metrics: [],
   deliveryMetrics: [],
+  circuitBreakerMetrics: [],
 };
 
 beforeEach(() => {

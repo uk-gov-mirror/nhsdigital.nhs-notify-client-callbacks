@@ -462,9 +462,6 @@ importers:
       '@nhs-notify-client-callbacks/models':
         specifier: workspace:*
         version: link:../../src/models
-      esbuild:
-        specifier: catalog:tools
-        version: 0.28.0
     devDependencies:
       '@tsconfig/node22':
         specifier: catalog:tools
@@ -478,6 +475,9 @@ importers:
       '@types/node':
         specifier: catalog:tools
         version: 25.6.0
+      esbuild:
+        specifier: catalog:tools
+        version: 0.28.0
       eslint:
         specifier: catalog:lint
         version: 9.39.4(jiti@2.6.1)

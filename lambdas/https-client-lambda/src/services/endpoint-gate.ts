@@ -5,7 +5,7 @@ import recordResultLuaSrc from "services/record-result.lua";
 
 export type AdmitResultAllowed = {
   allowed: true;
-  probe: boolean;
+  consumedTokens: number;
   effectiveRate: number;
 };
 
@@ -24,12 +24,12 @@ export type RecordResultOutcome =
 
 export type EndpointGateConfig = {
   burstCapacity: number;
-  cbProbeIntervalMs: number;
-  decayPeriodMs: number;
-  cbWindowPeriodMs: number;
-  cbErrorThreshold: number;
-  cbMinAttempts: number;
-  cbCooldownMs: number;
+  probeRateLimit: number;
+  recoveryPeriodMs: number;
+  samplePeriodMs: number;
+  failureThreshold: number;
+  minAttempts: number;
+  cooldownPeriodMs: number;
 };
 
 let admitSha: string | undefined;
@@ -76,22 +76,21 @@ export async function admit(
   targetId: string,
   refillPerSec: number,
   cbEnabled: boolean,
+  targetBatchSize: number,
   config: EndpointGateConfig,
 ): Promise<AdmitResult> {
-  const cbKey = `cb:{${targetId}}`;
-  const rlKey = `rl:{${targetId}}`;
+  const epKey = `ep:{${targetId}}`;
   const now = Date.now().toString();
-  const probeIntervalMs = cbEnabled ? config.cbProbeIntervalMs.toString() : "0";
+  const probeRate = cbEnabled ? config.probeRateLimit.toString() : "0";
 
   const args = [
     now,
     config.burstCapacity.toString(),
-    // eslint-disable-next-line sonarjs/null-dereference
-    refillPerSec.toString(),
-    config.cbCooldownMs.toString(),
-    config.decayPeriodMs.toString(),
-    config.cbWindowPeriodMs.toString(),
-    probeIntervalMs,
+    String(refillPerSec),
+    config.cooldownPeriodMs.toString(),
+    config.recoveryPeriodMs.toString(),
+    probeRate,
+    String(targetBatchSize),
   ];
 
   if (!admitSha) {
@@ -102,16 +101,16 @@ export async function admit(
     client,
     admitLuaSrc,
     admitSha,
-    [cbKey, rlKey],
+    [epKey],
     args,
   )) as [number, string, number, number];
 
-  const [allowed, reason, retryAfterMs, effectiveRate] = raw;
+  const [consumedOrFlag, reason, retryAfterMs, effectiveRate] = raw;
 
-  if (allowed === 1) {
+  if (reason === "allowed" || reason === "probe") {
     return {
       allowed: true,
-      probe: reason === "probe",
+      consumedTokens: Number(consumedOrFlag),
       effectiveRate: Number(effectiveRate),
     };
   }
@@ -127,20 +126,22 @@ export async function admit(
 export async function recordResult(
   client: RedisClientType,
   targetId: string,
-  success: boolean,
+  consumedTokens: number,
+  processingFailures: number,
   config: EndpointGateConfig,
 ): Promise<RecordResultOutcome> {
-  const cbKey = `cb:{${targetId}}`;
+  const epKey = `ep:{${targetId}}`;
   const now = Date.now().toString();
 
   const args = [
     now,
-    success ? "1" : "0",
-    config.cbCooldownMs.toString(),
-    config.decayPeriodMs.toString(),
-    config.cbErrorThreshold.toString(),
-    config.cbMinAttempts.toString(),
-    config.cbWindowPeriodMs.toString(),
+    String(consumedTokens),
+    String(processingFailures),
+    config.cooldownPeriodMs.toString(),
+    config.recoveryPeriodMs.toString(),
+    config.failureThreshold.toString(),
+    config.minAttempts.toString(),
+    config.samplePeriodMs.toString(),
   ];
 
   if (!recordResultSha) {
@@ -151,7 +152,7 @@ export async function recordResult(
     client,
     recordResultLuaSrc,
     recordResultSha,
-    [cbKey],
+    [epKey],
     args,
   )) as [number, string];
 
