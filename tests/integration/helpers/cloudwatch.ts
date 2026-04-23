@@ -60,22 +60,21 @@ function parseCallback(
   }
 }
 
-export async function awaitCallbacks(
+async function pollCallbacks(
   client: CloudWatchLogsClient,
   logGroupName: string,
-  messageIds: string | string[],
+  messageIds: string[],
   callbackType: CallbackItem["type"],
   expectedPerMessage: number,
   startTime: number,
 ): Promise<SignedCallback[]> {
-  const ids = Array.isArray(messageIds) ? messageIds : [messageIds];
-  const messageIdSet = new Set(ids);
-  const expectedTotal = ids.length * expectedPerMessage;
+  const messageIdSet = new Set(messageIds);
+  const expectedTotal = messageIds.length * expectedPerMessage;
   const queryStartTime = Math.max(0, startTime - LOOKBACK_MS);
   const filterPattern = `{ $.msg = "Callback received" && $.callbackType = "${callbackType}" }`;
 
   logger.debug(
-    `Waiting for ${expectedTotal} callback(s) (type=${callbackType}, messages=${ids.length}, logGroup=${logGroupName})`,
+    `Waiting for ${expectedTotal} callback(s) (type=${callbackType}, messages=${messageIds.length}, logGroup=${logGroupName})`,
   );
 
   let matched: SignedCallback[] = [];
@@ -91,11 +90,12 @@ export async function awaitCallbacks(
           }),
         );
 
-        matched = (response.events ?? []).flatMap((event) => {
-          if (!event.message) return [];
-          const cb = parseCallback(event.message, messageIdSet);
-          return cb ? [cb] : [];
-        });
+        matched = (response.events ?? [])
+          .filter((event): event is typeof event & { message: string } =>
+            Boolean(event.message),
+          )
+          .map((event) => parseCallback(event.message, messageIdSet))
+          .filter((cb): cb is SignedCallback => cb !== undefined);
 
         return matched.length >= expectedTotal;
       },
@@ -112,12 +112,71 @@ export async function awaitCallbacks(
   }
 
   if (matched.length !== expectedTotal) {
+    const foundIds = new Set(
+      matched.map(
+        (cb) =>
+          (cb.payload.attributes as { messageId?: string }).messageId ?? "",
+      ),
+    );
+    const missingIds = messageIds.filter((id) => !foundIds.has(id));
+    logger.warn("Missing callbacks", {
+      callbackType,
+      expectedTotal,
+      foundCount: matched.length,
+      missingIds,
+    });
     throw new Error(
       `Expected ${expectedTotal} callback(s) for type="${callbackType}", found ${matched.length}`,
     );
   }
 
   return matched;
+}
+
+export async function awaitCallback(
+  client: CloudWatchLogsClient,
+  logGroupName: string,
+  messageId: string,
+  callbackType: CallbackItem["type"],
+  startTime: number,
+): Promise<SignedCallback> {
+  const [callback] = await pollCallbacks(
+    client,
+    logGroupName,
+    [messageId],
+    callbackType,
+    1,
+    startTime,
+  );
+  return callback;
+}
+
+export async function awaitCallbacks(
+  client: CloudWatchLogsClient,
+  logGroupName: string,
+  messageIds: string[],
+  callbackType: CallbackItem["type"],
+  expectedPerMessage: number,
+  startTime: number,
+): Promise<Map<string, SignedCallback[]>> {
+  const results = await pollCallbacks(
+    client,
+    logGroupName,
+    messageIds,
+    callbackType,
+    expectedPerMessage,
+    startTime,
+  );
+
+  const map = new Map<string, SignedCallback[]>();
+  for (const cb of results) {
+    const id =
+      (cb.payload.attributes as { messageId?: string }).messageId ?? "";
+    const existing = map.get(id) ?? [];
+    existing.push(cb);
+    map.set(id, existing);
+  }
+  return map;
 }
 
 export async function awaitEmfMetrics(
@@ -146,9 +205,11 @@ export async function awaitEmfMetrics(
 
       const found = new Set<string>();
       for (const event of response.events ?? []) {
-        if (!event.message) continue; // eslint-disable-line no-continue
         try {
-          const entry = JSON.parse(event.message) as Record<string, unknown>;
+          const entry = JSON.parse(event.message ?? "") as Record<
+            string,
+            unknown
+          >;
           if (entry._aws) {
             for (const name of metricNames) {
               if (name in entry) found.add(name);

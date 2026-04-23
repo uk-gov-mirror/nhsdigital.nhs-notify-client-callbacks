@@ -2,7 +2,11 @@ import type {
   MessageStatusData,
   StatusPublishEvent,
 } from "@nhs-notify-client-callbacks/models";
-import { awaitCallbacks, countLogEntries } from "./helpers/cloudwatch";
+import {
+  awaitCallback,
+  awaitCallbacks,
+  countLogEntries,
+} from "./helpers/cloudwatch";
 import { createMessageStatusPublishEvent } from "./helpers/event-factories";
 import {
   buildMockWebhookTargetPath,
@@ -140,7 +144,7 @@ describe("Delivery Resilience", () => {
         ),
       );
 
-      const callbacks = await awaitCallbacks(
+      const callbackMap = await awaitCallbacks(
         ctx.cwLogs,
         ctx.webhookLogGroup,
         events.map((e) => e.data.messageId),
@@ -149,20 +153,12 @@ describe("Delivery Resilience", () => {
         ctx.startTime,
       );
 
-      const deliveredIds = callbacks
-        .map(
-          (cb) =>
-            (cb.payload.attributes as { messageId?: string }).messageId ?? "",
-        )
-        .toSorted((a, b) => String(a).localeCompare(String(b)));
+      const deliveredIds = [...callbackMap.keys()];
+      const expectedIds = events.map((e) => e.data.messageId);
+      expect(deliveredIds).toHaveLength(expectedIds.length);
+      expect(deliveredIds).toEqual(expect.arrayContaining(expectedIds));
 
-      expect(deliveredIds).toEqual(
-        events
-          .map((e) => e.data.messageId)
-          .toSorted((a, b) => String(a).localeCompare(String(b))),
-      );
-
-      for (const callback of callbacks) {
+      for (const [, [callback]] of callbackMap) {
         expect(callback.path).toBe(targetPath);
         assertCallbackHeaders(
           callback,
@@ -230,12 +226,11 @@ describe("Delivery Resilience", () => {
         sendSqsEvent(ctx.sqs, ctx.inboundQueueUrl, normalEvent),
       ]);
 
-      const [normalCallback] = await awaitCallbacks(
+      const normalCallback = await awaitCallback(
         ctx.cwLogs,
         ctx.webhookLogGroup,
         normalEvent.data.messageId,
         "MessageStatus",
-        1,
         ctx.startTime,
       );
 

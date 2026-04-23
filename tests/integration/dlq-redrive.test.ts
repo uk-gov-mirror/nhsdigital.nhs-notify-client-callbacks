@@ -2,7 +2,7 @@ import type {
   MessageStatusData,
   StatusPublishEvent,
 } from "@nhs-notify-client-callbacks/models";
-import { awaitCallbacks } from "./helpers/cloudwatch";
+import { awaitCallback, awaitCallbacks } from "./helpers/cloudwatch";
 import { createMessageStatusPublishEvent } from "./helpers/event-factories";
 import {
   CLIENT_FIXTURES,
@@ -90,12 +90,11 @@ describe("DLQ Redrive", () => {
       expect(redrivePayload.id).toBe(event.id);
       await ensureInboundQueueIsEmpty(ctx.sqs, ctx.inboundQueueUrl);
 
-      const [callback] = await awaitCallbacks(
+      const callback = await awaitCallback(
         ctx.cwLogs,
         ctx.webhookLogGroup,
         event.data.messageId,
         "MessageStatus",
-        1,
         startTime,
       );
 
@@ -142,24 +141,17 @@ describe("DLQ Redrive", () => {
 
       expect(dlqPayload.data.messageId).toBe(redriveEvent.data.messageId);
 
-      const [directCallback, redriveCallback] = await Promise.all([
-        awaitCallbacks(
-          ctx.cwLogs,
-          ctx.webhookLogGroup,
-          directEvent.data.messageId,
-          "MessageStatus",
-          1,
-          startTime,
-        ),
-        awaitCallbacks(
-          ctx.cwLogs,
-          ctx.webhookLogGroup,
-          redriveEvent.data.messageId,
-          "MessageStatus",
-          1,
-          startTime,
-        ),
-      ]).then(([d, r]) => [d[0], r[0]]);
+      const callbackMap = await awaitCallbacks(
+        ctx.cwLogs,
+        ctx.webhookLogGroup,
+        [directEvent.data.messageId, redriveEvent.data.messageId],
+        "MessageStatus",
+        1,
+        startTime,
+      );
+
+      const directCallback = callbackMap.get(directEvent.data.messageId)![0];
+      const redriveCallback = callbackMap.get(redriveEvent.data.messageId)![0];
 
       await ensureInboundQueueIsEmpty(ctx.sqs, ctx.inboundQueueUrl);
 
@@ -206,12 +198,11 @@ describe("DLQ Redrive", () => {
       await sendSqsEvent(ctx.sqs, deliveryUrl, dlqBody);
       await deleteMessage(ctx.sqs, dlqUrl, dlqMessage);
 
-      const [callback] = await awaitCallbacks(
+      const callback = await awaitCallback(
         ctx.cwLogs,
         ctx.webhookLogGroup,
         redriveMessageId,
         "MessageStatus",
-        1,
         redriveStartTime,
       );
 

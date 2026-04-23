@@ -2,7 +2,7 @@ import type {
   MessageStatusData,
   StatusPublishEvent,
 } from "@nhs-notify-client-callbacks/models";
-import { awaitCallbacks, awaitEmfMetrics } from "./helpers/cloudwatch";
+import { awaitCallback, awaitEmfMetrics } from "./helpers/cloudwatch";
 import { createMessageStatusPublishEvent } from "./helpers/event-factories";
 import { getClientConfig } from "./helpers/mock-client-config";
 import {
@@ -55,12 +55,11 @@ describe("Metrics", () => {
       await sendSqsEvent(ctx.sqs, ctx.inboundQueueUrl, event);
       await ensureInboundQueueIsEmpty(ctx.sqs, ctx.inboundQueueUrl);
 
-      await awaitCallbacks(
+      await awaitCallback(
         ctx.cwLogs,
         ctx.webhookLogGroup,
         event.data.messageId,
         "MessageStatus",
-        1,
         startTime,
       );
 
@@ -129,12 +128,11 @@ describe("Metrics", () => {
       await sendSqsEvent(ctx.sqs, ctx.inboundQueueUrl, event);
       await ensureInboundQueueIsEmpty(ctx.sqs, ctx.inboundQueueUrl);
 
-      await awaitCallbacks(
+      await awaitCallback(
         ctx.cwLogs,
         ctx.webhookLogGroup,
         event.data.messageId,
         "MessageStatus",
-        1,
         startTime,
       );
 

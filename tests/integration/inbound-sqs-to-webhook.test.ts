@@ -3,7 +3,7 @@ import type {
   MessageStatusData,
   StatusPublishEvent,
 } from "@nhs-notify-client-callbacks/models";
-import { awaitCallbacks } from "./helpers/cloudwatch";
+import { awaitCallback, awaitCallbacks } from "./helpers/cloudwatch";
 import {
   createChannelStatusPublishEvent,
   createMessageStatusPublishEvent,
@@ -63,12 +63,11 @@ describe("SQS to Webhook Integration", () => {
       await sendSqsEvent(ctx.sqs, ctx.inboundQueueUrl, event);
       await ensureInboundQueueIsEmpty(ctx.sqs, ctx.inboundQueueUrl);
 
-      const [callback] = await awaitCallbacks(
+      const callback = await awaitCallback(
         ctx.cwLogs,
         ctx.webhookLogGroup,
         event.data.messageId,
         "MessageStatus",
-        1,
         ctx.startTime,
       );
 
@@ -91,21 +90,20 @@ describe("SQS to Webhook Integration", () => {
       await sendSqsEvent(ctx.sqs, ctx.inboundQueueUrl, event);
       await ensureInboundQueueIsEmpty(ctx.sqs, ctx.inboundQueueUrl);
 
-      const callbacks = await awaitCallbacks(
+      const callbackMap = await awaitCallbacks(
         ctx.cwLogs,
         ctx.webhookLogGroup,
-        event.data.messageId,
+        [event.data.messageId],
         "MessageStatus",
         expectedPaths.length,
         ctx.startTime,
       );
 
-      const sortedPaths = callbacks
-        .map((cb) => cb.path)
-        .toSorted((a, b) => String(a).localeCompare(String(b)));
-      expect(sortedPaths).toEqual(
-        expectedPaths.toSorted((a, b) => String(a).localeCompare(String(b))),
-      );
+      const callbacks = callbackMap.get(event.data.messageId)!;
+
+      const paths = callbacks.map((cb) => cb.path);
+      expect(paths).toHaveLength(expectedPaths.length);
+      expect(paths).toEqual(expect.arrayContaining(expectedPaths));
 
       for (const callback of callbacks) {
         expect(callback.payload).toMatchObject({
@@ -132,12 +130,11 @@ describe("SQS to Webhook Integration", () => {
       await sendSqsEvent(ctx.sqs, ctx.inboundQueueUrl, event);
       await ensureInboundQueueIsEmpty(ctx.sqs, ctx.inboundQueueUrl);
 
-      const [callback] = await awaitCallbacks(
+      const callback = await awaitCallback(
         ctx.cwLogs,
         ctx.webhookLogGroup,
         event.data.messageId,
         "ChannelStatus",
-        1,
         ctx.startTime,
       );
 
@@ -217,12 +214,11 @@ describe("SQS to Webhook Integration", () => {
       await sendSqsEvent(ctx.sqs, ctx.inboundQueueUrl, event);
       await ensureInboundQueueIsEmpty(ctx.sqs, ctx.inboundQueueUrl);
 
-      const [callback] = await awaitCallbacks(
+      const callback = await awaitCallback(
         ctx.cwLogs,
         ctx.webhookLogGroup,
         event.data.messageId,
         "MessageStatus",
-        1,
         ctx.startTime,
       );
 
