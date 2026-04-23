@@ -1,22 +1,24 @@
 import type {
+  ChannelStatus,
   ChannelStatusData,
+  MessageStatus,
   MessageStatusData,
   StatusPublishEvent,
 } from "@nhs-notify-client-callbacks/models";
 import { EventTypes } from "@nhs-notify-client-callbacks/models";
+import type { EventMixEntry } from "types";
 
-export function createMessageStatusPublishEvent(
-  overrides?: Partial<MessageStatusData>,
+export function createMessageStatusEvent(
+  clientId: string,
+  messageStatus: MessageStatus,
 ): StatusPublishEvent<MessageStatusData> {
-  const messageId = overrides?.messageId ?? crypto.randomUUID();
-  const messageReference =
-    overrides?.messageReference ?? `ref-${crypto.randomUUID()}`;
+  const messageId = crypto.randomUUID();
 
   const data: MessageStatusData = {
-    clientId: "mock-client-1",
+    clientId,
     messageId,
-    messageReference,
-    messageStatus: "DELIVERED",
+    messageReference: `ref-${crypto.randomUUID()}`,
+    messageStatus,
     channels: [{ type: "NHSAPP", channelStatus: "DELIVERED" }],
     timestamp: new Date().toISOString(),
     routingPlan: {
@@ -25,7 +27,6 @@ export function createMessageStatusPublishEvent(
       version: "v1.0.0",
       createdDate: new Date().toISOString(),
     },
-    ...overrides,
   };
 
   return {
@@ -43,26 +44,23 @@ export function createMessageStatusPublishEvent(
   };
 }
 
-export function createChannelStatusPublishEvent(
-  overrides?: Partial<ChannelStatusData>,
+export function createChannelStatusEvent(
+  clientId: string,
+  channelStatus: ChannelStatus,
 ): StatusPublishEvent<ChannelStatusData> {
-  const messageId = overrides?.messageId ?? crypto.randomUUID();
-  const messageReference =
-    overrides?.messageReference ?? `ref-${crypto.randomUUID()}`;
+  const messageId = crypto.randomUUID();
 
   const data: ChannelStatusData = {
-    clientId: "mock-client-1",
+    clientId,
     messageId,
-    messageReference,
+    messageReference: `ref-${crypto.randomUUID()}`,
     channel: "NHSAPP",
-    channelStatus: "DELIVERED",
-    channelStatusDescription: "perf-test",
+    channelStatus,
     supplierStatus: "delivered",
     cascadeType: "primary",
     cascadeOrder: 0,
     timestamp: new Date().toISOString(),
     retryCount: 0,
-    ...overrides,
   };
 
   return {
@@ -78,4 +76,12 @@ export function createChannelStatusPublishEvent(
     traceparent: "00-4d678967f96e353c07a0a31c1849b500-07f83ba58dd8df70-01",
     data,
   };
+}
+
+export function createEvent(entry: EventMixEntry): StatusPublishEvent {
+  if (entry.factory === "messageStatus") {
+    return createMessageStatusEvent(entry.clientId, entry.messageStatus);
+  }
+
+  return createChannelStatusEvent(entry.clientId, entry.channelStatus);
 }

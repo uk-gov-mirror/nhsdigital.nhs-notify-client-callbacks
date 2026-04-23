@@ -448,6 +448,49 @@ importers:
         specifier: catalog:tools
         version: 5.9.3
 
+  lambdas/perf-runner-lambda:
+    dependencies:
+      '@aws-sdk/client-cloudwatch-logs':
+        specifier: catalog:aws
+        version: 3.1026.0
+      '@aws-sdk/client-sqs':
+        specifier: catalog:aws
+        version: 3.1026.0
+      '@nhs-notify-client-callbacks/logger':
+        specifier: workspace:*
+        version: link:../../src/logger
+      '@nhs-notify-client-callbacks/models':
+        specifier: workspace:*
+        version: link:../../src/models
+      esbuild:
+        specifier: catalog:tools
+        version: 0.28.0
+    devDependencies:
+      '@tsconfig/node22':
+        specifier: catalog:tools
+        version: 22.0.5
+      '@types/aws-lambda':
+        specifier: catalog:tools
+        version: 8.10.161
+      '@types/jest':
+        specifier: catalog:test
+        version: 30.0.0
+      '@types/node':
+        specifier: catalog:tools
+        version: 25.6.0
+      eslint:
+        specifier: catalog:lint
+        version: 9.39.4(jiti@2.6.1)
+      jest:
+        specifier: catalog:test
+        version: 30.3.0(@types/node@25.6.0)(ts-node@10.9.2(@types/node@25.6.0)(typescript@5.9.3))
+      ts-jest:
+        specifier: catalog:test
+        version: 29.4.9(@babel/core@7.29.0)(@jest/transform@30.3.0)(@jest/types@30.3.0)(babel-jest@30.3.0(@babel/core@7.29.0))(esbuild@0.28.0)(jest-util@30.3.0)(jest@30.3.0(@types/node@25.6.0)(ts-node@10.9.2(@types/node@25.6.0)(typescript@5.9.3)))(typescript@5.9.3)
+      typescript:
+        specifier: catalog:tools
+        version: 5.9.3
+
   src/config-cache:
     dependencies:
       '@nhs-notify-client-callbacks/models':
@@ -580,43 +623,6 @@ importers:
       '@nhs-notify-client-callbacks/logger':
         specifier: workspace:*
         version: link:../../src/logger
-      '@nhs-notify-client-callbacks/models':
-        specifier: workspace:*
-        version: link:../../src/models
-      '@nhs-notify-client-callbacks/test-support':
-        specifier: workspace:*
-        version: link:../test-support
-      async-wait-until:
-        specifier: catalog:app
-        version: 2.0.31
-    devDependencies:
-      '@tsconfig/node22':
-        specifier: catalog:tools
-        version: 22.0.5
-      '@types/jest':
-        specifier: catalog:test
-        version: 30.0.0
-      '@types/node':
-        specifier: catalog:tools
-        version: 25.6.0
-      eslint:
-        specifier: catalog:lint
-        version: 9.39.4(jiti@2.6.1)
-      jest:
-        specifier: catalog:test
-        version: 30.3.0(@types/node@25.6.0)(ts-node@10.9.2(@types/node@25.6.0)(typescript@5.9.3))
-      typescript:
-        specifier: catalog:tools
-        version: 5.9.3
-
-  tests/performance:
-    dependencies:
-      '@aws-sdk/client-cloudwatch-logs':
-        specifier: catalog:aws
-        version: 3.1026.0
-      '@aws-sdk/client-sqs':
-        specifier: catalog:aws
-        version: 3.1026.0
       '@nhs-notify-client-callbacks/models':
         specifier: workspace:*
         version: link:../../src/models

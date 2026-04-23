@@ -2,16 +2,13 @@
   "compilerOptions": {
     "isolatedModules": true,
     "paths": {
-      "helpers": [
-        "./helpers/index"
+      "*": [
+        "./src/*"
       ]
     }
   },
-  "exclude": [
-    "jest.config.ts"
-  ],
   "extends": "../../tsconfig.base.json",
   "include": [
-    "**/*.ts"
+    "src/**/*"
   ]
 }

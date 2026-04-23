@@ -1,0 +1,64 @@
+{
+  "clientId": "perf-client-3",
+  "subscriptions": [
+    {
+      "messageStatuses": [
+        "DELIVERED"
+      ],
+      "subscriptionId": "sub-72197a52-8f4a-4b9d-b074-90f51183b91c",
+      "subscriptionType": "MessageStatus",
+      "targetIds": [
+        "target-9f81befc-8cd2-49d7-9972-40b11c932d80",
+        "target-42228749-1610-4862-bcbf-ffb5b3a6f7eb"
+      ]
+    }
+  ],
+  "targets": [
+    {
+      "apiKey": {
+        "headerName": "x-api-key",
+        "headerValue": "REPLACED_BY_TERRAFORM"
+      },
+      "delivery": {
+        "circuitBreaker": {
+          "enabled": true
+        },
+        "maxRetryDurationSeconds": 7200,
+        "mtls": {
+          "certPinning": {
+            "enabled": false
+          },
+          "enabled": false
+        }
+      },
+      "invocationEndpoint": "https://REPLACED_BY_TERRAFORM",
+      "invocationMethod": "POST",
+      "invocationRateLimit": 300,
+      "targetId": "target-9f81befc-8cd2-49d7-9972-40b11c932d80",
+      "type": "API"
+    },
+    {
+      "apiKey": {
+        "headerName": "x-api-key",
+        "headerValue": "REPLACED_BY_TERRAFORM"
+      },
+      "delivery": {
+        "circuitBreaker": {
+          "enabled": true
+        },
+        "maxRetryDurationSeconds": 7200,
+        "mtls": {
+          "certPinning": {
+            "enabled": false
+          },
+          "enabled": false
+        }
+      },
+      "invocationEndpoint": "https://REPLACED_BY_TERRAFORM",
+      "invocationMethod": "POST",
+      "invocationRateLimit": 300,
+      "targetId": "target-42228749-1610-4862-bcbf-ffb5b3a6f7eb",
+      "type": "API"
+    }
+  ]
+}

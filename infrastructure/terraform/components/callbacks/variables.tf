@@ -155,6 +155,12 @@ variable "deploy_mock_clients" {
   default     = false
 }
 
+variable "deploy_perf_runner" {
+  type        = bool
+  description = "Flag to deploy the perf-runner lambda for performance testing (test/dev environments only)"
+  default     = false
+}
+
 variable "enable_xray_tracing" {
   type        = bool
   description = "Enable AWS X-Ray active tracing for Lambda functions"

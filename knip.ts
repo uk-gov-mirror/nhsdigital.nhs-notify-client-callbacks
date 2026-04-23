@@ -38,6 +38,9 @@ const config: KnipConfig = {
     "lambdas/mock-webhook-lambda": {
       ignoreDependencies: ["@tsconfig/node22"],
     },
+    "lambdas/perf-runner-lambda": {
+      ignoreDependencies: ["@tsconfig/node22", "@types/aws-lambda"],
+    },
     "src/config-cache": {
       ignoreDependencies: ["@tsconfig/node22"],
     },
@@ -58,9 +61,6 @@ const config: KnipConfig = {
         // those helpers are only consumed by ci-only integration tests
         "async-wait-until",
       ],
-    },
-    "tests/performance": {
-      ignoreDependencies: ["@tsconfig/node22"],
     },
     "tests/test-support": {
       ignoreDependencies: ["@tsconfig/node22"],
