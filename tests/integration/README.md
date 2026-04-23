@@ -13,7 +13,6 @@ In normal delivery flow, integration tests are triggered via the CI workflow.
   - `ENVIRONMENT` (required)
   - `AWS_PROFILE` (required)
   - `AWS_REGION` (optional, defaults to `eu-west-2`)
-  - `CLIENT_ID` (required for queue and https-client actions, e.g. `mock-client-single-target`)
 
 ## Run Integration Tests Locally
 
