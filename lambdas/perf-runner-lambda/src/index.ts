@@ -3,7 +3,11 @@ import { SQSClient } from "@aws-sdk/client-sqs";
 import { Logger } from "@nhs-notify-client-callbacks/logger";
 import { runPerformanceTest } from "runner";
 import { DEFAULT_SCENARIO } from "scenario";
-import type { PerfRunnerPayload, PerformanceResult } from "types";
+import type {
+  ElastiCacheDeps,
+  PerfRunnerPayload,
+  PerformanceResult,
+} from "types";
 
 const logger = new Logger();
 
@@ -16,6 +20,10 @@ export async function handler(
   const queueUrl = process.env.INBOUND_QUEUE_URL;
   const logGroupName = process.env.TRANSFORM_FILTER_LOG_GROUP;
   const deliveryLogGroupPrefix = process.env.DELIVERY_LOG_GROUP_PREFIX;
+  const mockWebhookLogGroup = process.env.MOCK_WEBHOOK_LOG_GROUP;
+  const elasticacheEndpoint = process.env.ELASTICACHE_ENDPOINT;
+  const elasticacheCacheName = process.env.ELASTICACHE_CACHE_NAME;
+  const elasticacheIamUsername = process.env.ELASTICACHE_IAM_USERNAME;
 
   if (!queueUrl) {
     throw new Error("Missing required environment variable: INBOUND_QUEUE_URL");
@@ -30,6 +38,16 @@ export async function handler(
   const sqsClient = new SQSClient({ region });
   const cloudWatchClient = new CloudWatchLogsClient({ region });
 
+  const elastiCacheDeps: ElastiCacheDeps | undefined =
+    elasticacheEndpoint && elasticacheCacheName && elasticacheIamUsername
+      ? {
+          endpoint: elasticacheEndpoint,
+          cacheName: elasticacheCacheName,
+          iamUsername: elasticacheIamUsername,
+          region,
+        }
+      : undefined;
+
   logger.info("Performance test started", { testId });
 
   try {
@@ -40,9 +58,12 @@ export async function handler(
         queueUrl,
         logGroupName,
         deliveryLogGroupPrefix,
+        mockWebhookLogGroup,
       },
       scenario,
       testId,
+      undefined,
+      elastiCacheDeps,
     );
 
     logger.info("Performance test completed", { testId });

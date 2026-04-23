@@ -450,10 +450,16 @@ importers:
 
   lambdas/perf-runner-lambda:
     dependencies:
+      '@aws-crypto/sha256-js':
+        specifier: catalog:aws
+        version: 5.2.0
       '@aws-sdk/client-cloudwatch-logs':
         specifier: catalog:aws
         version: 3.1026.0
       '@aws-sdk/client-sqs':
+        specifier: catalog:aws
+        version: 3.1026.0
+      '@aws-sdk/credential-providers':
         specifier: catalog:aws
         version: 3.1026.0
       '@nhs-notify-client-callbacks/logger':
@@ -462,9 +468,12 @@ importers:
       '@nhs-notify-client-callbacks/models':
         specifier: workspace:*
         version: link:../../src/models
-      esbuild:
-        specifier: catalog:tools
-        version: 0.28.0
+      '@redis/client':
+        specifier: catalog:app
+        version: 1.6.1
+      '@smithy/signature-v4':
+        specifier: catalog:aws
+        version: 5.3.13
     devDependencies:
       '@tsconfig/node22':
         specifier: catalog:tools
@@ -478,6 +487,9 @@ importers:
       '@types/node':
         specifier: catalog:tools
         version: 25.6.0
+      esbuild:
+        specifier: catalog:tools
+        version: 0.28.0
       eslint:
         specifier: catalog:lint
         version: 9.39.4(jiti@2.6.1)

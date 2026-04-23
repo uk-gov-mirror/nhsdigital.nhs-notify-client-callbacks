@@ -3,7 +3,6 @@ import {
   DEFAULT_TARGET,
   makeRecord,
 } from "__tests__/fixtures/handler-fixtures";
-import { VisibilityManagedError } from "services/visibility-managed-error";
 
 jest.mock("@nhs-notify-client-callbacks/logger", () => ({
   logger: {
@@ -74,17 +73,20 @@ jest.mock("services/redis-client", () => ({
   getRedisClient: (...args: unknown[]) => mockGetRedisClient(...args),
 }));
 
+jest.mock("services/delivery-observability", () => ({
+  recordAdmissionDenied: jest.fn(),
+  recordCircuitBreakerClosed: jest.fn(),
+  recordCircuitBreakerOpen: jest.fn(),
+  recordDeliveryAttempt: jest.fn(),
+  recordDeliveryDuration: jest.fn(),
+  recordDeliveryFailure: jest.fn(),
+  recordDeliveryPermanentFailure: jest.fn(),
+  recordDeliveryRateLimited: jest.fn(),
+  recordDeliverySuccess: jest.fn(),
+  recordRetryWindowExhausted: jest.fn(),
+}));
+
 jest.mock("services/delivery-metrics", () => ({
-  emitAdmissionDenied: jest.fn(),
-  emitCircuitBreakerClosed: jest.fn(),
-  emitCircuitBreakerOpen: jest.fn(),
-  emitDeliveryAttempt: jest.fn(),
-  emitDeliveryDuration: jest.fn(),
-  emitDeliveryFailure: jest.fn(),
-  emitDeliveryPermanentFailure: jest.fn(),
-  emitDeliverySuccess: jest.fn(),
-  emitRateLimited: jest.fn(),
-  emitRetryWindowExhausted: jest.fn(),
   flushMetrics: jest.fn().mockResolvedValue(undefined),
   resetMetrics: jest.fn(),
 }));
@@ -106,12 +108,12 @@ describe("processRecords", () => {
     mockJitteredBackoff.mockReturnValue(5);
     mockIsWindowExhausted.mockReturnValue(false);
     mockHandleRateLimitedRecord.mockRejectedValue(
-      new VisibilityManagedError("Rate limited — requeue"),
+      new Error("Rate limited — requeue"),
     );
     mockGetRedisClient.mockResolvedValue({});
     mockAdmit.mockResolvedValue({
       allowed: true,
-      probe: false,
+      consumedTokens: 100,
       effectiveRate: 10,
     });
     mockRecordResult.mockResolvedValue({ ok: true, state: "closed" });
@@ -159,7 +161,7 @@ describe("processRecords", () => {
     expect(failures).toEqual([{ itemIdentifier: "msg-1" }]);
   });
 
-  it("returns failure for 429 rate-limited responses", async () => {
+  it("returns failure for 429 when handleRateLimitedRecord rejects", async () => {
     mockDeliverPayload.mockResolvedValue({
       outcome: "rate_limited",
       retryAfterHeader: "60",
@@ -177,7 +179,7 @@ describe("processRecords", () => {
     );
   });
 
-  it("processes multiple records independently", async () => {
+  it("processes multiple records in a single target batch", async () => {
     const record1 = makeRecord({ messageId: "msg-1" });
     const record2 = makeRecord({ messageId: "msg-2" });
 
@@ -191,25 +193,45 @@ describe("processRecords", () => {
     const failures = await processRecords([record1, record2]);
 
     expect(failures).toEqual([{ itemIdentifier: "msg-2" }]);
+    expect(mockAdmit).toHaveBeenCalledTimes(1);
   });
 
-  it("an unexpected error on one record does not prevent subsequent records being processed", async () => {
+  it("delivers only admitted records when consumedTokens is less than batch size", async () => {
+    const record1 = makeRecord({ messageId: "msg-1" });
+    const record2 = makeRecord({ messageId: "msg-2" });
+    const record3 = makeRecord({ messageId: "msg-3" });
+
+    mockAdmit.mockResolvedValue({
+      allowed: true,
+      consumedTokens: 1,
+      effectiveRate: 10,
+    });
+
+    const failures = await processRecords([record1, record2, record3]);
+
+    expect(mockDeliverPayload).toHaveBeenCalledTimes(1);
+    expect(failures).toEqual([
+      { itemIdentifier: "msg-2" },
+      { itemIdentifier: "msg-3" },
+    ]);
+  });
+
+  it("an unexpected delivery error does not prevent other records in the batch", async () => {
     const record1 = makeRecord({ messageId: "msg-1" });
     const record2 = makeRecord({ messageId: "msg-2" });
 
-    mockLoadTargetConfig
-      .mockRejectedValueOnce(new Error("S3 unavailable"))
-      .mockResolvedValueOnce(DEFAULT_TARGET);
+    mockDeliverPayload
+      .mockRejectedValueOnce(new Error("Connection reset"))
+      .mockResolvedValueOnce({ outcome: "success" });
 
     const failures = await processRecords([record1, record2]);
 
     expect(failures).toEqual([{ itemIdentifier: "msg-1" }]);
-    expect(mockDeliverPayload).toHaveBeenCalledTimes(1);
     expect(mockChangeVisibility).toHaveBeenCalledWith("receipt-1", 5);
   });
 
   it("applies jittered backoff cooldown on unexpected errors", async () => {
-    mockLoadTargetConfig.mockRejectedValue(new Error("Infrastructure error"));
+    mockDeliverPayload.mockRejectedValue(new Error("Infrastructure error"));
 
     const failures = await processRecords([makeRecord()]);
 
@@ -217,7 +239,7 @@ describe("processRecords", () => {
     expect(mockChangeVisibility).toHaveBeenCalledWith("receipt-1", 5);
   });
 
-  it("does not apply a second visibility change for admission-denied (managed path)", async () => {
+  it("changes visibility once per record for admission-denied batch", async () => {
     mockAdmit.mockResolvedValue({
       allowed: false,
       reason: "rate_limited",
@@ -230,7 +252,7 @@ describe("processRecords", () => {
     expect(mockChangeVisibility).toHaveBeenCalledTimes(1);
   });
 
-  it("does not apply a second visibility change for transient failure (managed path)", async () => {
+  it("changes visibility once for transient failure", async () => {
     mockDeliverPayload.mockResolvedValue({
       outcome: "transient_failure",
       statusCode: 503,
@@ -241,13 +263,13 @@ describe("processRecords", () => {
     expect(mockChangeVisibility).toHaveBeenCalledTimes(1);
   });
 
-  it("returns failure when CLIENT_ID is not set", async () => {
+  it("throws when CLIENT_ID is not set", async () => {
     const saved = process.env.CLIENT_ID;
     delete process.env.CLIENT_ID;
 
-    const failures = await processRecords([makeRecord()]);
-
-    expect(failures).toEqual([{ itemIdentifier: "msg-1" }]);
+    await expect(processRecords([makeRecord()])).rejects.toThrow(
+      "CLIENT_ID is required",
+    );
 
     process.env.CLIENT_ID = saved;
   });
@@ -262,7 +284,7 @@ describe("processRecords", () => {
     expect(mockDeliverPayload).not.toHaveBeenCalled();
   });
 
-  it("calls changeVisibility with backoff on 5xx then throws", async () => {
+  it("calls changeVisibility with backoff on 5xx", async () => {
     mockDeliverPayload.mockResolvedValue({
       outcome: "transient_failure",
       statusCode: 503,
@@ -303,7 +325,7 @@ describe("processRecords", () => {
     expect(failures).toEqual([]);
   });
 
-  it("requeues when rate limited by endpoint gate", async () => {
+  it("requeues all records when rate limited by endpoint gate", async () => {
     mockAdmit.mockResolvedValue({
       allowed: false,
       reason: "rate_limited",
@@ -319,7 +341,7 @@ describe("processRecords", () => {
     expect(mockDeliverPayload).not.toHaveBeenCalled();
   });
 
-  it("requeues when circuit is open", async () => {
+  it("requeues all records when circuit is open", async () => {
     mockAdmit.mockResolvedValue({
       allowed: false,
       reason: "circuit_open",
@@ -350,17 +372,23 @@ describe("processRecords", () => {
       "target-1",
       10,
       false,
+      1,
       expect.any(Object),
     );
     expect(mockDeliverPayload).toHaveBeenCalled();
   });
 
-  it("calls recordResult(true) on successful delivery when CB enabled", async () => {
+  it("calls recordResult with batch counts on successful delivery when CB enabled", async () => {
     const targetCb = {
       ...DEFAULT_TARGET,
       delivery: { circuitBreaker: { enabled: true } },
     };
     mockLoadTargetConfig.mockResolvedValue(targetCb);
+    mockAdmit.mockResolvedValue({
+      allowed: true,
+      consumedTokens: 1,
+      effectiveRate: 10,
+    });
 
     const failures = await processRecords([makeRecord()]);
 
@@ -368,17 +396,23 @@ describe("processRecords", () => {
     expect(mockRecordResult).toHaveBeenCalledWith(
       expect.anything(),
       "target-1",
-      true,
+      1,
+      0,
       expect.any(Object),
     );
   });
 
-  it("calls recordResult(false) on 5xx before visibility change", async () => {
+  it("calls recordResult with failure count on 5xx when CB enabled", async () => {
     const targetCb = {
       ...DEFAULT_TARGET,
       delivery: { circuitBreaker: { enabled: true } },
     };
     mockLoadTargetConfig.mockResolvedValue(targetCb);
+    mockAdmit.mockResolvedValue({
+      allowed: true,
+      consumedTokens: 1,
+      effectiveRate: 10,
+    });
     mockDeliverPayload.mockResolvedValue({
       outcome: "transient_failure",
       statusCode: 503,
@@ -390,29 +424,19 @@ describe("processRecords", () => {
     expect(mockRecordResult).toHaveBeenCalledWith(
       expect.anything(),
       "target-1",
-      false,
+      1,
+      1,
       expect.any(Object),
     );
     expect(mockChangeVisibility).toHaveBeenCalled();
   });
 
-  it("does not call recordResult on rate-limited path", async () => {
+  it("does not call recordResult on gate admission-denied path", async () => {
     mockAdmit.mockResolvedValue({
       allowed: false,
       reason: "rate_limited",
       retryAfterMs: 2000,
       effectiveRate: 10,
-    });
-
-    await processRecords([makeRecord()]);
-
-    expect(mockRecordResult).not.toHaveBeenCalled();
-  });
-
-  it("does not call recordResult on 429 path", async () => {
-    mockDeliverPayload.mockResolvedValue({
-      outcome: "rate_limited",
-      retryAfterHeader: "60",
     });
 
     await processRecords([makeRecord()]);
@@ -449,7 +473,7 @@ describe("processRecords", () => {
     expect(mockRecordResult).not.toHaveBeenCalled();
   });
 
-  it("emits CircuitBreakerOpen metric when recordResult returns opened", async () => {
+  it("records CircuitBreakerOpen when recordResult returns opened", async () => {
     const targetCb = {
       ...DEFAULT_TARGET,
       delivery: { circuitBreaker: { enabled: true } },
@@ -461,16 +485,16 @@ describe("processRecords", () => {
     });
     mockRecordResult.mockResolvedValue({ ok: false, state: "opened" });
 
-    const { emitCircuitBreakerOpen } = jest.requireMock(
-      "services/delivery-metrics",
+    const { recordCircuitBreakerOpen } = jest.requireMock(
+      "services/delivery-observability",
     );
 
     await processRecords([makeRecord()]);
 
-    expect(emitCircuitBreakerOpen).toHaveBeenCalledWith("target-1");
+    expect(recordCircuitBreakerOpen).toHaveBeenCalledWith("target-1");
   });
 
-  it("does not emit CircuitBreakerOpen when recordResult returns failed", async () => {
+  it("does not record CircuitBreakerOpen when recordResult returns failed", async () => {
     const targetCb = {
       ...DEFAULT_TARGET,
       delivery: { circuitBreaker: { enabled: true } },
@@ -482,16 +506,16 @@ describe("processRecords", () => {
     });
     mockRecordResult.mockResolvedValue({ ok: false, state: "failed" });
 
-    const { emitCircuitBreakerOpen } = jest.requireMock(
-      "services/delivery-metrics",
+    const { recordCircuitBreakerOpen } = jest.requireMock(
+      "services/delivery-observability",
     );
 
     await processRecords([makeRecord()]);
 
-    expect(emitCircuitBreakerOpen).not.toHaveBeenCalled();
+    expect(recordCircuitBreakerOpen).not.toHaveBeenCalled();
   });
 
-  it("does not emit CircuitBreakerOpen when recordResult returns closed", async () => {
+  it("does not record CircuitBreakerOpen when recordResult returns closed", async () => {
     const targetCb = {
       ...DEFAULT_TARGET,
       delivery: { circuitBreaker: { enabled: true } },
@@ -503,26 +527,32 @@ describe("processRecords", () => {
     });
     mockRecordResult.mockResolvedValue({ ok: true, state: "closed" });
 
-    const { emitCircuitBreakerOpen } = jest.requireMock(
-      "services/delivery-metrics",
+    const { recordCircuitBreakerOpen } = jest.requireMock(
+      "services/delivery-observability",
     );
 
     await processRecords([makeRecord()]);
 
-    expect(emitCircuitBreakerOpen).not.toHaveBeenCalled();
+    expect(recordCircuitBreakerOpen).not.toHaveBeenCalled();
   });
 
-  it("emits RateLimited metric on 429 response", async () => {
+  it("records RateLimited on 429 response", async () => {
     mockDeliverPayload.mockResolvedValue({
       outcome: "rate_limited",
       retryAfterHeader: "60",
     });
 
-    const { emitRateLimited } = jest.requireMock("services/delivery-metrics");
+    const { recordDeliveryRateLimited } = jest.requireMock(
+      "services/delivery-observability",
+    );
 
     await processRecords([makeRecord()]);
 
-    expect(emitRateLimited).toHaveBeenCalledWith("target-1");
+    expect(recordDeliveryRateLimited).toHaveBeenCalledWith(
+      "client-1",
+      "target-1",
+      "test-message-id",
+    );
   });
 
   it("uses configured maxRetryDurationSeconds when set on target", async () => {
@@ -557,5 +587,31 @@ describe("processRecords", () => {
       expect.any(Number),
       7_200_000,
     );
+  });
+
+  it("groups records by target and processes each batch separately", async () => {
+    const record1 = makeRecord({ messageId: "msg-1" });
+    const record2 = makeRecord({
+      messageId: "msg-2",
+      body: JSON.stringify({
+        payload: {
+          data: [
+            {
+              type: "MessageStatus",
+              attributes: { messageStatus: "delivered" },
+            },
+          ],
+        },
+        subscriptionId: "sub-2",
+        targetId: "target-2",
+      }),
+    });
+
+    const failures = await processRecords([record1, record2]);
+
+    expect(failures).toEqual([]);
+    expect(mockAdmit).toHaveBeenCalledTimes(2);
+    expect(mockLoadTargetConfig).toHaveBeenCalledWith("client-1", "target-1");
+    expect(mockLoadTargetConfig).toHaveBeenCalledWith("client-1", "target-2");
   });
 });

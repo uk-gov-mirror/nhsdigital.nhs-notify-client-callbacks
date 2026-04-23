@@ -40,6 +40,15 @@ module "perf_runner_lambda" {
     INBOUND_QUEUE_URL          = module.sqs_inbound_event.sqs_queue_url
     TRANSFORM_FILTER_LOG_GROUP = module.client_transform_filter_lambda.cloudwatch_log_group_name
     DELIVERY_LOG_GROUP_PREFIX  = "/aws/lambda/${local.csi}-https-client-"
+    MOCK_WEBHOOK_LOG_GROUP     = var.deploy_mock_clients ? module.mock_webhook_lambda[0].cloudwatch_log_group_name : ""
+    ELASTICACHE_ENDPOINT       = aws_elasticache_serverless_cache.delivery_state.endpoint[0].address
+    ELASTICACHE_CACHE_NAME     = aws_elasticache_serverless_cache.delivery_state.name
+    ELASTICACHE_IAM_USERNAME   = "${var.project}-${var.environment}-${var.component}-elasticache-user"
+  }
+
+  vpc_config = {
+    subnet_ids         = try(local.acct.private_subnets[local.bc_name], [])
+    security_group_ids = [aws_security_group.https_client_lambda.id]
   }
 }
 
@@ -75,6 +84,22 @@ data "aws_iam_policy_document" "perf_runner_lambda" {
   }
 
   statement {
+    sid    = "SQSPurgeQueue"
+    effect = "Allow"
+
+    actions = [
+      "sqs:PurgeQueue",
+    ]
+
+    resources = [
+      module.sqs_inbound_event.sqs_queue_arn,
+      "${module.sqs_inbound_event.sqs_queue_arn}-dlq",
+      "arn:aws:sqs:${var.region}:${var.aws_account_id}:${local.csi}-*-delivery-queue",
+      "arn:aws:sqs:${var.region}:${var.aws_account_id}:${local.csi}-*-delivery-dlq-queue",
+    ]
+  }
+
+  statement {
     sid    = "CloudWatchLogsInsightsQuery"
     effect = "Allow"
 
@@ -83,10 +108,15 @@ data "aws_iam_policy_document" "perf_runner_lambda" {
       "logs:StopQuery",
     ]
 
-    resources = [
-      "arn:aws:logs:${var.region}:${var.aws_account_id}:log-group:${module.client_transform_filter_lambda.cloudwatch_log_group_name}:*",
-      "arn:aws:logs:${var.region}:${var.aws_account_id}:log-group:/aws/lambda/${local.csi}-https-client-*",
-    ]
+    resources = concat(
+      [
+        "arn:aws:logs:${var.region}:${var.aws_account_id}:log-group:${module.client_transform_filter_lambda.cloudwatch_log_group_name}:*",
+        "arn:aws:logs:${var.region}:${var.aws_account_id}:log-group:/aws/lambda/${local.csi}-https-client-*",
+      ],
+      var.deploy_mock_clients ? [
+        "arn:aws:logs:${var.region}:${var.aws_account_id}:log-group:${module.mock_webhook_lambda[0].cloudwatch_log_group_name}:*",
+      ] : [],
+    )
   }
 
   statement {
@@ -98,5 +128,19 @@ data "aws_iam_policy_document" "perf_runner_lambda" {
     ]
 
     resources = ["*"]
+  }
+
+  statement {
+    sid    = "ElastiCacheConnect"
+    effect = "Allow"
+
+    actions = [
+      "elasticache:Connect",
+    ]
+
+    resources = [
+      aws_elasticache_serverless_cache.delivery_state.arn,
+      aws_elasticache_user.delivery_state_iam.arn,
+    ]
   }
 }
