@@ -63,10 +63,6 @@ export function getMockItClientConfig(): MockItClientConfig {
   return getClientConfig("clientSingleTarget");
 }
 
-export function getMockItFanOutClientConfig(): MockItClientConfig {
-  return getClientConfig("clientFanOut");
-}
-
 function buildWebhookTargetPaths(key: ClientFixtureKey): string[] {
   const config = getClientConfig(key);
   return config.targets.map(({ targetId }) => `/${targetId}`);

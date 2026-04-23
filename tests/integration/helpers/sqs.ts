@@ -1,5 +1,6 @@
 import {
   ChangeMessageVisibilityCommand,
+  DeleteMessageCommand,
   GetQueueAttributesCommand,
   type Message,
   PurgeQueueCommand,
@@ -249,4 +250,27 @@ export async function awaitQueueMessageByMessageId(
   }
 
   return matchedMessage;
+}
+
+export async function deleteMessage(
+  client: SQSClient,
+  queueUrl: string,
+  message: Message,
+): Promise<void> {
+  await client.send(
+    new DeleteMessageCommand({
+      QueueUrl: queueUrl,
+      ReceiptHandle: message.ReceiptHandle!,
+    }),
+  );
+}
+
+export async function getQueueDepth(
+  client: SQSClient,
+  queueUrl: string,
+): Promise<number> {
+  return getQueueMessageCount(client, queueUrl, [
+    "ApproximateNumberOfMessages",
+    "ApproximateNumberOfMessagesNotVisible",
+  ]);
 }

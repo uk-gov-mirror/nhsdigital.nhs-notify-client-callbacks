@@ -1,25 +1,8 @@
-import { CloudWatchLogsClient } from "@aws-sdk/client-cloudwatch-logs";
-import {
-  DeleteMessageCommand,
-  GetQueueAttributesCommand,
-  SQSClient,
-} from "@aws-sdk/client-sqs";
 import type {
   MessageStatusData,
   StatusPublishEvent,
 } from "@nhs-notify-client-callbacks/models";
-import {
-  buildInboundEventQueueUrl,
-  buildLambdaLogGroupName,
-  createCloudWatchLogsClient,
-  createSqsClient,
-  getDeploymentDetails,
-} from "@nhs-notify-client-callbacks/test-support/helpers";
-import {
-  awaitSignedCallbacksByCountFromWebhookLogGroup,
-  countForcedStatusInvocations,
-  countLogEntries,
-} from "./helpers/cloudwatch";
+import { awaitCallbacks, countLogEntries } from "./helpers/cloudwatch";
 import { createMessageStatusPublishEvent } from "./helpers/event-factories";
 import {
   buildMockWebhookTargetPath,
@@ -28,191 +11,119 @@ import {
 import { assertCallbackHeaders } from "./helpers/signature";
 import {
   awaitQueueMessage,
-  buildMockClientDeliveryQueueUrl,
-  buildMockClientDlqQueueUrl,
+  deleteMessage,
+  getQueueDepth,
   purgeQueues,
   sendSqsEvent,
 } from "./helpers/sqs";
-
-function compareStrings(a: string, b: string): number {
-  if (a > b) return 1;
-  if (a < b) return -1;
-  return 0;
-}
+import {
+  type TestContext,
+  createTestContext,
+  destroyTestContext,
+} from "./helpers/test-context";
 
 describe("Delivery Resilience", () => {
-  let sqsClient: SQSClient;
-  let cloudWatchClient: CloudWatchLogsClient;
-  let callbackEventQueueUrl: string;
-  let webhookLogGroupName: string;
-  let startTime: number;
+  let ctx: TestContext;
 
-  beforeAll(async () => {
-    const deploymentDetails = getDeploymentDetails();
-
-    sqsClient = createSqsClient(deploymentDetails);
-    cloudWatchClient = createCloudWatchLogsClient(deploymentDetails);
-    callbackEventQueueUrl = buildInboundEventQueueUrl(deploymentDetails);
-    webhookLogGroupName = buildLambdaLogGroupName(
-      deploymentDetails,
-      "mock-webhook",
-    );
-    startTime = Date.now();
+  beforeAll(() => {
+    ctx = createTestContext();
   });
 
-  afterAll(async () => {
-    sqsClient.destroy();
-    cloudWatchClient.destroy();
+  afterAll(() => {
+    destroyTestContext(ctx);
   });
 
   describe("Retry & Window Exhaustion", () => {
-    let retryClientDlqQueueUrl: string;
-    let retryClientDeliveryQueueUrl: string;
+    let dlqUrl: string;
+    let deliveryUrl: string;
 
     beforeAll(async () => {
-      const deploymentDetails = getDeploymentDetails();
       const { clientId } = getClientConfig("clientShortRetry");
-      retryClientDlqQueueUrl = buildMockClientDlqQueueUrl(
-        deploymentDetails,
-        clientId,
-      );
-      retryClientDeliveryQueueUrl = buildMockClientDeliveryQueueUrl(
-        deploymentDetails,
-        clientId,
-      );
-      await purgeQueues(sqsClient, [
-        retryClientDlqQueueUrl,
-        retryClientDeliveryQueueUrl,
-      ]);
+      dlqUrl = ctx.clientDlqUrl(clientId);
+      deliveryUrl = ctx.clientDeliveryUrl(clientId);
+      await purgeQueues(ctx.sqs, [dlqUrl, deliveryUrl]);
     });
 
     afterAll(async () => {
-      await purgeQueues(sqsClient, [
-        retryClientDlqQueueUrl,
-        retryClientDeliveryQueueUrl,
-      ]);
+      await purgeQueues(ctx.sqs, [dlqUrl, deliveryUrl]);
     });
 
     it("should exhaust the retry window on persistent 5xx and route to DLQ", async () => {
-      const shortRetryConfig = getClientConfig("clientShortRetry");
+      const { clientId } = getClientConfig("clientShortRetry");
       const messageId = `force-500-${crypto.randomUUID()}`;
 
       const event: StatusPublishEvent<MessageStatusData> =
-        createMessageStatusPublishEvent({
-          data: {
-            clientId: shortRetryConfig.clientId,
-            messageId,
-          },
-        });
+        createMessageStatusPublishEvent({ data: { clientId, messageId } });
 
-      await sendSqsEvent(sqsClient, callbackEventQueueUrl, event);
+      await sendSqsEvent(ctx.sqs, ctx.inboundQueueUrl, event);
 
-      const dlqMessage = await awaitQueueMessage(
-        sqsClient,
-        retryClientDlqQueueUrl,
-        90_000,
-      );
+      const dlqMessage = await awaitQueueMessage(ctx.sqs, dlqUrl, 90_000);
 
       expect(dlqMessage.Body).toBeDefined();
       const dlqPayload = JSON.parse(dlqMessage.Body as string);
       expect(dlqPayload.payload.data[0].attributes.messageId).toBe(messageId);
 
-      const attemptCount = await countForcedStatusInvocations(
-        cloudWatchClient,
-        webhookLogGroupName,
-        messageId,
-        startTime,
+      const attemptCount = await countLogEntries(
+        ctx.cwLogs,
+        ctx.webhookLogGroup,
+        `{ $.msg = "Forced status code response" && $.messageId = "${messageId}" }`,
+        ctx.startTime,
         2,
       );
       expect(attemptCount).toBeGreaterThan(1);
 
-      await sqsClient.send(
-        new DeleteMessageCommand({
-          QueueUrl: retryClientDlqQueueUrl,
-          ReceiptHandle: dlqMessage.ReceiptHandle!,
-        }),
-      );
+      await deleteMessage(ctx.sqs, dlqUrl, dlqMessage);
     }, 180_000);
 
     it("should exhaust the retry window on persistent 429 and route to DLQ", async () => {
-      const shortRetryConfig = getClientConfig("clientShortRetry");
+      const { clientId } = getClientConfig("clientShortRetry");
       const messageId = `force-429-${crypto.randomUUID()}`;
 
       const event: StatusPublishEvent<MessageStatusData> =
-        createMessageStatusPublishEvent({
-          data: {
-            clientId: shortRetryConfig.clientId,
-            messageId,
-          },
-        });
+        createMessageStatusPublishEvent({ data: { clientId, messageId } });
 
-      await sendSqsEvent(sqsClient, callbackEventQueueUrl, event);
+      await sendSqsEvent(ctx.sqs, ctx.inboundQueueUrl, event);
 
-      const dlqMessage = await awaitQueueMessage(
-        sqsClient,
-        retryClientDlqQueueUrl,
-        90_000,
-      );
+      const dlqMessage = await awaitQueueMessage(ctx.sqs, dlqUrl, 90_000);
 
       expect(dlqMessage.Body).toBeDefined();
       const dlqPayload = JSON.parse(dlqMessage.Body as string);
       expect(dlqPayload.payload.data[0].attributes.messageId).toBe(messageId);
 
-      const attemptCount = await countForcedStatusInvocations(
-        cloudWatchClient,
-        webhookLogGroupName,
-        messageId,
-        startTime,
+      const attemptCount = await countLogEntries(
+        ctx.cwLogs,
+        ctx.webhookLogGroup,
+        `{ $.msg = "Forced status code response" && $.messageId = "${messageId}" }`,
+        ctx.startTime,
         2,
       );
       expect(attemptCount).toBeGreaterThan(1);
 
-      await sqsClient.send(
-        new DeleteMessageCommand({
-          QueueUrl: retryClientDlqQueueUrl,
-          ReceiptHandle: dlqMessage.ReceiptHandle!,
-        }),
-      );
+      await deleteMessage(ctx.sqs, dlqUrl, dlqMessage);
     }, 180_000);
   });
 
   describe("Rate Limiting", () => {
     const BURST_SIZE = 15;
-    let rateLimitDlqQueueUrl: string;
-    let rateLimitDeliveryQueueUrl: string;
-    let httpsClientLogGroupName: string;
+    let dlqUrl: string;
+    let deliveryUrl: string;
+    let httpsClientLogGroup: string;
 
     beforeAll(async () => {
-      const deploymentDetails = getDeploymentDetails();
       const { clientId } = getClientConfig("clientRateLimit");
-      rateLimitDlqQueueUrl = buildMockClientDlqQueueUrl(
-        deploymentDetails,
-        clientId,
-      );
-      rateLimitDeliveryQueueUrl = buildMockClientDeliveryQueueUrl(
-        deploymentDetails,
-        clientId,
-      );
-      httpsClientLogGroupName = buildLambdaLogGroupName(
-        deploymentDetails,
-        `https-client-${clientId}`,
-      );
-      await purgeQueues(sqsClient, [
-        rateLimitDlqQueueUrl,
-        rateLimitDeliveryQueueUrl,
-      ]);
+      dlqUrl = ctx.clientDlqUrl(clientId);
+      deliveryUrl = ctx.clientDeliveryUrl(clientId);
+      httpsClientLogGroup = ctx.logGroup(`https-client-${clientId}`);
+      await purgeQueues(ctx.sqs, [dlqUrl, deliveryUrl]);
     });
 
     afterAll(async () => {
-      await purgeQueues(sqsClient, [
-        rateLimitDlqQueueUrl,
-        rateLimitDeliveryQueueUrl,
-      ]);
+      await purgeQueues(ctx.sqs, [dlqUrl, deliveryUrl]);
     });
 
     it("should eventually deliver all events in a burst without dropping any to the DLQ", async () => {
       const rateLimitConfig = getClientConfig("clientRateLimit");
-      const rateLimitTargetPath = buildMockWebhookTargetPath("clientRateLimit");
+      const targetPath = buildMockWebhookTargetPath("clientRateLimit");
 
       const events = Array.from({ length: BURST_SIZE }, () =>
         createMessageStatusPublishEvent({
@@ -225,34 +136,34 @@ describe("Delivery Resilience", () => {
 
       await Promise.all(
         events.map((event) =>
-          sendSqsEvent(sqsClient, callbackEventQueueUrl, event),
+          sendSqsEvent(ctx.sqs, ctx.inboundQueueUrl, event),
         ),
       );
 
-      const callbacks = await awaitSignedCallbacksByCountFromWebhookLogGroup(
-        cloudWatchClient,
-        webhookLogGroupName,
+      const callbacks = await awaitCallbacks(
+        ctx.cwLogs,
+        ctx.webhookLogGroup,
         events.map((e) => e.data.messageId),
         "MessageStatus",
         1,
-        startTime,
+        ctx.startTime,
       );
 
-      const deliveredMessageIds = callbacks
+      const deliveredIds = callbacks
         .map(
           (cb) =>
             (cb.payload.attributes as { messageId?: string }).messageId ?? "",
         )
-        .toSorted(compareStrings);
+        .toSorted((a, b) => String(a).localeCompare(String(b)));
 
-      const expectedMessageIds = events
-        .map((e) => e.data.messageId)
-        .toSorted(compareStrings);
-
-      expect(deliveredMessageIds).toEqual(expectedMessageIds);
+      expect(deliveredIds).toEqual(
+        events
+          .map((e) => e.data.messageId)
+          .toSorted((a, b) => String(a).localeCompare(String(b))),
+      );
 
       for (const callback of callbacks) {
-        expect(callback.path).toBe(rateLimitTargetPath);
+        expect(callback.path).toBe(targetPath);
         assertCallbackHeaders(
           callback,
           rateLimitConfig.apiKeyVar,
@@ -260,29 +171,13 @@ describe("Delivery Resilience", () => {
         );
       }
 
-      const dlqAttributes = await sqsClient.send(
-        new GetQueueAttributesCommand({
-          QueueUrl: rateLimitDlqQueueUrl,
-          AttributeNames: [
-            "ApproximateNumberOfMessages",
-            "ApproximateNumberOfMessagesNotVisible",
-          ],
-        }),
-      );
-
-      const dlqMessageCount =
-        Number(dlqAttributes.Attributes?.ApproximateNumberOfMessages ?? 0) +
-        Number(
-          dlqAttributes.Attributes?.ApproximateNumberOfMessagesNotVisible ?? 0,
-        );
-
-      expect(dlqMessageCount).toBe(0);
+      expect(await getQueueDepth(ctx.sqs, dlqUrl)).toBe(0);
 
       const rateLimitedCount = await countLogEntries(
-        cloudWatchClient,
-        httpsClientLogGroupName,
+        ctx.cwLogs,
+        httpsClientLogGroup,
         `{ $.msg = "Admission denied" && $.reason = "rate_limited" }`,
-        startTime,
+        ctx.startTime,
         1,
       );
       expect(rateLimitedCount).toBeGreaterThanOrEqual(1);
@@ -291,36 +186,20 @@ describe("Delivery Resilience", () => {
 
   describe("Circuit Breaker", () => {
     const CB_BURST_SIZE = 15;
-    let cbClientDlqQueueUrl: string;
-    let cbClientDeliveryQueueUrl: string;
-    let cbHttpsClientLogGroupName: string;
+    let dlqUrl: string;
+    let deliveryUrl: string;
+    let httpsClientLogGroup: string;
 
     beforeAll(async () => {
-      const deploymentDetails = getDeploymentDetails();
       const { clientId } = getClientConfig("clientCircuitBreaker");
-      cbClientDlqQueueUrl = buildMockClientDlqQueueUrl(
-        deploymentDetails,
-        clientId,
-      );
-      cbClientDeliveryQueueUrl = buildMockClientDeliveryQueueUrl(
-        deploymentDetails,
-        clientId,
-      );
-      cbHttpsClientLogGroupName = buildLambdaLogGroupName(
-        deploymentDetails,
-        `https-client-${clientId}`,
-      );
-      await purgeQueues(sqsClient, [
-        cbClientDlqQueueUrl,
-        cbClientDeliveryQueueUrl,
-      ]);
+      dlqUrl = ctx.clientDlqUrl(clientId);
+      deliveryUrl = ctx.clientDeliveryUrl(clientId);
+      httpsClientLogGroup = ctx.logGroup(`https-client-${clientId}`);
+      await purgeQueues(ctx.sqs, [dlqUrl, deliveryUrl]);
     });
 
     afterAll(async () => {
-      await purgeQueues(sqsClient, [
-        cbClientDlqQueueUrl,
-        cbClientDeliveryQueueUrl,
-      ]);
+      await purgeQueues(ctx.sqs, [dlqUrl, deliveryUrl]);
     });
 
     it("should open the circuit breaker after repeated failures and not affect other clients", async () => {
@@ -346,34 +225,32 @@ describe("Delivery Resilience", () => {
 
       await Promise.all([
         ...cbEvents.map((event) =>
-          sendSqsEvent(sqsClient, callbackEventQueueUrl, event),
+          sendSqsEvent(ctx.sqs, ctx.inboundQueueUrl, event),
         ),
-        sendSqsEvent(sqsClient, callbackEventQueueUrl, normalEvent),
+        sendSqsEvent(ctx.sqs, ctx.inboundQueueUrl, normalEvent),
       ]);
 
-      const normalCallbacks =
-        await awaitSignedCallbacksByCountFromWebhookLogGroup(
-          cloudWatchClient,
-          webhookLogGroupName,
-          normalEvent.data.messageId,
-          "MessageStatus",
-          1,
-          startTime,
-        );
+      const [normalCallback] = await awaitCallbacks(
+        ctx.cwLogs,
+        ctx.webhookLogGroup,
+        normalEvent.data.messageId,
+        "MessageStatus",
+        1,
+        ctx.startTime,
+      );
 
-      expect(normalCallbacks).toHaveLength(1);
-      expect(normalCallbacks[0].path).toBe(singleTargetPath);
+      expect(normalCallback.path).toBe(singleTargetPath);
       assertCallbackHeaders(
-        normalCallbacks[0],
+        normalCallback,
         singleTargetConfig.apiKeyVar,
         singleTargetConfig.applicationIdVar,
       );
 
       const circuitOpenCount = await countLogEntries(
-        cloudWatchClient,
-        cbHttpsClientLogGroupName,
+        ctx.cwLogs,
+        httpsClientLogGroup,
         `{ $.msg = "Admission denied" && $.reason = "circuit_open" }`,
-        startTime,
+        ctx.startTime,
         1,
       );
       expect(circuitOpenCount).toBeGreaterThanOrEqual(1);
