@@ -44,7 +44,7 @@ function main() {
   done
   echo "Total: ${#tests[@]}, Passed: $(( ${#tests[@]} - status )), Failed: $status"
   test-docker-suite-teardown
-  [ $status -gt 0 ] && return 1 || return 0
+  [[ $status -gt 0 ]] && return 1 || return 0
 }
 
 # ==============================================================================
@@ -52,11 +52,13 @@ function main() {
 function test-docker-suite-setup() {
 
   :
+  return 0
 }
 
 function test-docker-suite-teardown() {
 
   :
+  return 0
 }
 
 # ==============================================================================
@@ -106,6 +108,7 @@ function test-docker-test() {
   output=$(docker-check-test)
   # Assert
   echo "$output" | grep -q "PASS"
+  return $?
 }
 
 function test-docker-run() {
@@ -116,6 +119,7 @@ function test-docker-run() {
   output=$(docker-run)
   # Assert
   echo "$output" | grep -Eq "Python [0-9]+\.[0-9]+\.[0-9]+"
+  return $?
 }
 
 function test-docker-clean() {
@@ -140,6 +144,7 @@ function test-docker-get-image-version-and-pull() {
     --filter=reference="$name" \
     --format "{{.Tag}}" \
   | grep -vq "<none>"
+  return $?
 }
 
 # ==============================================================================

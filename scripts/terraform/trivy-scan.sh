@@ -28,7 +28,8 @@ function main() {
   local dir_to_scan="."
 
   while [[ $# -gt 0 ]]; do
-    case "$1" in
+    local arg="$1"
+    case "$arg" in
       --mode|-m)
         if [[ $# -lt 2 ]]; then
           echo "Error: --mode requires an argument." >&2
@@ -47,12 +48,12 @@ function main() {
         break
         ;;
       -*)
-        echo "Unknown option: $1" >&2
+        echo "Unknown option: $arg" >&2
         usage
         exit 1
         ;;
       *)
-        dir_to_scan="$1"
+        dir_to_scan="$arg"
         shift
         ;;
     esac

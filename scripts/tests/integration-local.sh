@@ -16,13 +16,13 @@ set -euo pipefail
 # Required:
 #   AWS_PROFILE
 
-if [ -z "${ENVIRONMENT:-}" ]; then
+if [[ -z "${ENVIRONMENT:-}" ]]; then
   echo "Error: ENVIRONMENT must be set before running this target." >&2
   echo "Example: ENVIRONMENT=<env> make test-integration-local" >&2
   exit 1
 fi
 
-if [ -z "${AWS_PROFILE:-}" ]; then
+if [[ -z "${AWS_PROFILE:-}" ]]; then
   echo "Error: AWS_PROFILE must be set before running this target." >&2
   exit 1
 fi

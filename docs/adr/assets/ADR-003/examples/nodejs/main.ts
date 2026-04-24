@@ -1,6 +1,6 @@
 import { Octokit } from "octokit";
 import { createAppAuth } from "@octokit/auth-app";
-import * as fs from "fs";
+import * as fs from "node:fs";
 
 export const getOctokit = async (
   appId: string,

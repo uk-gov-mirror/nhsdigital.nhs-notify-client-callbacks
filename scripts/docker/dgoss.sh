@@ -98,7 +98,8 @@ GOSS_SLEEP=${GOSS_SLEEP:-0.2}
 
 [[ $CONTAINER_RUNTIME =~ ^(docker|podman)$ ]] || { error "Runtime must be one of docker or podman"; }
 
-case "$1" in
+readonly command="$1"
+case "$command" in
     run)
         run "$@"
         if [[ -e "${GOSS_FILES_PATH}/goss_wait.yaml" ]]; then

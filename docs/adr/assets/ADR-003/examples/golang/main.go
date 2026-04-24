@@ -38,7 +38,7 @@ func main() {
 	fmt.Printf("GITHUB_TOKEN=%s\n", accessToken)
 }
 
-func getJwtToken(ghAppId string, ghAppPkFile string) string {
+func getJwtToken(ghAppId, ghAppPkFile string) string {
 
 	pemContent, _ := ioutil.ReadFile(ghAppPkFile)
 	block, _ := pem.Decode(pemContent)
@@ -53,7 +53,7 @@ func getJwtToken(ghAppId string, ghAppPkFile string) string {
 	return jwtToken
 }
 
-func getInstallationId(jwtToken string, ghOrg string) int {
+func getInstallationId(jwtToken, ghOrg string) int {
 
 	client := resty.New()
 	resp, _ := client.R().

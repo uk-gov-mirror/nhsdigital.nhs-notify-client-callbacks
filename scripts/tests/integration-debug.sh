@@ -26,18 +26,18 @@ set -euo pipefail
 #   LOG_FILTER      CloudWatch Logs filter pattern / text
 #   AWS_REGION      (default: eu-west-2)
 
-if [ -z "${ENVIRONMENT:-}" ]; then
+if [[ -z "${ENVIRONMENT:-}" ]]; then
   echo "Error: ENVIRONMENT must be set before running this target." >&2
   echo "Example: ENVIRONMENT=<env> AWS_PROFILE=<profile> make test-integration-debug ACTION=queue-status" >&2
   exit 1
 fi
 
-if [ -z "${AWS_PROFILE:-}" ]; then
+if [[ -z "${AWS_PROFILE:-}" ]]; then
   echo "Error: AWS_PROFILE must be set before running this target." >&2
   exit 1
 fi
 
-if [ -z "${ACTION:-}" ]; then
+if [[ -z "${ACTION:-}" ]]; then
   echo "Error: ACTION must be set before running this target." >&2
   echo "Actions: queue-status, queue-peek, tail-transform, tail-webhook, tail-pipe, pipe-state" >&2
   exit 1
@@ -62,28 +62,31 @@ print_section() {
   echo "========================================"
   echo "$1"
   echo "========================================"
+  return 0
 }
 
 queue_url() {
   local queue_name="$1"
   echo "https://sqs.${REGION}.amazonaws.com/${ACCOUNT_ID}/${queue_name}"
+  return 0
 }
 
 target_dlq_queue_name() {
   local target_id
 
-  if [ ! -f "$SUBSCRIPTION_FIXTURE_PATH" ]; then
+  if [[ ! -f "$SUBSCRIPTION_FIXTURE_PATH" ]]; then
     echo "Error: subscription fixture not found: $SUBSCRIPTION_FIXTURE_PATH" >&2
     exit 1
   fi
 
   target_id="$(jq -r '.targets[0].targetId // empty' "$SUBSCRIPTION_FIXTURE_PATH")"
-  if [ -z "$target_id" ]; then
+  if [[ -z "$target_id" ]]; then
     echo "Error: unable to read targets[0].targetId from $SUBSCRIPTION_FIXTURE_PATH" >&2
     exit 1
   fi
 
   echo "${PREFIX}-${target_id}-dlq-queue"
+  return 0
 }
 
 show_queue_counts() {
@@ -98,12 +101,14 @@ show_queue_counts() {
     --queue-url "$(queue_url "$name")" \
     --attribute-names ApproximateNumberOfMessages ApproximateNumberOfMessagesNotVisible \
     --query '{ApproximateNumberOfMessages: Attributes.ApproximateNumberOfMessages, ApproximateNumberOfMessagesNotVisible: Attributes.ApproximateNumberOfMessagesNotVisible}'
+  return 0
 }
 
 action_queue_status() {
   show_queue_counts "Mock Target DLQ - Queue Message Counts" "$(target_dlq_queue_name)"
   show_queue_counts "Inbound Event Queue - Queue Message Counts" "${PREFIX}-inbound-event-queue"
   show_queue_counts "Inbound Event DLQ - Queue Message Counts" "${PREFIX}-inbound-event-dlq"
+  return 0
 }
 
 peek_queue_message() {
@@ -125,12 +130,14 @@ peek_queue_message() {
       then {message: "No messages"}
       else .Messages[0] | {Body, Attributes, MessageAttributes}
       end'
+  return 0
 }
 
 action_queue_peek() {
   peek_queue_message "Mock Target DLQ - Message Peek" "$(target_dlq_queue_name)"
   peek_queue_message "Inbound Event Queue - Message Peek" "${PREFIX}-inbound-event-queue"
   peek_queue_message "Inbound Event DLQ - Message Peek" "${PREFIX}-inbound-event-dlq"
+  return 0
 }
 
 log_filter_args() {
@@ -143,6 +150,7 @@ log_filter_args() {
   fi
 
   printf '%s\n' "${args[@]}"
+  return 0
 }
 
 action_tail_transform() {
@@ -158,6 +166,7 @@ action_tail_transform() {
     --follow \
     --format short \
     "${filter_args[@]}"
+  return 0
 }
 
 action_tail_webhook() {
@@ -173,6 +182,7 @@ action_tail_webhook() {
     --follow \
     --format short \
     "${filter_args[@]}"
+  return 0
 }
 
 action_tail_pipe() {
@@ -206,6 +216,7 @@ action_tail_pipe() {
     --follow \
     --format short \
     "${filter_args[@]}"
+  return 0
 }
 
 pipe_metric_sum() {
@@ -226,6 +237,7 @@ pipe_metric_sum() {
     --query "sum(Datapoints[].Sum)" \
     --output text \
     --no-cli-pager
+  return 0
 }
 
 action_pipe_state() {
@@ -254,6 +266,7 @@ action_pipe_state() {
   echo "ExecutionSucceeded: ${execution_succeeded}"
   echo "ExecutionFailed: ${execution_failed}"
   echo "DeadLetteredEvents: ${dead_lettered_events}"
+  return 0
 }
 
 case "$ACTION" in

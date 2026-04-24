@@ -23,6 +23,7 @@ function error_and_die {
 ##
 function version() {
   echo "${script_ver}";
+  return 0;
 }
 
 ##
@@ -105,6 +106,7 @@ lockfile:
 additional arguments:
   Any arguments provided after "--" will be passed directly to terraform as its own arguments
 EOF
+  return 0;
 };
 
 ##
@@ -127,7 +129,7 @@ ARGS=$(getopt \
         "$@");
 
 #Bad arguments
-if [ $? -ne 0 ]; then
+if [[ $? -ne 0 ]]; then
   usage;
   error_and_die "command line argument parse failure";
 fi;
@@ -160,63 +162,63 @@ while true; do
       ;;
     -c|--component)
       shift;
-      if [ -n "${1}" ]; then
+      if [[ -n "${1}" ]]; then
         component_arg="${1}";
         shift;
       fi;
       ;;
     -r|--region)
       shift;
-      if [ -n "${1}" ]; then
+      if [[ -n "${1}" ]]; then
         region_arg="${1}";
         shift;
       fi;
       ;;
     -e|--environment)
       shift;
-      if [ -n "${1}" ]; then
+      if [[ -n "${1}" ]]; then
         environment_arg="${1}";
         shift;
       fi;
       ;;
     -g|--group)
       shift;
-      if [ -n "${1}" ]; then
+      if [[ -n "${1}" ]]; then
         group="${1}";
         shift;
       fi;
       ;;
     -a|--action)
       shift;
-      if [ -n "${1}" ]; then
+      if [[ -n "${1}" ]]; then
         action="${1}";
         shift;
       fi;
       ;;
     -b|--bucket-prefix)
       shift;
-      if [ -n "${1}" ]; then
+      if [[ -n "${1}" ]]; then
         bucket_prefix="${1}";
         shift;
       fi;
       ;;
     -i|--build-id)
       shift;
-      if [ -n "${1}" ]; then
+      if [[ -n "${1}" ]]; then
         build_id="${1}";
         shift;
       fi;
       ;;
     -l|--lockfile)
       shift;
-      if [ -n "${1}" ]; then
+      if [[ -n "${1}" ]]; then
         lockfile="-lockfile=${1}";
         shift;
       fi;
       ;;
     -p|--project)
       shift;
-      if [ -n "${1}" ]; then
+      if [[ -n "${1}" ]]; then
         project="${1}";
         shift;
       fi;
@@ -240,6 +242,11 @@ while true; do
     --)
       shift;
       break;
+      ;;
+    *)
+      echo "Unknown option: ${1}" >&2;
+      usage;
+      exit 1;
       ;;
   esac;
 done;
@@ -269,37 +276,37 @@ echo;
 
 # Set Region from args or environment. Exit if unset.
 readonly region="${region_arg:-${AWS_DEFAULT_REGION}}";
-[ -n "${region}" ] \
+[[ -n "${region}" ]] \
   || error_and_die "No AWS region specified. No -r/--region argument supplied and AWS_DEFAULT_REGION undefined";
 
-[ -n "${project}" ] \
+[[ -n "${project}" ]] \
   || error_and_die "Required argument -p/--project not specified";
 
 # Bootstrapping is special
-if [ "${bootstrap}" == "true" ]; then
-  [ -n "${component_arg}" ] \
+if [[ "${bootstrap}" == "true" ]]; then
+  [[ -n "${component_arg}" ]] \
     && error_and_die "The --bootstrap parameter and the -c/--component parameter are mutually exclusive";
-  [ -n "${build_id}" ] \
+  [[ -n "${build_id}" ]] \
     && error_and_die "The --bootstrap parameter and the -i/--build-id parameter are mutually exclusive. We do not currently support plan files for bootstrap";
-  [ -n "${environment_arg}" ] && readonly environment="${environment_arg}";
+  [[ -n "${environment_arg}" ]] && readonly environment="${environment_arg}";
 else
   # Validate component to work with
-  [ -n "${component_arg}" ] \
+  [[ -n "${component_arg}" ]] \
     || error_and_die "Required argument missing: -c/--component";
   readonly component="${component_arg}";
 
   # Validate environment to work with
-  [ -n "${environment_arg}" ] \
+  [[ -n "${environment_arg}" ]] \
     || error_and_die "Required argument missing: -e/--environment";
   readonly environment="${environment_arg}";
 fi;
 
-[ -n "${action}" ] \
+[[ -n "${action}" ]] \
   || error_and_die "Required argument missing: -a/--action";
 
 # Validate AWS Credentials Available
 iam_iron_man="$(aws sts get-caller-identity --query 'Arn' --output text)";
-if [ -n "${iam_iron_man}" ]; then
+if [[ -n "${iam_iron_man}" ]]; then
   echo -e "AWS Credentials Found. Using ARN '${iam_iron_man}'";
 else
   error_and_die "No AWS Credentials Found. \"aws sts get-caller-identity --query 'Arn' --output text\" responded with ARN '${iam_iron_man}'";
@@ -307,14 +314,14 @@ fi;
 
 # Query canonical AWS Account ID
 aws_account_id="$(aws sts get-caller-identity --query 'Account' --output text)";
-if [ -n "${aws_account_id}" ]; then
+if [[ -n "${aws_account_id}" ]]; then
   echo -e "AWS Account ID: ${aws_account_id}";
 else
   error_and_die "Couldn't determine AWS Account ID. \"aws sts get-caller-identity --query 'Account' --output text\" provided no output";
 fi;
 
 # Validate S3 bucket. Set default if undefined
-if [ -n "${bucket_prefix}" ]; then
+if [[ -n "${bucket_prefix}" ]]; then
   readonly bucket="${bucket_prefix}-${aws_account_id}-${region}"
   echo -e "Using S3 bucket s3://${bucket}";
 else
@@ -323,7 +330,7 @@ else
 fi;
 
 declare component_path;
-if [ "${bootstrap}" == "true" ]; then
+if [[ "${bootstrap}" == "true" ]]; then
   component_path="${base_path}/bootstrap";
 else
   component_path="${base_path}/components/${component}";
@@ -336,7 +343,7 @@ else
   component_path="$(cd "${component_path}" && pwd)";
 fi;
 
-[ -d "${component_path}" ] || error_and_die "Component path ${component_path} does not exist";
+[[ -d "${component_path}" ]] || error_and_die "Component path ${component_path} does not exist";
 
 ## Debug
 #echo $component_path;
@@ -371,7 +378,7 @@ esac;
 export TF_IN_AUTOMATION="true";
 
 for rc_path in "${base_path}" "${base_path}/etc" "${component_path}"; do
-  if [ -f "${rc_path}/.terraformrc" ]; then
+  if [[ -f "${rc_path}/.terraformrc" ]]; then
     echo "Found .terraformrc at ${rc_path}/.terraformrc. Overriding.";
     export TF_CLI_CONFIG_FILE="${rc_path}/.terraformrc";
   fi;
@@ -383,14 +390,14 @@ declare default_plugin_cache_dir="$(pwd)/plugin-cache";
 export TF_PLUGIN_CACHE_DIR="${TF_PLUGIN_CACHE_DIR:-${default_plugin_cache_dir}}"
 mkdir -p "${TF_PLUGIN_CACHE_DIR}" \
   || error_and_die "Failed to created the plugin-cache directory (${TF_PLUGIN_CACHE_DIR})";
-[ -w "${TF_PLUGIN_CACHE_DIR}" ] \
+[[ -w "${TF_PLUGIN_CACHE_DIR}" ]] \
   || error_and_die "plugin-cache directory (${TF_PLUGIN_CACHE_DIR}) not writable";
 
 # Clear cache, safe enough as we enforce plugin cache
 rm -rf ${component_path}/.terraform;
 
 # Run global pre.sh
-if [ -f "pre.sh" ]; then
+if [[ -f "pre.sh" ]]; then
   source pre.sh "${region}" "${environment}" "${action}" \
     || error_and_die "Global pre script execution failed with exit code ${?}";
 fi;
@@ -406,7 +413,7 @@ tool_version=$(grep "terraform " .tool-versions | cut -d ' ' -f 2)
 asdf plugin add terraform && asdf install terraform "${tool_version}"
 current_version=$(terraform --version | head -n 1 | cut -d 'v' -f 2)
 
-if [ -z "${current_version}" ] || [ "${current_version}" != "${tool_version}" ]; then
+if [[ -z "${current_version}" ]] || [[ "${current_version}" != "${tool_version}" ]]; then
   error_and_die "Terraform version mismatch. Expected: ${tool_version}, Actual: ${current_version}"
 fi
 
@@ -415,8 +422,8 @@ fi
 # if not we will fill it with variable file parameters
 declare tf_var_params;
 
-if [ "${bootstrap}" == "true" ]; then
-  if [ "${action}" == "destroy" ]; then
+if [[ "${bootstrap}" == "true" ]]; then
+  if [[ "${action}" == "destroy" ]]; then
     error_and_die "You cannot destroy a bootstrap bucket using tfscaffold, it's just too dangerous. If you're absolutely certain that you want to delete the bucket and all contents, including any possible state files environments and components within this project, then you will need to do it from the AWS Console. Note you cannot do this from the CLI because the bootstrap bucket is versioned, and even the --force CLI parameter will not empty the bucket of versions";
   fi;
 
@@ -426,7 +433,7 @@ if [ "${bootstrap}" == "true" ]; then
 fi;
 
 # Run pre.sh
-if [ -f "pre.sh" ]; then
+if [[ -f "pre.sh" ]]; then
   source pre.sh "${region}" "${environment}" "${action}" \
     || error_and_die "Component pre script execution failed with exit code ${?}";
 fi;
@@ -441,16 +448,16 @@ declare -a secrets=();
 readonly secrets_file_name="secret.tfvars.enc";
 readonly secrets_file_path="build/${secrets_file_name}";
 aws s3 ls s3://${bucket}/${project}/${aws_account_id}/${region}/${environment}/${secrets_file_name} >/dev/null 2>&1;
-if [ $? -eq 0 ]; then
+if [[ $? -eq 0 ]]; then
   mkdir -p build;
   aws s3 cp s3://${bucket}/${project}/${aws_account_id}/${region}/${environment}/${secrets_file_name} ${secrets_file_path} \
     || error_and_die "S3 secrets file is present, but inaccessible. Ensure you have permission to read s3://${bucket}/${project}/${aws_account_id}/${region}/${environment}/${secrets_file_name}";
-  if [ -f "${secrets_file_path}" ]; then
+  if [[ -f "${secrets_file_path}" ]]; then
     secrets=($(aws kms decrypt --ciphertext-blob fileb://${secrets_file_path} --output text --query Plaintext | base64 --decode));
   fi;
 fi;
 
-if [ -n "${secrets[0]}" ]; then
+if [[ -n "${secrets[0]}" ]]; then
   secret_regex='^[A-Za-z0-9_-]+=.+$';
   secret_count=1;
   for secret_line in "${secrets[@]}"; do
@@ -474,7 +481,7 @@ fi;
 readonly dynamic_file_name="dynamic.tfvars";
 readonly dynamic_file_path="build/${dynamic_file_name}";
 aws s3 ls s3://${bucket}/${project}/${aws_account_id}/${region}/${environment}/${dynamic_file_name} >/dev/null 2>&1;
-if [ $? -eq 0 ]; then
+if [[ $? -eq 0 ]]; then
   aws s3 cp s3://${bucket}/${project}/${aws_account_id}/${region}/${environment}/${dynamic_file_name} ${dynamic_file_path} \
     || error_and_die "S3 tfvars file is present, but inaccessible. Ensure you have permission to read s3://${bucket}/${project}/${aws_account_id}/${region}/${environment}/${dynamic_file_name}";
 fi;
@@ -484,7 +491,7 @@ readonly versions_file_name="versions_${region}_${environment}.tfvars";
 readonly versions_file_path="${base_path}/etc/${versions_file_name}";
 
 # Check for presence of an environment variables file, and use it if readable
-if [ -n "${environment}" ]; then
+if [[ -n "${environment}" ]]; then
   readonly env_file_path="${base_path}/etc/env_${region}_${environment}.tfvars";
 fi;
 
@@ -497,7 +504,7 @@ readonly region_vars_file_name="${region}.tfvars";
 readonly region_vars_file_path="${base_path}/etc/${region_vars_file_name}";
 
 # Check for presence of a group variables file if specified, and use it if readable
-if [ -n "${group}" ]; then
+if [[ -n "${group}" ]]; then
   readonly group_vars_file_name="group_${group}.tfvars";
   readonly group_vars_file_path="${base_path}/etc/${group_vars_file_name}";
 fi;
@@ -509,16 +516,16 @@ declare -a tf_var_file_paths;
 # honourable thing and override global and region settings with environment
 # specific ones; however we do not officially support the same variable
 # being declared in multiple locations, and we warn when we find any duplicates
-[ -f "${global_vars_file_path}" ] && tf_var_file_paths+=("${global_vars_file_path}");
-[ -f "${region_vars_file_path}" ] && tf_var_file_paths+=("${region_vars_file_path}");
+[[ -f "${global_vars_file_path}" ]] && tf_var_file_paths+=("${global_vars_file_path}");
+[[ -f "${region_vars_file_path}" ]] && tf_var_file_paths+=("${region_vars_file_path}");
 
 # If a group has been specified, load the vars for the group. If we are to assume
 # terraform correctly handles override-ordering (which to be fair we don't hence
 # the warning about duplicate variables below) we add this to the list after
 # global and region-global variables, but before the environment variables
 # so that the environment can explicitly override variables defined in the group.
-if [ -n "${group}" ]; then
-  if [ -f "${group_vars_file_path}" ]; then
+if [[ -n "${group}" ]]; then
+  if [[ -f "${group_vars_file_path}" ]]; then
     tf_var_file_paths+=("${group_vars_file_path}");
   else
     echo -e "[WARNING] Group \"${group}\" has been specified, but no group variables file is available at ${group_vars_file_path}";
@@ -526,8 +533,8 @@ if [ -n "${group}" ]; then
 fi;
 
 # Environment is normally expected, but in bootstrapping it may not be provided
-if [ -n "${environment}" ]; then
-  if [ -f "${env_file_path}" ]; then
+if [[ -n "${environment}" ]]; then
+  if [[ -f "${env_file_path}" ]]; then
     tf_var_file_paths+=("${env_file_path}");
   else
     echo -e "[WARNING] Environment \"${environment}\" has been specified, but no environment variables file is available at ${env_file_path}";
@@ -535,13 +542,13 @@ if [ -n "${environment}" ]; then
 fi;
 
 # If present and readable, use versions and dynamic variables too
-[ -f "${versions_file_path}" ] && tf_var_file_paths+=("${versions_file_path}");
-[ -f "${dynamic_file_path}" ] && tf_var_file_paths+=("${dynamic_file_path}");
+[[ -f "${versions_file_path}" ]] && tf_var_file_paths+=("${versions_file_path}");
+[[ -f "${dynamic_file_path}" ]] && tf_var_file_paths+=("${dynamic_file_path}");
 
 # Warn on duplication
-if [ ${#tf_var_file_paths[@]} -gt 0 ]; then
+if [[ ${#tf_var_file_paths[@]} -gt 0 ]]; then
   duplicate_variables="$(cat "${tf_var_file_paths[@]}" | sed -n -e 's/\(^[a-zA-Z0-9_\-]\+\)\s*=.*$/\1/p' | sort | uniq -d)";
-  [ -n "${duplicate_variables}" ] \
+  [[ -n "${duplicate_variables}" ]] \
     && echo -e "
   ###################################################################
   # WARNING WARNING WARNING WARNING WARNING WARNING WARNING WARNING #
@@ -578,14 +585,14 @@ done;
 # altogether by supporting interpolation in the backend config stanza.
 #
 # For now we're left with this garbage, and no more support for <0.9.0.
-if [ -f backend_tfscaffold.tf ]; then
+if [[ -f backend_tfscaffold.tf ]]; then
   echo -e "WARNING: backend_tfscaffold.tf exists and will be overwritten!" >&2;
 fi;
 
 declare backend_prefix;
 declare backend_filename;
 
-if [ "${bootstrap}" == "true" ]; then
+if [[ "${bootstrap}" == "true" ]]; then
   backend_prefix="${project}/${aws_account_id}/${region}/bootstrap";
   backend_filename="bootstrap.tfstate";
 else
@@ -622,15 +629,15 @@ declare bootstrapped="true";
 
 # If we are in bootstrap mode, we need to know if we have already bootstrapped
 # or we are working with or modifying an existing bootstrap bucket
-if [ "${bootstrap}" == "true" ]; then
+if [[ "${bootstrap}" == "true" ]]; then
   # For this exist check we could do many things, but we explicitly perform
   # an ls against the key we will be working with so as to not require
   # permissions to, for example, list all buckets, or the bucket root keyspace
   aws s3 ls s3://${bucket}/${backend_prefix}/${backend_filename} >/dev/null 2>&1;
-  [ $? -eq 0 ] || bootstrapped="false";
+  [[ $? -eq 0 ]] || bootstrapped="false";
 fi;
 
-if [ "${bootstrapped}" == "true" ]; then
+if [[ "${bootstrapped}" == "true" ]]; then
   echo -e "${backend_config}" > backend_tfscaffold.tf \
     || error_and_die "Failed to write backend config to $(pwd)/backend_tfscaffold.tf";
 
@@ -638,7 +645,7 @@ if [ "${bootstrapped}" == "true" ]; then
   trap "rm -f $(pwd)/backend_tfscaffold.tf" EXIT;
 
   declare lockfile_or_upgrade;
-  [ -n ${lockfile} ] && lockfile_or_upgrade='-upgrade' || lockfile_or_upgrade="${lockfile}";
+  [[ -n ${lockfile} ]] && lockfile_or_upgrade='-upgrade' || lockfile_or_upgrade="${lockfile}";
 
   # Configure remote state storage
   echo "Setting up S3 remote state from s3://${bucket}/${backend_key}";
@@ -656,7 +663,7 @@ fi;
 
 case "${action}" in
   'plan')
-    if [ -n "${build_id}" ]; then
+    if [[ -n "${build_id}" ]]; then
       mkdir -p build;
 
       plan_file_name="${component_name}_${build_id}.tfplan";
@@ -665,7 +672,7 @@ case "${action}" in
       out="-out=build/${plan_file_name}";
     fi;
 
-    if [ "${detailed_exitcode}" == "true" ]; then
+    if [[ "${detailed_exitcode}" == "true" ]]; then
       detailed="-detailed-exitcode";
     fi;
 
@@ -684,11 +691,11 @@ case "${action}" in
     # Even when detailed exitcode is set, a 1 is still a fail,
     # so exit
     # (detailed exit codes are 0 and 2)
-    if [ "${status}" -eq 1 ]; then
+    if [[ "${status}" -eq 1 ]]; then
       error_and_die "Terraform plan failed";
     fi;
 
-    if [ -n "${build_id}" ]; then
+    if [[ -n "${build_id}" ]]; then
       aws s3 cp build/${plan_file_name} s3://${bucket}/${plan_file_remote_key} \
         || error_and_die "Plan file upload to S3 failed (s3://${bucket}/${plan_file_remote_key})";
     fi;
@@ -706,20 +713,20 @@ case "${action}" in
   'apply'|'destroy'|'refresh')
 
     # Support for terraform <0.10 is now deprecated
-    if [ "${action}" == "apply" ]; then
+    if [[ "${action}" == "apply" ]]; then
       echo "Compatibility: Adding to terraform arguments: -auto-approve=true";
       extra_args+=" -auto-approve=true";
     else # action is `destroy`
       # Check terraform version - if pre-0.15, need to add `-force`; 0.15 and above instead use `-auto-approve`
-      if [ $(terraform version | head -n1 | cut -d" " -f2 | cut -d"." -f1) == "v0" ] && [ $(terraform version | head -n1 | cut -d" " -f2 | cut -d"." -f2) -lt 15 ]; then
+      if [[ $(terraform version | head -n1 | cut -d" " -f2 | cut -d"." -f1) == "v0" ]] && [[ $(terraform version | head -n1 | cut -d" " -f2 | cut -d"." -f2) -lt 15 ]]; then
         echo "Compatibility: Adding to terraform arguments: -force";
         force='-force';
-      elif [ "${action}" != "refresh" ]; then
+      elif [[ "${action}" != "refresh" ]]; then
         extra_args+=" -auto-approve";
       fi;
     fi;
 
-    if [ -n "${build_id}" ]; then
+    if [[ -n "${build_id}" ]]; then
       mkdir -p build;
       plan_file_name="${component_name}_${build_id}.tfplan";
       plan_file_remote_key="${backend_prefix}/plans/${plan_file_name}";
@@ -747,7 +754,7 @@ case "${action}" in
         ${force};
       exit_code=$?;
 
-      if [ "${bootstrapped}" == "false" ]; then
+      if [[ "${bootstrapped}" == "false" ]]; then
         # If we are here, and we are in bootstrap mode, and not already bootstrapped,
         # Then we have just bootstrapped for the first time! Congratulations.
         # Now we need to copy our state file into the bootstrap bucket
@@ -772,11 +779,11 @@ case "${action}" in
 
     fi;
 
-    if [ ${exit_code} -ne 0 ]; then
+    if [[ ${exit_code} -ne 0 ]]; then
       error_and_die "Terraform ${action} failed with exit code ${exit_code}";
     fi;
 
-    if [ -f "post.sh" ]; then
+    if [[ -f "post.sh" ]]; then
       source post.sh "${region}" "${environment}" "${action}" \
         || error_and_die "Component post script execution failed with exit code ${?}";
     fi;
@@ -801,7 +808,7 @@ esac;
 
 popd
 
-if [ -f "post.sh" ]; then
+if [[ -f "post.sh" ]]; then
   source post.sh "${region}" "${environment}" "${action}" \
     || error_and_die "Global post script execution failed with exit code ${?}";
 fi;

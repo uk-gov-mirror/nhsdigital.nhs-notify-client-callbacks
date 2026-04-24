@@ -27,6 +27,8 @@ function main() {
   else
     cmd=$cmd run-terraform-in-docker
   fi
+
+  return 0
 }
 
 # Run Terraform natively.
@@ -36,6 +38,8 @@ function run-terraform-natively() {
 
   # shellcheck disable=SC2086
   terraform $cmd
+
+  return 0
 }
 
 # Run Terraform in a Docker container.
@@ -54,6 +58,8 @@ function run-terraform-in-docker() {
     --workdir /workdir \
     "$image" \
       $cmd
+
+  return 0
 }
 
 # ==============================================================================
