@@ -174,6 +174,7 @@ async function processRecord(
     targetId,
     messageId,
     sqsMessageId: record.messageId,
+    receiveCount: record.attributes.ApproximateReceiveCount,
   });
 
   const target = await loadTargetConfig(CLIENT_ID, targetId);
