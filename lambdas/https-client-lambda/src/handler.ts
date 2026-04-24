@@ -145,6 +145,7 @@ async function handleDeliveryResult(
     targetId,
     result.statusCode,
     backoffSec,
+    receiveCount,
     correlationId,
   );
   await changeVisibility(record.receiptHandle, backoffSec);
@@ -168,6 +169,7 @@ async function processRecord(
     clientId: CLIENT_ID,
     targetId,
     messageId,
+    sqsMessageId: record.messageId,
   });
 
   const target = await loadTargetConfig(CLIENT_ID, targetId);

@@ -61,6 +61,7 @@ export function recordDeliveryFailure(
   targetId: string,
   statusCode: number,
   backoffSec: number,
+  receiveCount: number,
   correlationId?: string,
 ): void {
   emitDeliveryFailure(targetId);
@@ -70,6 +71,7 @@ export function recordDeliveryFailure(
     correlationId,
     statusCode,
     backoffSec,
+    receiveCount,
   });
 }
 

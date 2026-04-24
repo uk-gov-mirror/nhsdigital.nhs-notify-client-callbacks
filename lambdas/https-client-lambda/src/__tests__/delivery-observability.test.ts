@@ -119,7 +119,7 @@ describe("delivery-observability", () => {
     );
     const { logger } = jest.requireMock("@nhs-notify-client-callbacks/logger");
 
-    recordDeliveryFailure("client-1", "target-1", 503, 30, "msg-123");
+    recordDeliveryFailure("client-1", "target-1", 503, 30, 3, "msg-123");
 
     expect(emitDeliveryFailure).toHaveBeenCalledWith("target-1");
     expect(logger.warn).toHaveBeenCalledWith(
@@ -130,6 +130,7 @@ describe("delivery-observability", () => {
         correlationId: "msg-123",
         statusCode: 503,
         backoffSec: 30,
+        receiveCount: 3,
       }),
     );
   });
