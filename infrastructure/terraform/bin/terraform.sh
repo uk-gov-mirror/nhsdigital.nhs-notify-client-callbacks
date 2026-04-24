@@ -14,7 +14,8 @@ readonly script_ver="1.8.1";
 # Standardised failure function
 ##
 function error_and_die {
-  echo -e "ERROR: ${1}" >&2;
+  local message="${1}";
+  echo -e "ERROR: ${message}" >&2;
   exit 1;
 };
 
@@ -352,21 +353,23 @@ fi;
 # Begin parameter-dependent logic
 ##
 
+readonly REFRESH_FLAG="-refresh=true";
+
 case "${action}" in
   apply)
-    refresh="-refresh=true";
+    refresh="${REFRESH_FLAG}";
     ;;
   destroy)
     destroy='-destroy';
-    refresh="-refresh=true";
+    refresh="${REFRESH_FLAG}";
     ;;
   plan)
-    refresh="-refresh=true";
+    refresh="${REFRESH_FLAG}";
     ;;
   plan-destroy)
     action="plan";
     destroy="-destroy";
-    refresh="-refresh=true";
+    refresh="${REFRESH_FLAG}";
     ;;
   *)
     ;;

@@ -12,6 +12,8 @@ function main() {
   access_token=$(get-access-token)
 
   echo "GITHUB_TOKEN=$access_token"
+
+  return 0
 }
 
 function get-jwt-token() {
@@ -21,6 +23,8 @@ function get-jwt-token() {
   signature=$(echo -n "$header.$payload" | openssl dgst -binary -sha256 -sign "$GITHUB_APP_PK_FILE" | openssl base64 | tr -d '\n=' | tr -- '+/' '-_')
 
   echo "$header.$payload.$signature"
+
+  return 0
 }
 
 function get-installation-id() {
@@ -31,6 +35,8 @@ function get-installation-id() {
     https://api.github.com/app/installations)
 
   echo "$installations_response" | jq '.[] | select(.account.login == "'"$GITHUB_ORG"'") .id'
+
+  return 0
 }
 
 function get-access-token() {
@@ -41,6 +47,8 @@ function get-access-token() {
     "https://api.github.com/app/installations/$installation_id/access_tokens")
 
   echo "$token_response" | jq .token -r
+
+  return 0
 }
 
 main

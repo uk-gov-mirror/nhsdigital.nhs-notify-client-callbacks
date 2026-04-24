@@ -58,9 +58,10 @@ PREFIX="nhs-${ENVIRONMENT}-callbacks"
 PIPE_NAME="${PREFIX}-main"
 
 print_section() {
+  local title="$1"
   echo ""
   echo "========================================"
-  echo "$1"
+  echo "$title"
   echo "========================================"
   return 0
 }

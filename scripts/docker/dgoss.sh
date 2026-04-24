@@ -18,7 +18,8 @@ info() {
     return 0
 }
 error() {
-    echo -e "ERROR: $*" >&2;
+    local message="$*";
+    echo -e "ERROR: $message" >&2;
     exit 1;
 }
 
