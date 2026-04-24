@@ -86,6 +86,7 @@ jest.mock("services/delivery-metrics", () => ({
   emitRateLimited: jest.fn(),
   emitRetryWindowExhausted: jest.fn(),
   flushMetrics: jest.fn().mockResolvedValue(undefined),
+  resetMetrics: jest.fn(),
 }));
 
 process.env.CLIENT_ID = "client-1";

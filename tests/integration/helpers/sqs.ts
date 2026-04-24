@@ -1,5 +1,6 @@
 import {
   ChangeMessageVisibilityCommand,
+  DeleteMessageCommand,
   GetQueueAttributesCommand,
   type Message,
   PurgeQueueCommand,
@@ -168,6 +169,7 @@ async function receiveOneMessage(client: SQSClient, queueUrl: string) {
 export async function awaitQueueMessage(
   client: SQSClient,
   queueUrl: string,
+  timeoutMs: number = QUEUE_WAIT_TIMEOUT_MS,
 ): Promise<Message> {
   let message: Message | undefined;
 
@@ -179,13 +181,13 @@ export async function awaitQueueMessage(
     },
     {
       intervalBetweenAttempts: POLL_INTERVAL_MS,
-      timeout: QUEUE_WAIT_TIMEOUT_MS,
+      timeout: timeoutMs,
     },
   );
 
   if (!message) {
     throw new Error(
-      `Timed out after ${QUEUE_WAIT_TIMEOUT_MS}ms waiting for a message to appear in ${queueUrl}`,
+      `Timed out after ${timeoutMs}ms waiting for a message to appear in ${queueUrl}`,
     );
   }
 
@@ -248,4 +250,27 @@ export async function awaitQueueMessageByMessageId(
   }
 
   return matchedMessage;
+}
+
+export async function deleteMessage(
+  client: SQSClient,
+  queueUrl: string,
+  message: Message,
+): Promise<void> {
+  await client.send(
+    new DeleteMessageCommand({
+      QueueUrl: queueUrl,
+      ReceiptHandle: message.ReceiptHandle!,
+    }),
+  );
+}
+
+export async function getQueueDepth(
+  client: SQSClient,
+  queueUrl: string,
+): Promise<number> {
+  return getQueueMessageCount(client, queueUrl, [
+    "ApproximateNumberOfMessages",
+    "ApproximateNumberOfMessagesNotVisible",
+  ]);
 }

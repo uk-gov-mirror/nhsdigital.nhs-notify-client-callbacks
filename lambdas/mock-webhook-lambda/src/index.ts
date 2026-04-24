@@ -175,6 +175,7 @@ async function buildResponse(
       messageId,
       callbackType: item.type,
       path,
+      isMtls,
       apiKey: providedApiKey,
       signature: headers["x-hmac-sha256-signature"] ?? "",
       payload: JSON.stringify(item),

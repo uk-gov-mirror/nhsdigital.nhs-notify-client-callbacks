@@ -1,100 +1,76 @@
-import { GetQueueAttributesCommand, SQSClient } from "@aws-sdk/client-sqs";
-import { CloudWatchLogsClient } from "@aws-sdk/client-cloudwatch-logs";
 import type {
   MessageStatusData,
   StatusPublishEvent,
 } from "@nhs-notify-client-callbacks/models";
+import { awaitCallback, awaitCallbacks } from "./helpers/cloudwatch";
+import { createMessageStatusPublishEvent } from "./helpers/event-factories";
 import {
-  buildInboundEventQueueUrl,
-  buildLambdaLogGroupName,
-  createCloudWatchLogsClient,
-  createSqsClient,
-  getDeploymentDetails,
-} from "@nhs-notify-client-callbacks/test-support/helpers";
+  CLIENT_FIXTURES,
+  type ClientFixtureKey,
+  getClientConfig,
+} from "./helpers/mock-client-config";
+import sendEventToDlqAndRedrive from "./helpers/redrive";
 import { assertCallbackHeaders } from "./helpers/signature";
 import {
-  buildMockClientDlqQueueUrl,
+  awaitQueueMessage,
+  deleteMessage,
   ensureInboundQueueIsEmpty,
+  getQueueDepth,
   purgeQueues,
   sendSqsEvent,
 } from "./helpers/sqs";
 import {
-  CLIENT_FIXTURES,
-  type ClientFixtureKey,
-  buildMockWebhookTargetPath,
-  getClientConfig,
-  getMockItClientConfig,
-} from "./helpers/mock-client-config";
-import { awaitSignedCallbacksFromWebhookLogGroup } from "./helpers/cloudwatch";
-import { createMessageStatusPublishEvent } from "./helpers/event-factories";
-import sendEventToDlqAndRedrive from "./helpers/redrive";
+  type TestContext,
+  createTestContext,
+  destroyTestContext,
+} from "./helpers/test-context";
 
 describe("DLQ Redrive", () => {
-  let sqsClient: SQSClient;
-  let cloudWatchClient: CloudWatchLogsClient;
-  let dlqQueueUrl!: string;
-  let allTargetDlqQueueUrls: string[];
-  let inboundQueueUrl: string;
-  let webhookLogGroupName: string;
+  let ctx: TestContext;
+  let dlqUrl: string;
+  let deliveryUrl: string;
+  let allDlqUrls: string[];
 
   beforeAll(async () => {
-    const deploymentDetails = getDeploymentDetails();
-    const { clientId } = getMockItClientConfig();
+    ctx = createTestContext();
+    const { clientId } = getClientConfig("clientSingleTarget");
 
-    sqsClient = createSqsClient(deploymentDetails);
-    cloudWatchClient = createCloudWatchLogsClient(deploymentDetails);
-
-    inboundQueueUrl = buildInboundEventQueueUrl(deploymentDetails);
-    dlqQueueUrl = buildMockClientDlqQueueUrl(deploymentDetails, clientId);
-    allTargetDlqQueueUrls = (
-      Object.keys(CLIENT_FIXTURES) as ClientFixtureKey[]
-    ).map((key) =>
-      buildMockClientDlqQueueUrl(
-        deploymentDetails,
-        getClientConfig(key).clientId,
-      ),
-    );
-    webhookLogGroupName = buildLambdaLogGroupName(
-      deploymentDetails,
-      "mock-webhook",
+    dlqUrl = ctx.clientDlqUrl(clientId);
+    deliveryUrl = ctx.clientDeliveryUrl(clientId);
+    allDlqUrls = (Object.keys(CLIENT_FIXTURES) as ClientFixtureKey[]).map(
+      (key) => ctx.clientDlqUrl(getClientConfig(key).clientId),
     );
 
-    await purgeQueues(sqsClient, [inboundQueueUrl, ...allTargetDlqQueueUrls]);
+    await purgeQueues(ctx.sqs, [
+      ctx.inboundQueueUrl,
+      deliveryUrl,
+      ...allDlqUrls,
+    ]);
   });
 
   afterAll(async () => {
-    await purgeQueues(sqsClient, [inboundQueueUrl, ...allTargetDlqQueueUrls]);
-    sqsClient.destroy();
-    cloudWatchClient.destroy();
+    await purgeQueues(ctx.sqs, [
+      ctx.inboundQueueUrl,
+      deliveryUrl,
+      ...allDlqUrls,
+    ]);
+    destroyTestContext(ctx);
   });
 
   describe("Infrastructure validation", () => {
     it("should confirm a DLQ is accessible for all configured clients", async () => {
-      const responses = await Promise.all(
-        allTargetDlqQueueUrls.map((queueUrl) =>
-          sqsClient.send(
-            new GetQueueAttributesCommand({
-              QueueUrl: queueUrl,
-              AttributeNames: ["QueueArn", "ApproximateNumberOfMessages"],
-            }),
-          ),
-        ),
+      const depths = await Promise.all(
+        allDlqUrls.map((url) => getQueueDepth(ctx.sqs, url)),
       );
 
-      for (const response of responses) {
-        expect(response.Attributes?.QueueArn).toBeDefined();
+      for (const depth of depths) {
+        expect(depth).toBeGreaterThanOrEqual(0);
       }
     });
 
     it("should confirm the inbound event queue exists and is accessible", async () => {
-      const response = await sqsClient.send(
-        new GetQueueAttributesCommand({
-          QueueUrl: inboundQueueUrl,
-          AttributeNames: ["QueueArn", "ApproximateNumberOfMessages"],
-        }),
-      );
-
-      expect(response.Attributes?.QueueArn).toBeDefined();
+      const depth = await getQueueDepth(ctx.sqs, ctx.inboundQueueUrl);
+      expect(depth).toBeGreaterThanOrEqual(0);
     });
   });
 
@@ -103,33 +79,32 @@ describe("DLQ Redrive", () => {
       const startTime = Date.now();
       const event: StatusPublishEvent<MessageStatusData> =
         createMessageStatusPublishEvent();
+
       const { payload: redrivePayload } = await sendEventToDlqAndRedrive(
-        sqsClient,
-        dlqQueueUrl,
-        inboundQueueUrl,
+        ctx.sqs,
+        dlqUrl,
+        ctx.inboundQueueUrl,
         event,
       );
 
       expect(redrivePayload.id).toBe(event.id);
-      await ensureInboundQueueIsEmpty(sqsClient, inboundQueueUrl);
+      await ensureInboundQueueIsEmpty(ctx.sqs, ctx.inboundQueueUrl);
 
-      const callbacks = await awaitSignedCallbacksFromWebhookLogGroup(
-        cloudWatchClient,
-        webhookLogGroupName,
+      const callback = await awaitCallback(
+        ctx.cwLogs,
+        ctx.webhookLogGroup,
         event.data.messageId,
         "MessageStatus",
         startTime,
-        buildMockWebhookTargetPath(),
       );
 
-      expect(callbacks.length).toBeGreaterThan(0);
-      expect(callbacks[0].payload).toMatchObject({
+      expect(callback.payload).toMatchObject({
         type: "MessageStatus",
         attributes: expect.objectContaining({
           messageStatus: "delivered",
         }),
       });
-      assertCallbackHeaders(callbacks[0]);
+      assertCallbackHeaders(callback);
     }, 120_000);
 
     it("should apply the same transformation logic to redriven events as original deliveries", async () => {
@@ -155,47 +130,90 @@ describe("DLQ Redrive", () => {
         },
       });
 
-      await sendSqsEvent(sqsClient, inboundQueueUrl, directEvent);
+      await sendSqsEvent(ctx.sqs, ctx.inboundQueueUrl, directEvent);
 
       const { payload: dlqPayload } = await sendEventToDlqAndRedrive(
-        sqsClient,
-        dlqQueueUrl,
-        inboundQueueUrl,
+        ctx.sqs,
+        dlqUrl,
+        ctx.inboundQueueUrl,
         redriveEvent,
       );
 
       expect(dlqPayload.data.messageId).toBe(redriveEvent.data.messageId);
 
-      const [directCallbacks, redriveCallbacks] = await Promise.all([
-        awaitSignedCallbacksFromWebhookLogGroup(
-          cloudWatchClient,
-          webhookLogGroupName,
-          directEvent.data.messageId,
-          "MessageStatus",
-          startTime,
-          buildMockWebhookTargetPath(),
-        ),
-        awaitSignedCallbacksFromWebhookLogGroup(
-          cloudWatchClient,
-          webhookLogGroupName,
-          redriveEvent.data.messageId,
-          "MessageStatus",
-          startTime,
-          buildMockWebhookTargetPath(),
-        ),
-      ]);
+      const callbackMap = await awaitCallbacks(
+        ctx.cwLogs,
+        ctx.webhookLogGroup,
+        [directEvent.data.messageId, redriveEvent.data.messageId],
+        "MessageStatus",
+        1,
+        startTime,
+      );
 
-      await ensureInboundQueueIsEmpty(sqsClient, inboundQueueUrl);
+      const directCallback = callbackMap.get(directEvent.data.messageId)![0];
+      const redriveCallback = callbackMap.get(redriveEvent.data.messageId)![0];
 
-      expect(redriveCallbacks[0].payload).toMatchObject({
-        type: directCallbacks[0].payload.type,
+      await ensureInboundQueueIsEmpty(ctx.sqs, ctx.inboundQueueUrl);
+
+      expect(redriveCallback.payload).toMatchObject({
+        type: directCallback.payload.type,
         attributes: expect.objectContaining({
           messageStatus: (
-            directCallbacks[0].payload.attributes as { messageStatus?: string }
+            directCallback.payload.attributes as { messageStatus?: string }
           ).messageStatus,
         }),
       });
-      assertCallbackHeaders(redriveCallbacks[0]);
+      assertCallbackHeaders(redriveCallback);
     }, 120_000);
+  });
+
+  describe("Delivery DLQ redrive", () => {
+    it("should redrive a 4xx-failed message from the delivery DLQ back through the delivery queue", async () => {
+      const redriveStartTime = Date.now();
+      const forceMessageId = `force-400-redrive-${crypto.randomUUID()}`;
+
+      const failingEvent: StatusPublishEvent<MessageStatusData> =
+        createMessageStatusPublishEvent({
+          data: { messageId: forceMessageId },
+        });
+
+      await sendSqsEvent(ctx.sqs, ctx.inboundQueueUrl, failingEvent);
+
+      const dlqMessage = await awaitQueueMessage(ctx.sqs, dlqUrl, 90_000);
+
+      expect(dlqMessage.Body).toBeDefined();
+      expect(dlqMessage.MessageAttributes?.ERROR_CODE?.StringValue).toBe(
+        "HTTP_CLIENT_ERROR",
+      );
+
+      const dlqBody = JSON.parse(dlqMessage.Body as string) as {
+        payload: { data: { attributes: { messageId: string } }[] };
+        subscriptionId: string;
+        targetId: string;
+      };
+
+      const redriveMessageId = `redriven-dlq-${crypto.randomUUID()}`;
+      dlqBody.payload.data[0].attributes.messageId = redriveMessageId;
+
+      await sendSqsEvent(ctx.sqs, deliveryUrl, dlqBody);
+      await deleteMessage(ctx.sqs, dlqUrl, dlqMessage);
+
+      const callback = await awaitCallback(
+        ctx.cwLogs,
+        ctx.webhookLogGroup,
+        redriveMessageId,
+        "MessageStatus",
+        redriveStartTime,
+      );
+
+      expect(callback.payload).toMatchObject({
+        type: "MessageStatus",
+        attributes: expect.objectContaining({
+          messageId: redriveMessageId,
+          messageStatus: "delivered",
+        }),
+      });
+      assertCallbackHeaders(callback);
+    }, 180_000);
   });
 });
