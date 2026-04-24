@@ -87,6 +87,10 @@ async function checkAdmission(
   }
 }
 
+const OUTCOME_DELIVERED = "delivered" as const;
+const OUTCOME_DLQ = "dlq" as const;
+type RecordOutcome = typeof OUTCOME_DELIVERED | typeof OUTCOME_DLQ;
+
 async function handleDeliveryResult(
   result: DeliveryResult,
   record: SQSRecord,
@@ -95,7 +99,7 @@ async function handleDeliveryResult(
   targetId: string,
   cbEnabled: boolean,
   correlationId?: string,
-): Promise<void> {
+): Promise<RecordOutcome> {
   if (result.outcome === OUTCOME_SUCCESS) {
     if (cbEnabled) {
       const cbOutcome = await recordResult(redis, targetId, true, gateConfig);
@@ -104,7 +108,7 @@ async function handleDeliveryResult(
       }
     }
     recordDeliverySuccess(clientId, targetId, correlationId);
-    return;
+    return OUTCOME_DELIVERED;
   }
 
   if (result.outcome === OUTCOME_PERMANENT_FAILURE) {
@@ -116,7 +120,7 @@ async function handleDeliveryResult(
       correlationId,
     );
     await sendToDlq(record.body, result);
-    return;
+    return OUTCOME_DLQ;
   }
 
   if (result.outcome === OUTCOME_RATE_LIMITED) {
@@ -129,7 +133,7 @@ async function handleDeliveryResult(
       result.retryAfterHeader,
       receiveCount,
     );
-    return;
+    return OUTCOME_DELIVERED; // unreachable — handleRateLimitedRecord always throws
   }
 
   const receiveCount = Number(record.attributes.ApproximateReceiveCount);
@@ -155,7 +159,7 @@ async function handleDeliveryResult(
 async function processRecord(
   record: SQSRecord,
   redis: RedisClientType,
-): Promise<void> {
+): Promise<RecordOutcome> {
   const { CLIENT_ID } = process.env;
   if (!CLIENT_ID) {
     throw new Error("CLIENT_ID is required");
@@ -185,7 +189,7 @@ async function processRecord(
   if (isWindowExhausted(firstReceivedMs, maxRetryDurationMs)) {
     recordRetryWindowExhausted(CLIENT_ID, targetId, messageId);
     await sendToDlq(record.body);
-    return;
+    return OUTCOME_DLQ;
   }
 
   const applicationId = await getApplicationId(CLIENT_ID);
@@ -214,7 +218,7 @@ async function processRecord(
   const result = await deliverPayload(target, payloadJson, signature, agent);
   recordDeliveryDuration(targetId, Date.now() - deliveryStart);
 
-  await handleDeliveryResult(
+  return handleDeliveryResult(
     result,
     record,
     redis,
@@ -240,10 +244,9 @@ export async function processRecords(
 
   const results = await pMap(
     records,
-    async (record): Promise<SQSBatchItemFailure | null> => {
+    async (record): Promise<SQSBatchItemFailure | RecordOutcome> => {
       try {
-        await processRecord(record, redis);
-        return null;
+        return await processRecord(record, redis);
       } catch (error) {
         if (!(error instanceof VisibilityManagedError)) {
           logger.error("Failed to process record", {
@@ -265,11 +268,15 @@ export async function processRecords(
   );
 
   await flushMetrics();
-  const failures = results.filter((r): r is SQSBatchItemFailure => r !== null);
-  const successCount = records.length - failures.length;
+  const failures = results.filter(
+    (r): r is SQSBatchItemFailure => typeof r === "object",
+  );
+  const deliveredCount = results.filter((r) => r === OUTCOME_DELIVERED).length;
+  const dlqCount = results.filter((r) => r === OUTCOME_DLQ).length;
   logger.info("Batch complete", {
     batchSize: records.length,
-    successCount,
+    deliveredCount,
+    dlqCount,
     failureCount: failures.length,
   });
   return failures;
