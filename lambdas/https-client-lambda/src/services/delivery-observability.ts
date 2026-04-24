@@ -15,17 +15,19 @@ import {
 export function recordDeliveryAttempt(
   clientId: string,
   targetId: string,
+  correlationId?: string,
 ): void {
   emitDeliveryAttempt(targetId);
-  logger.info("Attempting delivery", { clientId, targetId });
+  logger.info("Attempting delivery", { clientId, targetId, correlationId });
 }
 
 export function recordDeliverySuccess(
   clientId: string,
   targetId: string,
+  correlationId?: string,
 ): void {
   emitDeliverySuccess(targetId);
-  logger.info("Delivery succeeded", { clientId, targetId });
+  logger.info("Delivery succeeded", { clientId, targetId, correlationId });
 }
 
 export function recordDeliveryPermanentFailure(
@@ -33,11 +35,13 @@ export function recordDeliveryPermanentFailure(
   targetId: string,
   statusCode?: number,
   errorCode?: string,
+  correlationId?: string,
 ): void {
   emitDeliveryPermanentFailure(targetId);
   logger.warn("Permanent delivery failure — sending to DLQ", {
     clientId,
     targetId,
+    correlationId,
     ...(statusCode !== undefined && { statusCode }),
     ...(errorCode !== undefined && { errorCode }),
   });
@@ -46,9 +50,10 @@ export function recordDeliveryPermanentFailure(
 export function recordDeliveryRateLimited(
   clientId: string,
   targetId: string,
+  correlationId?: string,
 ): void {
   emitRateLimited(targetId);
-  logger.info("Rate limited (429)", { clientId, targetId });
+  logger.info("Rate limited (429)", { clientId, targetId, correlationId });
 }
 
 export function recordDeliveryFailure(
@@ -56,34 +61,46 @@ export function recordDeliveryFailure(
   targetId: string,
   statusCode: number,
   backoffSec: number,
+  receiveCount: number,
+  correlationId?: string,
 ): void {
   emitDeliveryFailure(targetId);
   logger.warn("Transient delivery failure — requeuing", {
     clientId,
     targetId,
+    correlationId,
     statusCode,
     backoffSec,
+    receiveCount,
   });
 }
 
-export function recordCircuitBreakerOpen(targetId: string): void {
+export function recordCircuitBreakerOpen(
+  targetId: string,
+  correlationId?: string,
+): void {
   emitCircuitBreakerOpen(targetId);
-  logger.warn("Circuit breaker opened", { targetId });
+  logger.warn("Circuit breaker opened", { targetId, correlationId });
 }
 
-export function recordCircuitBreakerClosed(targetId: string): void {
+export function recordCircuitBreakerClosed(
+  targetId: string,
+  correlationId?: string,
+): void {
   emitCircuitBreakerClosed(targetId);
-  logger.info("Circuit breaker closed", { targetId });
+  logger.info("Circuit breaker closed", { targetId, correlationId });
 }
 
 export function recordRetryWindowExhausted(
   clientId: string,
   targetId: string,
+  correlationId?: string,
 ): void {
   emitRetryWindowExhausted(targetId);
   logger.warn("Retry window exhausted — sending to DLQ", {
     clientId,
     targetId,
+    correlationId,
   });
 }
 
@@ -91,9 +108,15 @@ export function recordAdmissionDenied(
   clientId: string,
   targetId: string,
   reason: string,
+  correlationId?: string,
 ): void {
   emitAdmissionDenied(targetId, reason);
-  logger.warn("Admission denied", { clientId, targetId, reason });
+  logger.warn("Admission denied", {
+    clientId,
+    targetId,
+    correlationId,
+    reason,
+  });
 }
 
 export function recordDeliveryDuration(

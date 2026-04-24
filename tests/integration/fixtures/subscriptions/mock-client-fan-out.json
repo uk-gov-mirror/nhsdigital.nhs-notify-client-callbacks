@@ -1,5 +1,5 @@
 {
-  "clientId": "mock-client-2",
+  "clientId": "mock-client-fan-out",
   "subscriptions": [
     {
       "messageStatuses": [

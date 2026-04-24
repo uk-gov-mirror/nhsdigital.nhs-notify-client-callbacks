@@ -1,19 +1,9 @@
-import { CloudWatchLogsClient } from "@aws-sdk/client-cloudwatch-logs";
-import { DeleteMessageCommand, SQSClient } from "@aws-sdk/client-sqs";
-import {
-  type ChannelStatusData,
-  type MessageStatusData,
-  type StatusPublishEvent,
+import type {
+  ChannelStatusData,
+  MessageStatusData,
+  StatusPublishEvent,
 } from "@nhs-notify-client-callbacks/models";
-import {
-  buildInboundEventDlqQueueUrl,
-  buildInboundEventQueueUrl,
-  buildLambdaLogGroupName,
-  createCloudWatchLogsClient,
-  createSqsClient,
-  getDeploymentDetails,
-} from "@nhs-notify-client-callbacks/test-support/helpers";
-import { awaitSignedCallbacksByCountFromWebhookLogGroup } from "./helpers/cloudwatch";
+import { awaitCallback, awaitCallbacks } from "./helpers/cloudwatch";
 import {
   createChannelStatusPublishEvent,
   createMessageStatusPublishEvent,
@@ -21,151 +11,112 @@ import {
 import {
   buildMockWebhookTargetPath,
   buildMockWebhookTargetPaths,
-  getMockItClient2Config,
-  getMockItClientConfig,
+  getClientConfig,
 } from "./helpers/mock-client-config";
 import { assertCallbackHeaders } from "./helpers/signature";
 import {
   awaitQueueMessage,
   awaitQueueMessageByMessageId,
-  buildMockClientDeliveryQueueUrl,
-  buildMockClientDlqQueueUrl,
+  deleteMessage,
   ensureInboundQueueIsEmpty,
   purgeQueues,
   sendSqsEvent,
 } from "./helpers/sqs";
 import {
-  processChannelStatusEvent,
-  processMessageStatusEvent,
-} from "./helpers/status-events";
-
-function compareStrings(a: string, b: string): number {
-  if (a > b) return 1;
-  if (a < b) return -1;
-  return 0;
-}
+  type TestContext,
+  createTestContext,
+  destroyTestContext,
+} from "./helpers/test-context";
 
 describe("SQS to Webhook Integration", () => {
-  let sqsClient: SQSClient;
-  let cloudWatchClient: CloudWatchLogsClient;
-  let callbackEventQueueUrl: string;
-  let clientDlqQueueUrl: string;
-  let clientDeliveryQueueUrl: string;
-  let inboundEventDlqQueueUrl: string;
-  let webhookLogGroupName: string;
-  let webhookTargetPath: string;
-  let startTime: number;
+  let ctx: TestContext;
+  let clientDlqUrl: string;
+  let clientDeliveryUrl: string;
 
   beforeAll(async () => {
-    const deploymentDetails = getDeploymentDetails();
-    const { clientId } = getMockItClientConfig();
-
-    sqsClient = createSqsClient(deploymentDetails);
-    cloudWatchClient = createCloudWatchLogsClient(deploymentDetails);
-    callbackEventQueueUrl = buildInboundEventQueueUrl(deploymentDetails);
-    clientDlqQueueUrl = buildMockClientDlqQueueUrl(deploymentDetails, clientId);
-    clientDeliveryQueueUrl = buildMockClientDeliveryQueueUrl(
-      deploymentDetails,
-      clientId,
-    );
-    inboundEventDlqQueueUrl = buildInboundEventDlqQueueUrl(deploymentDetails);
-    webhookLogGroupName = buildLambdaLogGroupName(
-      deploymentDetails,
-      "mock-webhook",
-    );
-    webhookTargetPath = buildMockWebhookTargetPath();
-    startTime = Date.now();
-    await purgeQueues(sqsClient, [
-      inboundEventDlqQueueUrl,
-      clientDlqQueueUrl,
-      clientDeliveryQueueUrl,
-      callbackEventQueueUrl,
+    ctx = createTestContext();
+    const { clientId } = getClientConfig("clientSingleTarget");
+    clientDlqUrl = ctx.clientDlqUrl(clientId);
+    clientDeliveryUrl = ctx.clientDeliveryUrl(clientId);
+    await purgeQueues(ctx.sqs, [
+      ctx.inboundDlqUrl,
+      clientDlqUrl,
+      clientDeliveryUrl,
+      ctx.inboundQueueUrl,
     ]);
   });
 
   afterAll(async () => {
-    await purgeQueues(sqsClient, [
-      inboundEventDlqQueueUrl,
-      clientDlqQueueUrl,
-      clientDeliveryQueueUrl,
-      callbackEventQueueUrl,
+    await purgeQueues(ctx.sqs, [
+      ctx.inboundDlqUrl,
+      clientDlqUrl,
+      clientDeliveryUrl,
+      ctx.inboundQueueUrl,
     ]);
-
-    sqsClient.destroy();
-    cloudWatchClient.destroy();
+    destroyTestContext(ctx);
   });
 
   describe("Message Status Event Flow", () => {
     it("should process message status event from SQS to webhook", async () => {
-      const messageStatusEvent: StatusPublishEvent<MessageStatusData> =
-        createMessageStatusPublishEvent();
+      const event = createMessageStatusPublishEvent();
 
-      const callbacks = await processMessageStatusEvent(
-        sqsClient,
-        cloudWatchClient,
-        callbackEventQueueUrl,
-        webhookLogGroupName,
-        messageStatusEvent,
-        webhookTargetPath,
-        startTime,
+      await sendSqsEvent(ctx.sqs, ctx.inboundQueueUrl, event);
+      await ensureInboundQueueIsEmpty(ctx.sqs, ctx.inboundQueueUrl);
+
+      const callback = await awaitCallback(
+        ctx.cwLogs,
+        ctx.webhookLogGroup,
+        event.data.messageId,
+        "MessageStatus",
+        ctx.startTime,
       );
 
-      expect(callbacks).toHaveLength(1);
-
-      expect(callbacks[0].payload).toMatchObject({
+      expect(callback.payload).toMatchObject({
         type: "MessageStatus",
-
-        attributes: expect.objectContaining({
-          messageStatus: "delivered",
-        }),
+        attributes: expect.objectContaining({ messageStatus: "delivered" }),
       });
-
-      assertCallbackHeaders(callbacks[0]);
+      assertCallbackHeaders(callback);
     }, 120_000);
 
     it("should fan out a message status event to subscription with multiple target endpoints", async () => {
-      const client2Config = getMockItClient2Config();
-      const expectedPaths = buildMockWebhookTargetPaths("client2");
+      const fanOutConfig = getClientConfig("clientFanOut");
+      const expectedPaths = buildMockWebhookTargetPaths("clientFanOut");
 
-      const messageStatusEvent: StatusPublishEvent<MessageStatusData> =
+      const event: StatusPublishEvent<MessageStatusData> =
         createMessageStatusPublishEvent({
-          data: {
-            clientId: client2Config.clientId,
-          },
+          data: { clientId: fanOutConfig.clientId },
         });
 
-      await sendSqsEvent(sqsClient, callbackEventQueueUrl, messageStatusEvent);
-      await ensureInboundQueueIsEmpty(sqsClient, callbackEventQueueUrl);
+      await sendSqsEvent(ctx.sqs, ctx.inboundQueueUrl, event);
+      await ensureInboundQueueIsEmpty(ctx.sqs, ctx.inboundQueueUrl);
 
-      const callbacks = await awaitSignedCallbacksByCountFromWebhookLogGroup(
-        cloudWatchClient,
-        webhookLogGroupName,
-        messageStatusEvent.data.messageId,
+      const callbackMap = await awaitCallbacks(
+        ctx.cwLogs,
+        ctx.webhookLogGroup,
+        [event.data.messageId],
         "MessageStatus",
         expectedPaths.length,
-        startTime,
+        ctx.startTime,
       );
 
-      expect(callbacks).toHaveLength(expectedPaths.length);
+      const callbacks = callbackMap.get(event.data.messageId)!;
 
-      const actualPaths = callbacks
-        .map((callback) => callback.path)
-        .toSorted(compareStrings);
-      expect(actualPaths).toEqual(expectedPaths.toSorted(compareStrings));
+      const paths = callbacks.map((cb) => cb.path);
+      expect(paths).toHaveLength(expectedPaths.length);
+      expect(paths).toEqual(expect.arrayContaining(expectedPaths));
 
       for (const callback of callbacks) {
         expect(callback.payload).toMatchObject({
           type: "MessageStatus",
           attributes: expect.objectContaining({
-            messageId: messageStatusEvent.data.messageId,
+            messageId: event.data.messageId,
             messageStatus: "delivered",
           }),
         });
-
         assertCallbackHeaders(
           callback,
-          client2Config.apiKeyVar,
-          client2Config.applicationIdVar,
+          fanOutConfig.apiKeyVar,
+          fanOutConfig.applicationIdVar,
         );
       }
     }, 120_000);
@@ -173,32 +124,30 @@ describe("SQS to Webhook Integration", () => {
 
   describe("Channel Status Event Flow", () => {
     it("should process channel status event from SQS to webhook", async () => {
-      const channelStatusEvent: StatusPublishEvent<ChannelStatusData> =
+      const event: StatusPublishEvent<ChannelStatusData> =
         createChannelStatusPublishEvent();
 
-      const callbacks = await processChannelStatusEvent(
-        sqsClient,
-        cloudWatchClient,
-        callbackEventQueueUrl,
-        webhookLogGroupName,
-        channelStatusEvent,
-        webhookTargetPath,
-        startTime,
+      await sendSqsEvent(ctx.sqs, ctx.inboundQueueUrl, event);
+      await ensureInboundQueueIsEmpty(ctx.sqs, ctx.inboundQueueUrl);
+
+      const callback = await awaitCallback(
+        ctx.cwLogs,
+        ctx.webhookLogGroup,
+        event.data.messageId,
+        "ChannelStatus",
+        ctx.startTime,
       );
 
-      expect(callbacks).toHaveLength(1);
-
-      expect(callbacks[0].payload).toMatchObject({
+      expect(callback.payload).toMatchObject({
         type: "ChannelStatus",
         attributes: expect.objectContaining({
           channel: "nhsapp",
           channelStatus: "delivered",
           supplierStatus: "delivered",
-          messageId: channelStatusEvent.data.messageId,
+          messageId: event.data.messageId,
         }),
       });
-
-      assertCallbackHeaders(callbacks[0]);
+      assertCallbackHeaders(callback);
     }, 120_000);
   });
 
@@ -206,14 +155,12 @@ describe("SQS to Webhook Integration", () => {
     it("should route a non-retriable (4xx) webhook response to the per-client DLQ", async () => {
       const event: StatusPublishEvent<MessageStatusData> =
         createMessageStatusPublishEvent({
-          data: {
-            messageId: `force-400-${Date.now()}`,
-          },
+          data: { messageId: `force-400-${crypto.randomUUID()}` },
         });
 
-      await sendSqsEvent(sqsClient, callbackEventQueueUrl, event);
+      await sendSqsEvent(ctx.sqs, ctx.inboundQueueUrl, event);
 
-      const dlqMessage = await awaitQueueMessage(sqsClient, clientDlqQueueUrl);
+      const dlqMessage = await awaitQueueMessage(ctx.sqs, clientDlqUrl);
 
       expect(dlqMessage.Body).toBeDefined();
       expect(dlqMessage.MessageAttributes?.ERROR_CODE?.StringValue).toBe(
@@ -223,36 +170,27 @@ describe("SQS to Webhook Integration", () => {
         dlqMessage.MessageAttributes?.ERROR_MESSAGE?.StringValue,
       ).toContain("Forced status 400");
 
-      await sqsClient.send(
-        new DeleteMessageCommand({
-          QueueUrl: clientDlqQueueUrl,
-          ReceiptHandle: dlqMessage.ReceiptHandle!,
-        }),
-      );
+      await deleteMessage(ctx.sqs, clientDlqUrl, dlqMessage);
     }, 120_000);
   });
 
   describe("Inbound Event DLQ", () => {
     it("should move an invalid inbound event to the inbound-event DLQ when schema validation fails", async () => {
-      const messageId = `invalid-schema-${Date.now()}`;
+      const messageId = `invalid-schema-${crypto.randomUUID()}`;
       const invalidEvent = createMessageStatusPublishEvent({
         data: {
           messageId,
-          channels: [
-            // @ts-expect-error - intentionally invalid for schema-failure DLQ path
-            {
-              channelStatus: "DELIVERED",
-            },
-          ],
+          // @ts-expect-error - intentionally invalid for schema-failure DLQ path
+          channels: [{ channelStatus: "DELIVERED" }],
         },
       });
 
-      await sendSqsEvent(sqsClient, callbackEventQueueUrl, invalidEvent);
-      await ensureInboundQueueIsEmpty(sqsClient, callbackEventQueueUrl);
+      await sendSqsEvent(ctx.sqs, ctx.inboundQueueUrl, invalidEvent);
+      await ensureInboundQueueIsEmpty(ctx.sqs, ctx.inboundQueueUrl);
 
       const dlqMessage = await awaitQueueMessageByMessageId(
-        sqsClient,
-        inboundEventDlqQueueUrl,
+        ctx.sqs,
+        ctx.inboundDlqUrl,
         messageId,
       );
 
@@ -260,11 +198,43 @@ describe("SQS to Webhook Integration", () => {
       const dlqPayload = JSON.parse(dlqMessage.Body as string);
       expect(dlqPayload.data.messageId).toBe(messageId);
 
-      await sqsClient.send(
-        new DeleteMessageCommand({
-          QueueUrl: inboundEventDlqQueueUrl,
-          ReceiptHandle: dlqMessage.ReceiptHandle!,
+      await deleteMessage(ctx.sqs, ctx.inboundDlqUrl, dlqMessage);
+    }, 120_000);
+  });
+
+  describe("mTLS Delivery", () => {
+    it("should deliver a callback via mTLS to the mTLS-secured mock webhook", async () => {
+      const mtlsConfig = getClientConfig("clientMtls");
+
+      const event: StatusPublishEvent<MessageStatusData> =
+        createMessageStatusPublishEvent({
+          data: { clientId: mtlsConfig.clientId },
+        });
+
+      await sendSqsEvent(ctx.sqs, ctx.inboundQueueUrl, event);
+      await ensureInboundQueueIsEmpty(ctx.sqs, ctx.inboundQueueUrl);
+
+      const callback = await awaitCallback(
+        ctx.cwLogs,
+        ctx.webhookLogGroup,
+        event.data.messageId,
+        "MessageStatus",
+        ctx.startTime,
+      );
+
+      expect(callback.path).toBe(buildMockWebhookTargetPath("clientMtls"));
+      expect(callback.isMtls).toBe(true);
+      expect(callback.payload).toMatchObject({
+        type: "MessageStatus",
+        attributes: expect.objectContaining({
+          messageId: event.data.messageId,
+          messageStatus: "delivered",
         }),
+      });
+      assertCallbackHeaders(
+        callback,
+        mtlsConfig.apiKeyVar,
+        mtlsConfig.applicationIdVar,
       );
     }, 120_000);
   });

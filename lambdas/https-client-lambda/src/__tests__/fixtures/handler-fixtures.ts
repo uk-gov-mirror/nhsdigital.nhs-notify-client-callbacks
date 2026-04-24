@@ -18,7 +18,13 @@ export const makeRecord = (overrides: Partial<SQSRecord> = {}): SQSRecord => ({
   body: JSON.stringify({
     payload: {
       data: [
-        { type: "MessageStatus", attributes: { messageStatus: "delivered" } },
+        {
+          type: "MessageStatus",
+          attributes: {
+            messageId: "test-message-id",
+            messageStatus: "delivered",
+          },
+        },
       ],
     },
     subscriptionId: "sub-1",
