@@ -42,7 +42,7 @@ import { flushMetrics } from "services/delivery-metrics";
 type RedisClientType = Awaited<ReturnType<typeof getRedisClient>>;
 
 const DEFAULT_MAX_RETRY_DURATION_MS = 7_200_000; // 2 hours
-const DEFAULT_CONCURRENCY_LIMIT = 5;
+const DEFAULT_CONCURRENCY_LIMIT = 10;
 
 const gateConfig: EndpointGateConfig = {
   // Max tokens the bucket can hold — absorbs short traffic bursts without throttling (default: 2250)

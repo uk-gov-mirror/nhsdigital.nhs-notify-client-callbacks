@@ -121,6 +121,12 @@ variable "lambda_batch_size" {
   default     = 10
 }
 
+variable "lambda_batching_window_in_seconds" {
+  type        = number
+  description = "Maximum time in seconds to wait for a full batch before invoking Lambda. Allows the delivery queue to fill to batch_size, improving Lambda concurrency utilisation."
+  default     = 1
+}
+
 variable "lambda_memory" {
   type        = number
   description = "Lambda memory allocation in MB"

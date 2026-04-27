@@ -102,7 +102,7 @@ variable "pipe_log_level" {
 
 variable "pipe_sqs_input_batch_size" {
   type    = number
-  default = 1
+  default = 500
 }
 
 variable "pipe_sqs_max_batch_window" {
