@@ -28,6 +28,7 @@ set -euo pipefail
 #
 # Optional:
 #   LOG_FILTER      CloudWatch Logs filter pattern / text
+#   LOG_SINCE       How far back to start tailing logs (default: 30m, e.g. 1h, 2h, 30m)
 #   AWS_REGION      (default: eu-west-2)
 
 if [ -z "${ENVIRONMENT:-}" ]; then
@@ -49,6 +50,7 @@ fi
 
 REGION="${AWS_REGION:-eu-west-2}"
 LOG_FILTER="${LOG_FILTER:-}"
+LOG_SINCE="${LOG_SINCE:-30m}"
 CLIENT_ID="${CLIENT_ID:-}"
 
 if ! aws sts get-caller-identity --profile "$AWS_PROFILE" >/dev/null 2>&1; then
@@ -149,7 +151,7 @@ action_tail_transform() {
     "/aws/lambda/${PREFIX}-client-transform-filter" \
     --region "$REGION" \
     --profile "$AWS_PROFILE" \
-    --since 30m \
+    --since "$LOG_SINCE" \
     --follow \
     --format short \
     "${filter_args[@]}"
@@ -165,7 +167,7 @@ action_tail_https_client() {
     "/aws/lambda/${PREFIX}-https-client-${CLIENT_ID}" \
     --region "$REGION" \
     --profile "$AWS_PROFILE" \
-    --since 30m \
+    --since "$LOG_SINCE" \
     --follow \
     --format short \
     "${filter_args[@]}"
@@ -180,7 +182,7 @@ action_tail_webhook() {
     "/aws/lambda/${PREFIX}-mock-webhook" \
     --region "$REGION" \
     --profile "$AWS_PROFILE" \
-    --since 30m \
+    --since "$LOG_SINCE" \
     --follow \
     --format short \
     "${filter_args[@]}"
@@ -213,7 +215,7 @@ action_tail_pipe() {
     "$pipe_log_group_name" \
     --region "$REGION" \
     --profile "$AWS_PROFILE" \
-    --since 30m \
+    --since "$LOG_SINCE" \
     --follow \
     --format short \
     "${filter_args[@]}"
