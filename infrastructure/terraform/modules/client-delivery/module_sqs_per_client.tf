@@ -18,6 +18,14 @@ module "sqs_delivery" {
   sqs_policy_overload = data.aws_iam_policy_document.sqs_delivery.json
 }
 
+resource "aws_sqs_queue_redrive_policy" "delivery" {
+  queue_url = module.sqs_delivery.sqs_queue_url
+  redrive_policy = jsonencode({
+    deadLetterTargetArn = module.dlq_delivery.sqs_queue_arn
+    maxReceiveCount     = var.sqs_max_receive_count
+  })
+}
+
 data "aws_iam_policy_document" "sqs_delivery" {
   statement {
     sid    = "AllowEventBridgeToSendMessage"
