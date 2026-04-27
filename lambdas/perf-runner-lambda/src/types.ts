@@ -10,6 +10,8 @@ export type MessageStatusMixEntry = {
   factory: "messageStatus";
   clientId: string;
   messageStatus: MessageStatus;
+  forcedStatusCode?: number;
+  forcedStatusCodeUntilMs?: number;
 };
 
 export type ChannelStatusMixEntry = {
@@ -17,6 +19,8 @@ export type ChannelStatusMixEntry = {
   factory: "channelStatus";
   clientId: string;
   channelStatus: ChannelStatus;
+  forcedStatusCode?: number;
+  forcedStatusCodeUntilMs?: number;
 };
 
 export type EventMixEntry = MessageStatusMixEntry | ChannelStatusMixEntry;
@@ -24,6 +28,7 @@ export type EventMixEntry = MessageStatusMixEntry | ChannelStatusMixEntry;
 export type Phase = {
   durationSecs: number;
   targetEps: number;
+  eventMix?: EventMixEntry[];
 };
 
 export type Scenario = {

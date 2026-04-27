@@ -11,8 +11,16 @@ import type { EventMixEntry } from "types";
 export function createMessageStatusEvent(
   clientId: string,
   messageStatus: MessageStatus,
+  forcedStatusCode?: number,
+  forcedStatusCodeUntilMs?: number,
 ): StatusPublishEvent<MessageStatusData> {
-  const messageId = crypto.randomUUID();
+  const uuid = crypto.randomUUID();
+  const messageId =
+    forcedStatusCode !== undefined
+      ? forcedStatusCodeUntilMs !== undefined
+        ? `force-${forcedStatusCode}-until-${forcedStatusCodeUntilMs}-${uuid}`
+        : `force-${forcedStatusCode}-${uuid}`
+      : uuid;
 
   const data: MessageStatusData = {
     clientId,
@@ -47,8 +55,16 @@ export function createMessageStatusEvent(
 export function createChannelStatusEvent(
   clientId: string,
   channelStatus: ChannelStatus,
+  forcedStatusCode?: number,
+  forcedStatusCodeUntilMs?: number,
 ): StatusPublishEvent<ChannelStatusData> {
-  const messageId = crypto.randomUUID();
+  const uuid = crypto.randomUUID();
+  const messageId =
+    forcedStatusCode !== undefined
+      ? forcedStatusCodeUntilMs !== undefined
+        ? `force-${forcedStatusCode}-until-${forcedStatusCodeUntilMs}-${uuid}`
+        : `force-${forcedStatusCode}-${uuid}`
+      : uuid;
 
   const data: ChannelStatusData = {
     clientId,
@@ -80,8 +96,18 @@ export function createChannelStatusEvent(
 
 export function createEvent(entry: EventMixEntry): StatusPublishEvent {
   if (entry.factory === "messageStatus") {
-    return createMessageStatusEvent(entry.clientId, entry.messageStatus);
+    return createMessageStatusEvent(
+      entry.clientId,
+      entry.messageStatus,
+      entry.forcedStatusCode,
+      entry.forcedStatusCodeUntilMs,
+    );
   }
 
-  return createChannelStatusEvent(entry.clientId, entry.channelStatus);
+  return createChannelStatusEvent(
+    entry.clientId,
+    entry.channelStatus,
+    entry.forcedStatusCode,
+    entry.forcedStatusCodeUntilMs,
+  );
 }
