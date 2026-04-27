@@ -54,7 +54,7 @@ function runRecordResult(
 
 describe("record-result.lua", () => {
   describe("success recording", () => {
-    it("returns closed state for a successful batch", () => {
+    it("returns ok state for a successful batch", () => {
       const store = createRedisStore();
       store.set("ep:t1", new Map([["sample_till", "9999999999"]]));
 
@@ -64,7 +64,7 @@ describe("record-result.lua", () => {
       });
 
       expect(ok).toBe(1);
-      expect(state).toBe("closed");
+      expect(state).toBe("ok");
     });
 
     it("increments cur_attempts without incrementing cur_failures", () => {

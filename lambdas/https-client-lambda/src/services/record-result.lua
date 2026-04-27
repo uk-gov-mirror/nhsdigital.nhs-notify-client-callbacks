@@ -11,9 +11,10 @@
 --   state: "closed" | "opened" | "failed"
 
 -- Return state constants
-local OPENED = "opened"
-local CLOSED = "closed"
-local FAILED = "failed"
+local OPENED             = "opened"
+local CLOSED             = "closed"
+local FAILED             = "failed"
+local OK                 = "ok"
 
 -- Keys
 local epKey              = KEYS[1] -- ep:{targetId}  combined endpoint state hash
@@ -32,24 +33,24 @@ local samplePeriodMs     = tonumber(ARGV[8]) or 0
 -- LOAD CURRENT STATE
 --------------------------------------------------------------------------------
 
-local state          = redis.call("HMGET", epKey,
+local state              = redis.call("HMGET", epKey,
   "is_open", "switched_at",
   "cur_attempts", "prev_attempts", "cur_failures", "prev_failures",
   "sample_till")
-local isOpen         = tonumber(state[1] or "0") == 1
-local switchedAt     = tonumber(state[2] or tostring(now))
-local curAttempts    = tonumber(state[3] or "0")
-local prevAttempts   = tonumber(state[4] or "0")
-local curFailures    = tonumber(state[5] or "0")
-local prevFailures   = tonumber(state[6] or "0")
-local sampleTill     = tonumber(state[7] or "0")
+local isOpen             = tonumber(state[1] or "0") == 1
+local switchedAt         = tonumber(state[2] or tostring(now))
+local curAttempts        = tonumber(state[3] or "0")
+local prevAttempts       = tonumber(state[4] or "0")
+local curFailures        = tonumber(state[5] or "0")
+local prevFailures       = tonumber(state[6] or "0")
+local sampleTill         = tonumber(state[7] or "0")
 
 --------------------------------------------------------------------------------
 -- 1. DETERMINE CIRCUIT SUB-STATE
 --------------------------------------------------------------------------------
 
-local isHalfOpen  = isOpen and now > switchedAt + cooldownPeriodMs
-local isFullyOpen = isOpen and not isHalfOpen
+local isHalfOpen         = isOpen and now > switchedAt + cooldownPeriodMs
+local isFullyOpen        = isOpen and not isHalfOpen
 
 --------------------------------------------------------------------------------
 -- 2. MANAGE SLIDING WINDOW
@@ -84,9 +85,9 @@ end
 -- 4. INTERPOLATE VALUES
 --------------------------------------------------------------------------------
 
-local weight   = (sampleTill - now) / samplePeriodMs
-local attempts = prevAttempts * weight + curAttempts
-local failures = prevFailures * weight + curFailures
+local weight              = (sampleTill - now) / samplePeriodMs
+local attempts            = prevAttempts * weight + curAttempts
+local failures            = prevFailures * weight + curFailures
 
 --------------------------------------------------------------------------------
 -- 5. CIRCUIT BREAKER LOGIC
@@ -146,4 +147,4 @@ if isOpen or processingFailures > 0 then
   return { 0, FAILED }
 end
 
-return { 1, CLOSED }
+return { 1, OK }

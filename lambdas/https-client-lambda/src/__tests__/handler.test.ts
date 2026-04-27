@@ -116,7 +116,7 @@ describe("processRecords", () => {
       consumedTokens: 100,
       effectiveRate: 10,
     });
-    mockRecordResult.mockResolvedValue({ ok: true, state: "closed" });
+    mockRecordResult.mockResolvedValue({ ok: true, state: "ok" });
   });
 
   it("returns no failures on successful delivery", async () => {
@@ -534,6 +534,40 @@ describe("processRecords", () => {
     await processRecords([makeRecord()]);
 
     expect(recordCircuitBreakerOpen).not.toHaveBeenCalled();
+  });
+
+  it("records CircuitBreakerClosed only on genuine close transition", async () => {
+    const targetCb = {
+      ...DEFAULT_TARGET,
+      delivery: { circuitBreaker: { enabled: true } },
+    };
+    mockLoadTargetConfig.mockResolvedValue(targetCb);
+    mockRecordResult.mockResolvedValue({ ok: true, state: "closed" });
+
+    const { recordCircuitBreakerClosed } = jest.requireMock(
+      "services/delivery-observability",
+    );
+
+    await processRecords([makeRecord()]);
+
+    expect(recordCircuitBreakerClosed).toHaveBeenCalledWith("target-1");
+  });
+
+  it("does not record CircuitBreakerClosed on normal healthy batch", async () => {
+    const targetCb = {
+      ...DEFAULT_TARGET,
+      delivery: { circuitBreaker: { enabled: true } },
+    };
+    mockLoadTargetConfig.mockResolvedValue(targetCb);
+    mockRecordResult.mockResolvedValue({ ok: true, state: "ok" });
+
+    const { recordCircuitBreakerClosed } = jest.requireMock(
+      "services/delivery-observability",
+    );
+
+    await processRecords([makeRecord()]);
+
+    expect(recordCircuitBreakerClosed).not.toHaveBeenCalled();
   });
 
   it("records RateLimited on 429 response", async () => {

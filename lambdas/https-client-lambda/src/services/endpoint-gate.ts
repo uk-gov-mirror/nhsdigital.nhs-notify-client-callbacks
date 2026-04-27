@@ -19,7 +19,7 @@ export type AdmitResultDenied = {
 export type AdmitResult = AdmitResultAllowed | AdmitResultDenied;
 
 export type RecordResultOutcome =
-  | { ok: true; state: "closed" }
+  | { ok: true; state: "ok" | "closed" }
   | { ok: false; state: "opened" | "failed" };
 
 export type EndpointGateConfig = {
