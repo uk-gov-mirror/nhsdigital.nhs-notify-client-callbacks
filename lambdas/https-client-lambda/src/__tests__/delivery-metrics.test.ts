@@ -1,6 +1,7 @@
 const mockCreateMetricsLogger = jest.fn();
 jest.mock("aws-embedded-metrics", () => ({
   Unit: { Count: "Count", Milliseconds: "Milliseconds" },
+  StorageResolution: { High: 1, Standard: 60 },
   createMetricsLogger: () => mockCreateMetricsLogger(),
 }));
 
@@ -83,6 +84,7 @@ describe("delivery-metrics", () => {
       "DeliveryAttempt",
       1,
       "Count",
+      1,
     );
   });
 
@@ -96,6 +98,7 @@ describe("delivery-metrics", () => {
       "DeliverySuccess",
       1,
       "Count",
+      1,
     );
   });
 
@@ -109,6 +112,7 @@ describe("delivery-metrics", () => {
       "DeliveryFailure",
       1,
       "Count",
+      1,
     );
   });
 
@@ -123,6 +127,7 @@ describe("delivery-metrics", () => {
       "DeliveryPermanentFailure",
       1,
       "Count",
+      1,
     );
   });
 
@@ -137,6 +142,7 @@ describe("delivery-metrics", () => {
       "CircuitBreakerOpen",
       1,
       "Count",
+      1,
     );
   });
 
@@ -151,6 +157,7 @@ describe("delivery-metrics", () => {
       "DeliveryRateLimited",
       1,
       "Count",
+      1,
     );
   });
 
@@ -165,6 +172,7 @@ describe("delivery-metrics", () => {
       "CircuitBreakerClosed",
       1,
       "Count",
+      1,
     );
   });
 
@@ -179,6 +187,7 @@ describe("delivery-metrics", () => {
       "DeliveryRetryWindowExhausted",
       1,
       "Count",
+      1,
     );
   });
 
@@ -201,6 +210,7 @@ describe("delivery-metrics", () => {
       "AdmissionDenied",
       1,
       "Count",
+      1,
     );
   });
 
@@ -215,6 +225,7 @@ describe("delivery-metrics", () => {
       "DeliveryDurationMs",
       250,
       "Milliseconds",
+      1,
     );
   });
 

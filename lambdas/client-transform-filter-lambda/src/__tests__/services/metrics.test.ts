@@ -1,7 +1,11 @@
-import { Unit, createMetricsLogger } from "aws-embedded-metrics";
+import { StorageResolution, Unit, createMetricsLogger } from "aws-embedded-metrics";
 import { CallbackMetrics, createMetricLogger } from "services/metrics";
 
-jest.mock("aws-embedded-metrics");
+jest.mock("aws-embedded-metrics", () => ({
+  Unit: { Count: "Count" },
+  StorageResolution: { High: 1, Standard: 60 },
+  createMetricsLogger: jest.fn(),
+}));
 
 const mockPutMetric = jest.fn();
 const mockSetDimensions = jest.fn();
@@ -80,6 +84,7 @@ describe("CallbackMetrics", () => {
         "EventsReceived",
         1,
         Unit.Count,
+        StorageResolution.High,
       );
     });
   });
@@ -92,6 +97,7 @@ describe("CallbackMetrics", () => {
         "TransformationsSuccessful",
         1,
         Unit.Count,
+        StorageResolution.High,
       );
     });
   });
@@ -104,6 +110,7 @@ describe("CallbackMetrics", () => {
         "TransformationsFailed",
         1,
         Unit.Count,
+        StorageResolution.High,
       );
     });
   });
@@ -116,6 +123,7 @@ describe("CallbackMetrics", () => {
         "CallbacksInitiated",
         1,
         Unit.Count,
+        StorageResolution.High,
       );
     });
   });
@@ -128,6 +136,7 @@ describe("CallbackMetrics", () => {
         "ValidationErrors",
         1,
         Unit.Count,
+        StorageResolution.High,
       );
     });
   });
@@ -140,6 +149,7 @@ describe("CallbackMetrics", () => {
         "FilteringStarted",
         1,
         Unit.Count,
+        StorageResolution.High,
       );
     });
   });
@@ -152,6 +162,7 @@ describe("CallbackMetrics", () => {
         "FilteringMatched",
         1,
         Unit.Count,
+        StorageResolution.High,
       );
     });
   });

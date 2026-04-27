@@ -1,4 +1,4 @@
-import { Unit, createMetricsLogger } from "aws-embedded-metrics";
+import { StorageResolution, Unit, createMetricsLogger } from "aws-embedded-metrics";
 import type { MetricsLogger } from "aws-embedded-metrics";
 
 let metricsInstance: MetricsLogger | undefined;
@@ -28,56 +28,56 @@ function getMetrics(): MetricsLogger {
 export function emitDeliveryAttempt(targetId: string): void {
   const metrics = getMetrics();
   metrics.setProperty("targetId", targetId);
-  metrics.putMetric("DeliveryAttempt", 1, Unit.Count);
+  metrics.putMetric("DeliveryAttempt", 1, Unit.Count, StorageResolution.High);
 }
 
 export function emitDeliverySuccess(targetId: string): void {
   const metrics = getMetrics();
   metrics.setProperty("targetId", targetId);
-  metrics.putMetric("DeliverySuccess", 1, Unit.Count);
+  metrics.putMetric("DeliverySuccess", 1, Unit.Count, StorageResolution.High);
 }
 
 export function emitDeliveryFailure(targetId: string): void {
   const metrics = getMetrics();
   metrics.setProperty("targetId", targetId);
-  metrics.putMetric("DeliveryFailure", 1, Unit.Count);
+  metrics.putMetric("DeliveryFailure", 1, Unit.Count, StorageResolution.High);
 }
 
 export function emitDeliveryPermanentFailure(targetId: string): void {
   const metrics = getMetrics();
   metrics.setProperty("targetId", targetId);
-  metrics.putMetric("DeliveryPermanentFailure", 1, Unit.Count);
+  metrics.putMetric("DeliveryPermanentFailure", 1, Unit.Count, StorageResolution.High);
 }
 
 export function emitRateLimited(targetId: string): void {
   const metrics = getMetrics();
   metrics.setProperty("targetId", targetId);
-  metrics.putMetric("DeliveryRateLimited", 1, Unit.Count);
+  metrics.putMetric("DeliveryRateLimited", 1, Unit.Count, StorageResolution.High);
 }
 
 export function emitCircuitBreakerOpen(targetId: string): void {
   const metrics = getMetrics();
   metrics.setProperty("targetId", targetId);
-  metrics.putMetric("CircuitBreakerOpen", 1, Unit.Count);
+  metrics.putMetric("CircuitBreakerOpen", 1, Unit.Count, StorageResolution.High);
 }
 
 export function emitCircuitBreakerClosed(targetId: string): void {
   const metrics = getMetrics();
   metrics.setProperty("targetId", targetId);
-  metrics.putMetric("CircuitBreakerClosed", 1, Unit.Count);
+  metrics.putMetric("CircuitBreakerClosed", 1, Unit.Count, StorageResolution.High);
 }
 
 export function emitRetryWindowExhausted(targetId: string): void {
   const metrics = getMetrics();
   metrics.setProperty("targetId", targetId);
-  metrics.putMetric("DeliveryRetryWindowExhausted", 1, Unit.Count);
+  metrics.putMetric("DeliveryRetryWindowExhausted", 1, Unit.Count, StorageResolution.High);
 }
 
 export function emitAdmissionDenied(targetId: string, reason: string): void {
   const metrics = getMetrics();
   metrics.setProperty("targetId", targetId);
   metrics.setProperty("reason", reason);
-  metrics.putMetric("AdmissionDenied", 1, Unit.Count);
+  metrics.putMetric("AdmissionDenied", 1, Unit.Count, StorageResolution.High);
 }
 
 export function emitDeliveryDuration(
@@ -86,7 +86,7 @@ export function emitDeliveryDuration(
 ): void {
   const metrics = getMetrics();
   metrics.setProperty("targetId", targetId);
-  metrics.putMetric("DeliveryDurationMs", durationMs, Unit.Milliseconds);
+  metrics.putMetric("DeliveryDurationMs", durationMs, Unit.Milliseconds, StorageResolution.High);
 }
 
 export async function flushMetrics(): Promise<void> {
