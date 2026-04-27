@@ -143,7 +143,7 @@ export async function runPerformanceTest(
       deps.sqsClient,
       deps.queueUrl,
       phase,
-      scenario.eventMix,
+      phase.eventMix ?? scenario.eventMix,
     );
     phaseResults.push(result);
   }

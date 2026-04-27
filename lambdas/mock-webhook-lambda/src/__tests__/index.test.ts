@@ -367,6 +367,54 @@ describe("Mock Webhook Lambda", () => {
       const body = JSON.parse(result.body);
       expect(body.message).toBe("Forced status 500");
     });
+
+    it("should return forced status code when messageId uses timed format and deadline is in the future", async () => {
+      const futureMs = Date.now() + 60_000;
+      const callback = {
+        data: [
+          {
+            type: "MessageStatus",
+            attributes: {
+              messageId: `force-500-until-${futureMs}-some-uuid`,
+              messageStatus: "delivered",
+            },
+            links: { message: "some-message-link" },
+            meta: { idempotencyKey: "some-idempotency-key" },
+          },
+        ],
+      };
+
+      const event = createMockEvent(JSON.stringify(callback));
+      const result = await handler(event);
+
+      expect(result.statusCode).toBe(500);
+      const body = JSON.parse(result.body);
+      expect(body.message).toBe("Forced status 500");
+    });
+
+    it("should return 200 when messageId uses timed format and deadline has passed", async () => {
+      const pastMs = Date.now() - 60_000;
+      const callback = {
+        data: [
+          {
+            type: "MessageStatus",
+            attributes: {
+              messageId: `force-500-until-${pastMs}-some-uuid`,
+              messageStatus: "delivered",
+            },
+            links: { message: "some-message-link" },
+            meta: { idempotencyKey: "some-idempotency-key" },
+          },
+        ],
+      };
+
+      const event = createMockEvent(JSON.stringify(callback));
+      const result = await handler(event);
+
+      expect(result.statusCode).toBe(200);
+      const body = JSON.parse(result.body);
+      expect(body.message).toBe("Callback received");
+    });
   });
 
   describe("Logging", () => {

@@ -156,18 +156,37 @@ async function buildResponse(
     const [item] = parsed.data;
     const correlationId = item.meta.idempotencyKey;
     const { messageId } = item.attributes;
-    const forcedStatusMatch = /^force-(\d{3})-/.exec(messageId);
-    if (forcedStatusMatch) {
-      const statusCode = Number(forcedStatusMatch[1]);
-      logger.info("Forced status code response", {
-        correlationId,
-        messageId,
-        statusCode,
-      });
-      return {
-        statusCode,
-        body: JSON.stringify({ message: `Forced status ${statusCode}` }),
-      };
+    const timedForcedStatusMatch =
+      /^force-(\d{3})-until-(\d+)-/.exec(messageId);
+    if (timedForcedStatusMatch) {
+      const statusCode = Number(timedForcedStatusMatch[1]);
+      const until = Number(timedForcedStatusMatch[2]);
+      if (Date.now() < until) {
+        logger.info("Timed forced status code response", {
+          correlationId,
+          messageId,
+          statusCode,
+          until,
+        });
+        return {
+          statusCode,
+          body: JSON.stringify({ message: `Forced status ${statusCode}` }),
+        };
+      }
+    } else {
+      const forcedStatusMatch = /^force-(\d{3})-/.exec(messageId);
+      if (forcedStatusMatch) {
+        const statusCode = Number(forcedStatusMatch[1]);
+        logger.info("Forced status code response", {
+          correlationId,
+          messageId,
+          statusCode,
+        });
+        return {
+          statusCode,
+          body: JSON.stringify({ message: `Forced status ${statusCode}` }),
+        };
+      }
     }
 
     logger.info("Callback received", {
