@@ -143,4 +143,19 @@ data "aws_iam_policy_document" "perf_runner_lambda" {
       aws_elasticache_user.delivery_state_iam.arn,
     ]
   }
+
+  statement {
+    sid    = "VPCNetworkInterfacePermissions"
+    effect = "Allow"
+
+    actions = [
+      "ec2:CreateNetworkInterface",
+      "ec2:DeleteNetworkInterface",
+      "ec2:DescribeNetworkInterfaces",
+    ]
+
+    resources = [
+      "*",
+    ]
+  }
 }
