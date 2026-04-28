@@ -195,3 +195,9 @@ variable "elasticache_data_storage_maximum_gb" {
   description = "Maximum data storage in GB for the ElastiCache Serverless delivery state cache"
   default     = 1
 }
+
+variable "token_bucket_burst_capacity" {
+  type        = number
+  description = "Token bucket burst capacity used by the rate limiter"
+  default     = 2250
+}

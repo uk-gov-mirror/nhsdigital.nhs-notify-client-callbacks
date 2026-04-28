@@ -19,7 +19,7 @@ export type AdmitResultDenied = {
 export type AdmitResult = AdmitResultAllowed | AdmitResultDenied;
 
 export type RecordResultOutcome =
-  | { ok: true; state: "closed" }
+  | { ok: true; state: "closed" | "ok" }
   | { ok: false; state: "opened" | "failed" };
 
 export type EndpointGateConfig = {
@@ -159,7 +159,7 @@ export async function recordResult(
   const [ok, state] = raw;
 
   if (ok === 1) {
-    return { ok: true, state: "closed" };
+    return { ok: true, state: state as "closed" | "ok" };
   }
 
   return { ok: false, state: state as "opened" | "failed" };

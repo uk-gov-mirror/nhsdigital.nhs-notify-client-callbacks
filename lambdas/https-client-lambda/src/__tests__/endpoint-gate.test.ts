@@ -197,8 +197,8 @@ describe("evalScript", () => {
 });
 
 describe("recordResult", () => {
-  it("returns closed on success below threshold", async () => {
-    mockSendCommand.mockResolvedValueOnce([1, "closed"]);
+  it("returns ok on steady-state success below threshold", async () => {
+    mockSendCommand.mockResolvedValueOnce([1, "ok"]);
 
     const result = await recordResult(
       mockRedis,
@@ -208,7 +208,7 @@ describe("recordResult", () => {
       defaultConfig,
     );
 
-    expect(result).toEqual({ ok: true, state: "closed" });
+    expect(result).toEqual({ ok: true, state: "ok" });
     expect(mockSendCommand).toHaveBeenCalledWith(
       expect.arrayContaining(["EVALSHA"]),
     );
@@ -228,6 +228,20 @@ describe("recordResult", () => {
     expect(result).toEqual({ ok: false, state: "opened" });
   });
 
+  it("returns closed when circuit transitions from open to closed", async () => {
+    mockSendCommand.mockResolvedValueOnce([1, "closed"]);
+
+    const result = await recordResult(
+      mockRedis,
+      "target-1",
+      5,
+      0,
+      defaultConfig,
+    );
+
+    expect(result).toEqual({ ok: true, state: "closed" });
+  });
+
   it("returns failed when failure is below threshold", async () => {
     mockSendCommand.mockResolvedValueOnce([0, "failed"]);
 
@@ -245,7 +259,7 @@ describe("recordResult", () => {
   it("falls back to EVAL on NOSCRIPT error", async () => {
     mockSendCommand
       .mockRejectedValueOnce(new Error("NOSCRIPT No matching script"))
-      .mockResolvedValueOnce([1, "closed"]);
+      .mockResolvedValueOnce([1, "ok"]);
 
     const result = await recordResult(
       mockRedis,
@@ -255,12 +269,12 @@ describe("recordResult", () => {
       defaultConfig,
     );
 
-    expect(result).toEqual({ ok: true, state: "closed" });
+    expect(result).toEqual({ ok: true, state: "ok" });
     expect(mockSendCommand).toHaveBeenCalledTimes(2);
   });
 
   it("passes correct ep key for target", async () => {
-    mockSendCommand.mockResolvedValueOnce([1, "closed"]);
+    mockSendCommand.mockResolvedValueOnce([1, "ok"]);
 
     await recordResult(mockRedis, "my-target", 1, 0, defaultConfig);
 
@@ -269,7 +283,7 @@ describe("recordResult", () => {
   });
 
   it("passes consumedTokens and processingFailures as ARGV", async () => {
-    mockSendCommand.mockResolvedValueOnce([1, "closed"]);
+    mockSendCommand.mockResolvedValueOnce([1, "ok"]);
 
     await recordResult(mockRedis, "target-1", 8, 3, defaultConfig);
 

@@ -14,6 +14,7 @@
 local OPENED = "opened"
 local CLOSED = "closed"
 local FAILED = "failed"
+local OK     = "ok"
 
 -- Keys
 local epKey              = KEYS[1] -- ep:{targetId}  combined endpoint state hash
@@ -147,4 +148,4 @@ if isOpen or processingFailures > 0 then
   return { 0, FAILED }
 end
 
-return { 1, CLOSED }
+return { 1, OK }
