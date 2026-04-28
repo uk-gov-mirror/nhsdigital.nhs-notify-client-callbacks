@@ -197,15 +197,28 @@ describe("processRecords", () => {
   });
 
   it("delivers only admitted records when consumedTokens is less than batch size", async () => {
-    const record1 = makeRecord({ messageId: "msg-1" });
-    const record2 = makeRecord({ messageId: "msg-2" });
-    const record3 = makeRecord({ messageId: "msg-3" });
+    const record1 = makeRecord({
+      messageId: "msg-1",
+      receiptHandle: "receipt-1",
+    });
+    const record2 = makeRecord({
+      messageId: "msg-2",
+      receiptHandle: "receipt-2",
+    });
+    const record3 = makeRecord({
+      messageId: "msg-3",
+      receiptHandle: "receipt-3",
+    });
 
     mockAdmit.mockResolvedValue({
       allowed: true,
       consumedTokens: 1,
       effectiveRate: 10,
     });
+
+    const { recordAdmissionDenied } = jest.requireMock(
+      "services/delivery-observability",
+    );
 
     const failures = await processRecords([record1, record2, record3]);
 
@@ -214,6 +227,15 @@ describe("processRecords", () => {
       { itemIdentifier: "msg-2" },
       { itemIdentifier: "msg-3" },
     ]);
+    expect(recordAdmissionDenied).toHaveBeenCalledWith(
+      "client-1",
+      "target-1",
+      "rate_limited",
+      ["test-message-id", "test-message-id"],
+    );
+
+    expect(mockChangeVisibility).toHaveBeenCalledWith("receipt-2", 1);
+    expect(mockChangeVisibility).toHaveBeenCalledWith("receipt-3", 1);
   });
 
   it("an unexpected delivery error does not prevent other records in the batch", async () => {
@@ -650,5 +672,69 @@ describe("processRecords", () => {
     expect(mockAdmit).toHaveBeenCalledTimes(2);
     expect(mockLoadTargetConfig).toHaveBeenCalledWith("client-1", "target-1");
     expect(mockLoadTargetConfig).toHaveBeenCalledWith("client-1", "target-2");
+  });
+
+  it("calls recordAdmissionDenied with correlationIds when batch denied", async () => {
+    const record1 = makeRecord({ messageId: "msg-1" });
+    const record2 = makeRecord({ messageId: "msg-2" });
+
+    mockAdmit.mockResolvedValue({
+      allowed: false,
+      reason: "circuit_open",
+      retryAfterMs: 30_000,
+      effectiveRate: 0,
+    });
+
+    const { recordAdmissionDenied } = jest.requireMock(
+      "services/delivery-observability",
+    );
+
+    await processRecords([record1, record2]);
+
+    expect(recordAdmissionDenied).toHaveBeenCalledWith(
+      "client-1",
+      "target-1",
+      "circuit_open",
+      ["test-message-id", "test-message-id"],
+    );
+  });
+
+  it("logs deliveredCount and dlqCount in batch complete", async () => {
+    const record1 = makeRecord({ messageId: "msg-1" });
+    const record2 = makeRecord({ messageId: "msg-2" });
+
+    mockDeliverPayload
+      .mockResolvedValueOnce({ outcome: "success" })
+      .mockResolvedValueOnce({ outcome: "permanent_failure" });
+
+    const { logger } = jest.requireMock("@nhs-notify-client-callbacks/logger");
+
+    await processRecords([record1, record2]);
+
+    expect(logger.info).toHaveBeenCalledWith(
+      "Batch complete",
+      expect.objectContaining({
+        batchSize: 2,
+        deliveredCount: 1,
+        dlqCount: 1,
+        failureCount: 0,
+      }),
+    );
+  });
+
+  it("includes correlationId in error log on unexpected delivery failure", async () => {
+    mockDeliverPayload.mockRejectedValue(new Error("Connection reset"));
+
+    const { logger } = jest.requireMock("@nhs-notify-client-callbacks/logger");
+
+    await processRecords([makeRecord()]);
+
+    expect(logger.error).toHaveBeenCalledWith(
+      "Failed to process record",
+      expect.objectContaining({
+        messageId: "msg-1",
+        correlationId: "test-message-id",
+      }),
+    );
   });
 });

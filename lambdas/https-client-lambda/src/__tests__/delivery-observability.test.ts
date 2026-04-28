@@ -39,7 +39,7 @@ describe("delivery-observability", () => {
     );
     const { logger } = jest.requireMock("@nhs-notify-client-callbacks/logger");
 
-    recordDeliveryAttempt("client-1", "target-1", "msg-123");
+    recordDeliveryAttempt("client-1", "target-1", "msg-123", "sqs-msg-1", 3);
 
     expect(emitDeliveryAttempt).toHaveBeenCalledWith("target-1");
     expect(logger.info).toHaveBeenCalledWith(
@@ -48,6 +48,8 @@ describe("delivery-observability", () => {
         clientId: "client-1",
         targetId: "target-1",
         correlationId: "msg-123",
+        sqsMessageId: "sqs-msg-1",
+        receiveCount: 3,
       }),
     );
   });
@@ -190,25 +192,30 @@ describe("delivery-observability", () => {
     );
   });
 
-  it("recordAdmissionDenied emits metric and logs", () => {
+  it("recordAdmissionDenied emits per-record metrics and logs", () => {
     const { emitAdmissionDenied } = jest.requireMock(
       "services/delivery-metrics",
     );
     const { logger } = jest.requireMock("@nhs-notify-client-callbacks/logger");
 
-    recordAdmissionDenied("client-1", "target-1", "rate_limited", "msg-123");
+    recordAdmissionDenied("client-1", "target-1", "rate_limited", [
+      "msg-a",
+      "msg-b",
+    ]);
 
     expect(emitAdmissionDenied).toHaveBeenCalledWith(
       "target-1",
       "rate_limited",
+      2,
     );
     expect(logger.warn).toHaveBeenCalledWith(
       "Admission denied",
       expect.objectContaining({
         clientId: "client-1",
         targetId: "target-1",
-        correlationId: "msg-123",
         reason: "rate_limited",
+        deniedCount: 2,
+        correlationIds: ["msg-a", "msg-b"],
       }),
     );
   });

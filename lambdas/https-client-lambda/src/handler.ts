@@ -99,14 +99,20 @@ function groupByTarget(records: SQSRecord[]): TargetBatch[] {
   );
 }
 
+function extractCorrelationId(
+  message: CallbackDeliveryMessage,
+): string | undefined {
+  return message.payload.data[0]?.attributes?.messageId;
+}
+
 async function deliverRecord(
   record: SQSRecord,
   message: CallbackDeliveryMessage,
   target: Awaited<ReturnType<typeof loadTargetConfig>>,
   applicationId: string,
   clientId: string,
-): Promise<{ success: boolean }> {
-  const correlationId = message.payload.data[0]?.attributes?.messageId;
+): Promise<{ success: boolean; dlq: boolean }> {
+  const correlationId = extractCorrelationId(message);
 
   const maxRetryDurationMs =
     target.delivery?.maxRetryDurationSeconds === undefined
@@ -120,7 +126,7 @@ async function deliverRecord(
   if (isWindowExhausted(firstReceivedMs, maxRetryDurationMs)) {
     recordRetryWindowExhausted(clientId, message.targetId, correlationId);
     await sendToDlq(record.body);
-    return { success: true };
+    return { success: true, dlq: true };
   }
 
   const agent = await buildAgent(target);
@@ -131,14 +137,20 @@ async function deliverRecord(
   );
   const payloadJson = JSON.stringify(message.payload);
 
-  recordDeliveryAttempt(clientId, message.targetId, correlationId);
+  recordDeliveryAttempt(
+    clientId,
+    message.targetId,
+    correlationId,
+    record.messageId,
+    Number(record.attributes.ApproximateReceiveCount),
+  );
   const deliveryStart = Date.now();
   const result = await deliverPayload(target, payloadJson, signature, agent);
   recordDeliveryDuration(message.targetId, Date.now() - deliveryStart);
 
   if (result.outcome === OUTCOME_SUCCESS) {
     recordDeliverySuccess(clientId, message.targetId, correlationId);
-    return { success: true };
+    return { success: true, dlq: false };
   }
 
   if (result.outcome === OUTCOME_PERMANENT_FAILURE) {
@@ -150,7 +162,7 @@ async function deliverRecord(
       correlationId,
     );
     await sendToDlq(record.body, result);
-    return { success: true };
+    return { success: true, dlq: true };
   }
 
   if (result.outcome === OUTCOME_RATE_LIMITED) {
@@ -163,7 +175,7 @@ async function deliverRecord(
       result.retryAfterHeader,
       receiveCount,
     );
-    return { success: true };
+    return { success: true, dlq: false };
   }
 
   const receiveCount = Number(record.attributes.ApproximateReceiveCount);
@@ -177,7 +189,32 @@ async function deliverRecord(
     correlationId,
   );
   await changeVisibility(record.receiptHandle, backoffSec);
-  return { success: false };
+  return { success: false, dlq: false };
+}
+
+type TargetBatchResult = {
+  failures: SQSBatchItemFailure[];
+  deliveredCount: number;
+  dlqCount: number;
+};
+
+async function handleBatchDenied(
+  batch: TargetBatch,
+  clientId: string,
+  reason: string,
+  retryAfterMs: number,
+): Promise<TargetBatchResult> {
+  const delaySec = Math.ceil(retryAfterMs / 1000);
+  const correlationIds = batch.messages.map((m) => extractCorrelationId(m));
+  recordAdmissionDenied(clientId, batch.targetId, reason, correlationIds);
+  const failures: SQSBatchItemFailure[] = [];
+  for (const record of batch.records) {
+    // eslint-disable-next-line sonarjs/pseudo-random -- jitter for backoff, not security-sensitive
+    const jitterSec = Math.floor(Math.random() * 5);
+    await changeVisibility(record.receiptHandle, delaySec + jitterSec);
+    failures.push({ itemIdentifier: record.messageId });
+  }
+  return { failures, deliveredCount: 0, dlqCount: 0 };
 }
 
 async function processTargetBatch(
@@ -185,7 +222,7 @@ async function processTargetBatch(
   redis: RedisClientType,
   clientId: string,
   concurrencyLimit: number,
-): Promise<SQSBatchItemFailure[]> {
+): Promise<TargetBatchResult> {
   const target = await loadTargetConfig(clientId, batch.targetId);
   const cbEnabled = target.delivery?.circuitBreaker?.enabled ?? false;
 
@@ -199,16 +236,12 @@ async function processTargetBatch(
   );
 
   if (!gateResult.allowed) {
-    const baseDelaySec = Math.ceil(gateResult.retryAfterMs / 1000);
-    recordAdmissionDenied(clientId, batch.targetId, gateResult.reason);
-    const failures: SQSBatchItemFailure[] = [];
-    for (const record of batch.records) {
-      // eslint-disable-next-line sonarjs/pseudo-random -- jitter for backoff, not security-sensitive
-      const jitterSec = Math.floor(Math.random() * 5);
-      await changeVisibility(record.receiptHandle, baseDelaySec + jitterSec);
-      failures.push({ itemIdentifier: record.messageId });
-    }
-    return failures;
+    return handleBatchDenied(
+      batch,
+      clientId,
+      gateResult.reason,
+      gateResult.retryAfterMs,
+    );
   }
 
   const { consumedTokens } = gateResult;
@@ -223,7 +256,10 @@ async function processTargetBatch(
 
   const deliveryResults = await pMap(
     admitted,
-    async (record, index): Promise<{ record: SQSRecord; success: boolean }> => {
+    async (
+      record,
+      index,
+    ): Promise<{ record: SQSRecord; success: boolean; dlq: boolean }> => {
       try {
         const outcome = await deliverRecord(
           record,
@@ -232,10 +268,12 @@ async function processTargetBatch(
           applicationId,
           clientId,
         );
-        return { record, success: outcome.success };
+        return { record, success: outcome.success, dlq: outcome.dlq };
       } catch (error) {
+        const correlationId = extractCorrelationId(admittedMessages[index]);
         logger.error("Failed to process record", {
           messageId: record.messageId,
+          correlationId,
           err: error,
         });
         const receiveCount = Number(record.attributes.ApproximateReceiveCount);
@@ -243,7 +281,7 @@ async function processTargetBatch(
           record.receiptHandle,
           jitteredBackoffSeconds(receiveCount),
         );
-        return { record, success: false };
+        return { record, success: false, dlq: false };
       }
     },
     { concurrency: concurrencyLimit },
@@ -255,6 +293,11 @@ async function processTargetBatch(
       failures.push({ itemIdentifier: record.messageId });
     }
   }
+
+  const deliveredCount = deliveryResults.filter(
+    (r) => r.success && !r.dlq,
+  ).length;
+  const dlqCount = deliveryResults.filter((r) => r.dlq).length;
 
   if (cbEnabled && consumedTokens > 0) {
     const cbOutcome = await recordResult(
@@ -275,11 +318,24 @@ async function processTargetBatch(
     }
   }
 
-  for (const record of rejected) {
-    failures.push({ itemIdentifier: record.messageId });
+  if (rejected.length > 0) {
+    const rejectedMessages = batch.messages.slice(consumedTokens);
+    const rejectedCorrelationIds = rejectedMessages.map((m) =>
+      extractCorrelationId(m),
+    );
+    recordAdmissionDenied(
+      clientId,
+      batch.targetId,
+      "rate_limited",
+      rejectedCorrelationIds,
+    );
+    for (const record of rejected) {
+      await changeVisibility(record.receiptHandle, 1);
+      failures.push({ itemIdentifier: record.messageId });
+    }
   }
 
-  return failures;
+  return { failures, deliveredCount, dlqCount };
 }
 
 export async function processRecords(
@@ -302,19 +358,25 @@ export async function processRecords(
   const targetBatches = groupByTarget(records);
 
   const allFailures: SQSBatchItemFailure[] = [];
+  let totalDelivered = 0;
+  let totalDlq = 0;
 
   for (const batch of targetBatches) {
-    const batchFailures = await processTargetBatch(
+    const batchResult = await processTargetBatch(
       batch,
       redis,
       CLIENT_ID,
       concurrencyLimit,
     );
-    allFailures.push(...batchFailures);
+    allFailures.push(...batchResult.failures);
+    totalDelivered += batchResult.deliveredCount;
+    totalDlq += batchResult.dlqCount;
   }
 
   logger.info("Batch complete", {
     batchSize: records.length,
+    deliveredCount: totalDelivered,
+    dlqCount: totalDlq,
     failureCount: allFailures.length,
   });
 
