@@ -62,10 +62,11 @@ module "https_client_lambda" {
 }
 
 resource "aws_lambda_event_source_mapping" "sqs_delivery" {
-  event_source_arn = module.sqs_delivery.sqs_queue_arn
-  function_name    = module.https_client_lambda.function_arn
-  batch_size       = var.lambda_batch_size
-  enabled          = true
+  event_source_arn                   = module.sqs_delivery.sqs_queue_arn
+  function_name                      = module.https_client_lambda.function_arn
+  batch_size                         = var.lambda_batch_size
+  maximum_batching_window_in_seconds = var.lambda_batching_window_in_seconds
+  enabled                            = true
 
   function_response_types = ["ReportBatchItemFailures"]
 }

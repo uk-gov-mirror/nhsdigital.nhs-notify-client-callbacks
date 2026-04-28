@@ -43,7 +43,7 @@ import { flushMetrics, resetMetrics } from "services/delivery-metrics";
 type RedisClientType = Awaited<ReturnType<typeof getRedisClient>>;
 
 const DEFAULT_MAX_RETRY_DURATION_MS = 7_200_000; // 2 hours
-const DEFAULT_CONCURRENCY_LIMIT = 5;
+const DEFAULT_CONCURRENCY_LIMIT = 10;
 const BURST_MULTIPLIER = 5;
 const MAX_BURST_CAPACITY = Number(
   process.env.TOKEN_BUCKET_BURST_CAPACITY ?? "2250",

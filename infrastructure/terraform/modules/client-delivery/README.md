@@ -25,6 +25,7 @@ No requirements.
 | <a name="input_group"></a> [group](#input\_group) | The name of the tfscaffold group | `string` | `null` | no |
 | <a name="input_kms_key_arn"></a> [kms\_key\_arn](#input\_kms\_key\_arn) | KMS Key ARN for encryption at rest | `string` | n/a | yes |
 | <a name="input_lambda_batch_size"></a> [lambda\_batch\_size](#input\_lambda\_batch\_size) | Number of SQS messages per Lambda invocation | `number` | `10` | no |
+| <a name="input_lambda_batching_window_in_seconds"></a> [lambda\_batching\_window\_in\_seconds](#input\_lambda\_batching\_window\_in\_seconds) | Maximum time in seconds to wait for a full batch before invoking Lambda. Allows the delivery queue to fill to batch\_size, improving Lambda concurrency utilisation. | `number` | `1` | no |
 | <a name="input_lambda_code_base_path"></a> [lambda\_code\_base\_path](#input\_lambda\_code\_base\_path) | Base path to Lambda source code directories | `string` | n/a | yes |
 | <a name="input_lambda_memory"></a> [lambda\_memory](#input\_lambda\_memory) | Lambda memory allocation in MB | `number` | `256` | no |
 | <a name="input_lambda_s3_bucket"></a> [lambda\_s3\_bucket](#input\_lambda\_s3\_bucket) | S3 bucket for Lambda function artefacts | `string` | n/a | yes |
