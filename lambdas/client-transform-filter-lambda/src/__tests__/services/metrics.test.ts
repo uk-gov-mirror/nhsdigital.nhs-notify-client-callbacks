@@ -1,4 +1,8 @@
-import { StorageResolution, Unit, createMetricsLogger } from "aws-embedded-metrics";
+import {
+  StorageResolution,
+  Unit,
+  createMetricsLogger,
+} from "aws-embedded-metrics";
 import { CallbackMetrics, createMetricLogger } from "services/metrics";
 
 jest.mock("aws-embedded-metrics", () => ({
