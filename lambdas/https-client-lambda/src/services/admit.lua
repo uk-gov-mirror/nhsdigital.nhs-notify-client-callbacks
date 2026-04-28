@@ -28,25 +28,32 @@ local targetBatchSize   = tonumber(ARGV[7]) or 0
 -- LOAD STATE
 --------------------------------------------------------------------------------
 
+local cbEnabled           = probeRateLimit > 0
+
 local state               = redis.call("HMGET", epKey,
   "is_open", "switched_at", "bucket_tokens", "bucket_refilled_at")
 local isOpenRaw           = state[1]
 local needInit            = isOpenRaw == false or isOpenRaw == nil
-local isOpen              = needInit or tonumber(isOpenRaw) == 1
-local switchedAt          = needInit and 0 or tonumber(state[2] or "0")
+local isOpen              = cbEnabled and (needInit or tonumber(isOpenRaw) == 1)
+local switchedAt          = (cbEnabled and needInit) and 0 or tonumber(state[2] or "0")
 local bucketTokens        = tonumber(state[3] or "0")
-local bucketRefilledAt    = needInit and now or tonumber(state[4] or "0")
+local bucketRefilledAt    = (cbEnabled and needInit) and now or tonumber(state[4] or "0")
 
 --------------------------------------------------------------------------------
 -- 1. CIRCUIT BREAKER — determine effective rate
+--
+-- When probeRateLimit is 0 the circuit breaker is disabled; skip straight to
+-- the token bucket at the full configured rate.
 --------------------------------------------------------------------------------
 
-local isHalfOpen   = isOpen and now > switchedAt + cooldownMs
-local isRecovering = (not isOpen) and now < switchedAt + recoveryPeriodMs
+local isHalfOpen   = cbEnabled and isOpen and now > switchedAt + cooldownMs
+local isRecovering = cbEnabled and (not isOpen) and now < switchedAt + recoveryPeriodMs
 
 local effectiveRate
 
-if isOpen then
+if not cbEnabled then
+  effectiveRate = targetRateLimit
+elseif isOpen then
   if isHalfOpen then
     effectiveRate = probeRateLimit
   else
@@ -80,7 +87,7 @@ end
 -- generationTime, the leftover fractional time carries over to the next call.
 --------------------------------------------------------------------------------
 
-if isOpen then
+if cbEnabled and isOpen then
   bucketTokens = 0
 end
 

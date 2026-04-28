@@ -511,4 +511,103 @@ describe("admit.lua", () => {
       expect(store.has("ep:target-b")).toBe(true);
     });
   });
+
+  describe("circuit breaker disabled (probeRateLimit = 0)", () => {
+    it("uses full targetRateLimit on a fresh endpoint with no prior state", () => {
+      const store = createRedisStore();
+      const now = 1_000_000;
+
+      const { effectiveRate } = runAdmit(store, {
+        now,
+        targetRateLimit: 10,
+        probeRateLimit: 0,
+      });
+
+      expect(effectiveRate).toBe(10);
+    });
+
+    it("allows tokens immediately on first contact", () => {
+      const store = createRedisStore();
+      const now = 1_000_000;
+
+      const { consumedTokens, effectiveRate, reason } = runAdmit(store, {
+        now,
+        targetRateLimit: 10,
+        probeRateLimit: 0,
+      });
+
+      expect(effectiveRate).toBe(10);
+      expect(consumedTokens).toBeGreaterThanOrEqual(1);
+      expect(reason).toBe("allowed");
+    });
+
+    it("ignores is_open state when CB is disabled", () => {
+      const store = createRedisStore();
+      const now = 1_000_000;
+      store.set(
+        "ep:t1",
+        new Map([
+          ["is_open", "1"],
+          ["switched_at", now.toString()],
+          ["bucket_tokens", "5"],
+          ["bucket_refilled_at", now.toString()],
+        ]),
+      );
+
+      const { consumedTokens, effectiveRate, reason } = runAdmit(store, {
+        now,
+        targetRateLimit: 10,
+        probeRateLimit: 0,
+      });
+
+      expect(effectiveRate).toBe(10);
+      expect(consumedTokens).toBe(1);
+      expect(reason).toBe("allowed");
+    });
+
+    it("does not zero bucket tokens when is_open and CB disabled", () => {
+      const store = createRedisStore();
+      const now = 1_000_000;
+      store.set(
+        "ep:t1",
+        new Map([
+          ["is_open", "1"],
+          ["switched_at", now.toString()],
+          ["bucket_tokens", "5"],
+          ["bucket_refilled_at", now.toString()],
+        ]),
+      );
+
+      const { consumedTokens } = runAdmit(store, {
+        now,
+        targetRateLimit: 10,
+        probeRateLimit: 0,
+        targetBatchSize: 3,
+      });
+
+      expect(consumedTokens).toBe(3);
+    });
+
+    it("never returns circuit_open when CB is disabled", () => {
+      const store = createRedisStore();
+      const now = 1_000_000;
+      store.set(
+        "ep:t1",
+        new Map([
+          ["is_open", "1"],
+          ["switched_at", (now - 10_000).toString()],
+          ["bucket_tokens", "0"],
+          ["bucket_refilled_at", now.toString()],
+        ]),
+      );
+
+      const { reason } = runAdmit(store, {
+        now,
+        cooldownMs: 120_000,
+        probeRateLimit: 0,
+      });
+
+      expect(reason).not.toBe("circuit_open");
+    });
+  });
 });
