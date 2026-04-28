@@ -197,8 +197,8 @@ describe("evalScript", () => {
 });
 
 describe("recordResult", () => {
-  it("returns ok on steady-state success below threshold", async () => {
-    mockSendCommand.mockResolvedValueOnce([1, "ok"]);
+  it("returns closed state when circuit is steady-state", async () => {
+    mockSendCommand.mockResolvedValueOnce(["closed", 0]);
 
     const result = await recordResult(
       mockRedis,
@@ -208,14 +208,14 @@ describe("recordResult", () => {
       defaultConfig,
     );
 
-    expect(result).toEqual({ ok: true, state: "ok" });
+    expect(result).toEqual({ circuitState: "closed", stateChanged: false });
     expect(mockSendCommand).toHaveBeenCalledWith(
       expect.arrayContaining(["EVALSHA"]),
     );
   });
 
-  it("returns opened when failure crosses threshold", async () => {
-    mockSendCommand.mockResolvedValueOnce([0, "opened"]);
+  it("returns open with stateChanged when failure crosses threshold", async () => {
+    mockSendCommand.mockResolvedValueOnce(["open", 1]);
 
     const result = await recordResult(
       mockRedis,
@@ -225,11 +225,11 @@ describe("recordResult", () => {
       defaultConfig,
     );
 
-    expect(result).toEqual({ ok: false, state: "opened" });
+    expect(result).toEqual({ circuitState: "open", stateChanged: true });
   });
 
-  it("returns closed when circuit transitions from open to closed", async () => {
-    mockSendCommand.mockResolvedValueOnce([1, "closed"]);
+  it("returns closed_recovery with stateChanged when circuit closes", async () => {
+    mockSendCommand.mockResolvedValueOnce(["closed_recovery", 1]);
 
     const result = await recordResult(
       mockRedis,
@@ -239,11 +239,14 @@ describe("recordResult", () => {
       defaultConfig,
     );
 
-    expect(result).toEqual({ ok: true, state: "closed" });
+    expect(result).toEqual({
+      circuitState: "closed_recovery",
+      stateChanged: true,
+    });
   });
 
-  it("returns failed when failure is below threshold", async () => {
-    mockSendCommand.mockResolvedValueOnce([0, "failed"]);
+  it("returns half_open without stateChanged when probing", async () => {
+    mockSendCommand.mockResolvedValueOnce(["half_open", 0]);
 
     const result = await recordResult(
       mockRedis,
@@ -253,13 +256,13 @@ describe("recordResult", () => {
       defaultConfig,
     );
 
-    expect(result).toEqual({ ok: false, state: "failed" });
+    expect(result).toEqual({ circuitState: "half_open", stateChanged: false });
   });
 
   it("falls back to EVAL on NOSCRIPT error", async () => {
     mockSendCommand
       .mockRejectedValueOnce(new Error("NOSCRIPT No matching script"))
-      .mockResolvedValueOnce([1, "ok"]);
+      .mockResolvedValueOnce(["closed", 0]);
 
     const result = await recordResult(
       mockRedis,
@@ -269,12 +272,12 @@ describe("recordResult", () => {
       defaultConfig,
     );
 
-    expect(result).toEqual({ ok: true, state: "ok" });
+    expect(result).toEqual({ circuitState: "closed", stateChanged: false });
     expect(mockSendCommand).toHaveBeenCalledTimes(2);
   });
 
   it("passes correct ep key for target", async () => {
-    mockSendCommand.mockResolvedValueOnce([1, "ok"]);
+    mockSendCommand.mockResolvedValueOnce(["closed", 0]);
 
     await recordResult(mockRedis, "my-target", 1, 0, defaultConfig);
 
@@ -283,7 +286,7 @@ describe("recordResult", () => {
   });
 
   it("passes consumedTokens and processingFailures as ARGV", async () => {
-    mockSendCommand.mockResolvedValueOnce([1, "ok"]);
+    mockSendCommand.mockResolvedValueOnce(["closed", 0]);
 
     await recordResult(mockRedis, "target-1", 8, 3, defaultConfig);
 

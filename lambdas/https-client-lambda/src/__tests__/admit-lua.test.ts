@@ -62,7 +62,7 @@ function runAdmit(
 
 describe("admit.lua", () => {
   describe("rate limiting", () => {
-    it("enters recovery ramp-up on a fresh endpoint with no prior state", () => {
+    it("enters half-open probe on a fresh endpoint with no prior state", () => {
       const store = createRedisStore();
       const now = 1_000_000;
 
@@ -73,29 +73,39 @@ describe("admit.lua", () => {
 
       expect(consumedTokens).toBe(0);
       expect(reason).toBe("rate_limited");
-      expect(effectiveRate).toBe(0);
+      expect(effectiveRate).toBeCloseTo(1 / 60, 5);
     });
 
-    it("persists switched_at on first contact so recovery ramp progresses", () => {
+    it("does not persist circuit state on first contact", () => {
       const store = createRedisStore();
       const now = 1_000_000;
 
       runAdmit(store, { now, targetRateLimit: 10 });
 
       const epHash = store.get("ep:t1")!;
-      expect(epHash.get("switched_at")).toBe(now.toString());
+      expect(epHash.has("is_open")).toBe(false);
+      expect(epHash.has("switched_at")).toBe(false);
     });
 
-    it("ramps up rate on subsequent calls after fresh endpoint initialisation", () => {
+    it("allows full rate after record-result closes the circuit", () => {
       const store = createRedisStore();
       const now = 1_000_000;
+
+      store.set(
+        "ep:t1",
+        new Map([
+          ["is_open", "0"],
+          ["switched_at", now.toString()],
+          ["bucket_tokens", "0"],
+          ["bucket_refilled_at", now.toString()],
+        ]),
+      );
+
       const later = now + 60_000;
-
-      runAdmit(store, { now, targetRateLimit: 10 });
-
       const { consumedTokens, reason } = runAdmit(store, {
         now: later,
         targetRateLimit: 10,
+        recoveryPeriodMs: 600_000,
       });
 
       expect(consumedTokens).toBeGreaterThanOrEqual(1);
@@ -108,6 +118,7 @@ describe("admit.lua", () => {
       store.set(
         "ep:t1",
         new Map([
+          ["is_open", "0"],
           ["bucket_tokens", "0"],
           ["bucket_refilled_at", "0"],
           ["switched_at", "0"],
@@ -130,6 +141,7 @@ describe("admit.lua", () => {
       store.set(
         "ep:t1",
         new Map([
+          ["is_open", "0"],
           ["bucket_tokens", "5"],
           ["bucket_refilled_at", now.toString()],
           ["switched_at", "0"],
@@ -149,6 +161,7 @@ describe("admit.lua", () => {
       store.set(
         "ep:t1",
         new Map([
+          ["is_open", "0"],
           ["bucket_tokens", "2"],
           ["bucket_refilled_at", now.toString()],
           ["switched_at", "0"],
@@ -168,6 +181,7 @@ describe("admit.lua", () => {
       store.set(
         "ep:t1",
         new Map([
+          ["is_open", "0"],
           ["bucket_tokens", "0"],
           ["bucket_refilled_at", now.toString()],
           ["switched_at", "0"],
@@ -186,6 +200,7 @@ describe("admit.lua", () => {
       store.set(
         "ep:t1",
         new Map([
+          ["is_open", "0"],
           ["bucket_tokens", "0"],
           ["bucket_refilled_at", now.toString()],
           ["switched_at", "0"],
@@ -205,6 +220,7 @@ describe("admit.lua", () => {
       store.set(
         "ep:t1",
         new Map([
+          ["is_open", "0"],
           ["bucket_tokens", "0"],
           ["bucket_refilled_at", "0"],
           ["switched_at", "0"],
@@ -226,6 +242,7 @@ describe("admit.lua", () => {
       store.set(
         "ep:t1",
         new Map([
+          ["is_open", "0"],
           ["bucket_tokens", "0"],
           ["bucket_refilled_at", now.toString()],
           ["switched_at", "0"],
@@ -246,6 +263,7 @@ describe("admit.lua", () => {
       store.set(
         "ep:t1",
         new Map([
+          ["is_open", "0"],
           ["bucket_tokens", "0"],
           ["bucket_refilled_at", (now - 150).toString()],
           ["switched_at", "0"],
@@ -345,6 +363,32 @@ describe("admit.lua", () => {
       expect(effectiveRate).toBeCloseTo(1 / 60, 5);
     });
 
+    it("zeroes residual bucket tokens when circuit is half-open", () => {
+      const store = createRedisStore();
+      const now = 1_000_000;
+      const switchedAt = now - 130_000;
+
+      store.set(
+        "ep:t1",
+        new Map([
+          ["is_open", "1"],
+          ["switched_at", switchedAt.toString()],
+          ["bucket_tokens", "100"],
+          ["bucket_refilled_at", (now - 60_000).toString()],
+        ]),
+      );
+
+      const { consumedTokens } = runAdmit(store, {
+        now,
+        cooldownMs: 120_000,
+        probeRateLimit: 1 / 60,
+      });
+
+      expect(consumedTokens).toBe(1);
+      const epHash = store.get("ep:t1")!;
+      expect(Number(epHash.get("bucket_tokens"))).toBe(0);
+    });
+
     it("uses recovery ramp when closed during recovery period", () => {
       const store = createRedisStore();
       const switchedAt = 1_000_000;
@@ -366,7 +410,9 @@ describe("admit.lua", () => {
         targetRateLimit: 10,
         recoveryPeriodMs,
       });
-      expect(effectiveRate).toBe(5);
+      const probeRate = defaultArgs.probeRateLimit;
+      const expectedRate = probeRate + 0.5 * (10 - probeRate);
+      expect(effectiveRate).toBeCloseTo(expectedRate, 5);
     });
 
     it("uses full rate when closed and past recovery period", () => {
@@ -401,6 +447,7 @@ describe("admit.lua", () => {
       store.set(
         "ep:t1",
         new Map([
+          ["is_open", "0"],
           ["bucket_tokens", "5"],
           ["bucket_refilled_at", now.toString()],
           ["switched_at", "0"],
@@ -413,16 +460,29 @@ describe("admit.lua", () => {
       expect(Number(epHash.get("bucket_tokens"))).toBe(3);
     });
 
-    it("does not write sampling or circuit fields", () => {
+    it("does not write any fields when circuit_open early return", () => {
       const store = createRedisStore();
       runAdmit(store, {
         now: 10_000,
       });
 
+      expect(store.has("ep:t1")).toBe(false);
+    });
+
+    it("does not write sampling or circuit fields on half-open path", () => {
+      const store = createRedisStore();
+      runAdmit(store, {
+        now: 200_000,
+      });
+
       const epHash = store.get("ep:t1")!;
+      expect(epHash.has("bucket_tokens")).toBe(true);
+      expect(epHash.has("bucket_refilled_at")).toBe(true);
       expect(epHash.has("cur_attempts")).toBe(false);
       expect(epHash.has("cur_failures")).toBe(false);
       expect(epHash.has("sample_till")).toBe(false);
+      expect(epHash.has("is_open")).toBe(false);
+      expect(epHash.has("switched_at")).toBe(false);
     });
 
     it("isolates state between targets", () => {
@@ -430,6 +490,7 @@ describe("admit.lua", () => {
       store.set(
         "ep:target-a",
         new Map([
+          ["is_open", "0"],
           ["bucket_tokens", "5"],
           ["bucket_refilled_at", "10000"],
         ]),
@@ -437,6 +498,7 @@ describe("admit.lua", () => {
       store.set(
         "ep:target-b",
         new Map([
+          ["is_open", "0"],
           ["bucket_tokens", "3"],
           ["bucket_refilled_at", "10000"],
         ]),

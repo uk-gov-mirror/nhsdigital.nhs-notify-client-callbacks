@@ -473,7 +473,7 @@ describe("processRecords", () => {
     expect(mockRecordResult).not.toHaveBeenCalled();
   });
 
-  it("records CircuitBreakerOpen when recordResult returns opened", async () => {
+  it("records CircuitBreakerOpen when recordResult indicates circuit opened", async () => {
     const targetCb = {
       ...DEFAULT_TARGET,
       delivery: { circuitBreaker: { enabled: true } },
@@ -483,7 +483,10 @@ describe("processRecords", () => {
       outcome: "transient_failure",
       statusCode: 503,
     });
-    mockRecordResult.mockResolvedValue({ ok: false, state: "opened" });
+    mockRecordResult.mockResolvedValue({
+      circuitState: "open",
+      stateChanged: true,
+    });
 
     const { recordCircuitBreakerOpen } = jest.requireMock(
       "services/delivery-observability",
@@ -494,7 +497,7 @@ describe("processRecords", () => {
     expect(recordCircuitBreakerOpen).toHaveBeenCalledWith("target-1");
   });
 
-  it("does not record CircuitBreakerOpen when recordResult returns failed", async () => {
+  it("does not record CircuitBreakerOpen when recordResult has no state change", async () => {
     const targetCb = {
       ...DEFAULT_TARGET,
       delivery: { circuitBreaker: { enabled: true } },
@@ -504,7 +507,10 @@ describe("processRecords", () => {
       outcome: "transient_failure",
       statusCode: 503,
     });
-    mockRecordResult.mockResolvedValue({ ok: false, state: "failed" });
+    mockRecordResult.mockResolvedValue({
+      circuitState: "open",
+      stateChanged: false,
+    });
 
     const { recordCircuitBreakerOpen } = jest.requireMock(
       "services/delivery-observability",
@@ -515,7 +521,7 @@ describe("processRecords", () => {
     expect(recordCircuitBreakerOpen).not.toHaveBeenCalled();
   });
 
-  it("does not record CircuitBreakerOpen when recordResult returns ok", async () => {
+  it("does not record CircuitBreakerOpen when circuit is closed", async () => {
     const targetCb = {
       ...DEFAULT_TARGET,
       delivery: { circuitBreaker: { enabled: true } },
@@ -525,7 +531,10 @@ describe("processRecords", () => {
       outcome: "transient_failure",
       statusCode: 503,
     });
-    mockRecordResult.mockResolvedValue({ ok: true, state: "ok" });
+    mockRecordResult.mockResolvedValue({
+      circuitState: "closed",
+      stateChanged: false,
+    });
 
     const { recordCircuitBreakerOpen } = jest.requireMock(
       "services/delivery-observability",
@@ -536,7 +545,7 @@ describe("processRecords", () => {
     expect(recordCircuitBreakerOpen).not.toHaveBeenCalled();
   });
 
-  it("records CircuitBreakerClosed when recordResult returns closed", async () => {
+  it("records CircuitBreakerClosed when recordResult indicates circuit closed", async () => {
     const targetCb = {
       ...DEFAULT_TARGET,
       delivery: { circuitBreaker: { enabled: true } },
@@ -546,7 +555,10 @@ describe("processRecords", () => {
       outcome: "success",
       statusCode: 200,
     });
-    mockRecordResult.mockResolvedValue({ ok: true, state: "closed" });
+    mockRecordResult.mockResolvedValue({
+      circuitState: "closed_recovery",
+      stateChanged: true,
+    });
 
     const { recordCircuitBreakerClosed } = jest.requireMock(
       "services/delivery-observability",

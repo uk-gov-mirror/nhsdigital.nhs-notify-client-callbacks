@@ -30,12 +30,12 @@ local targetBatchSize   = tonumber(ARGV[7]) or 0
 
 local state               = redis.call("HMGET", epKey,
   "is_open", "switched_at", "bucket_tokens", "bucket_refilled_at")
-local isOpen              = tonumber(state[1] or "0") == 1
-local switchedAtRaw       = state[2]
-local switchedAt          = tonumber(switchedAtRaw or tostring(now))
+local isOpenRaw           = state[1]
+local needInit            = isOpenRaw == false or isOpenRaw == nil
+local isOpen              = needInit or tonumber(isOpenRaw) == 1
+local switchedAt          = needInit and 0 or tonumber(state[2] or "0")
 local bucketTokens        = tonumber(state[3] or "0")
-local bucketRefilledAt    = tonumber(state[4] or "0")
-local needInitSwitchedAt  = switchedAtRaw == false or switchedAtRaw == nil
+local bucketRefilledAt    = needInit and now or tonumber(state[4] or "0")
 
 --------------------------------------------------------------------------------
 -- 1. CIRCUIT BREAKER — determine effective rate
@@ -54,7 +54,9 @@ if isOpen then
   end
 else
   if isRecovering then
-    effectiveRate = targetRateLimit * (now - switchedAt) / recoveryPeriodMs
+    local rampRange = math.max(0, targetRateLimit - probeRateLimit)
+    local rampProgress = math.max(0, now - switchedAt) / recoveryPeriodMs
+    effectiveRate = probeRateLimit + rampProgress * rampRange
   else
     effectiveRate = targetRateLimit
   end
@@ -69,6 +71,10 @@ end
 -- Refill precision: bucketRefilledAt advances by exactly the time required to
 -- generate the whole tokens (not set to `now`), preserving fractional time.
 --------------------------------------------------------------------------------
+
+if isOpen then
+  bucketTokens = 0
+end
 
 local generatedTokens = math.floor((now - bucketRefilledAt) * effectiveRate / 1000)
 local availTokens     = math.min(capacity, bucketTokens + generatedTokens)
@@ -88,10 +94,6 @@ redis.call("HSET", epKey,
   "bucket_tokens", bucketTokens,
   "bucket_refilled_at", bucketRefilledAt
 )
-
-if needInitSwitchedAt then
-  redis.call("HSET", epKey, "switched_at", switchedAt)
-end
 
 local reason     = consumedTokens < 1 and "rate_limited" or "allowed"
 local retryAfter = consumedTokens < 1 and 1000 or 0

@@ -18,9 +18,12 @@ export type AdmitResultDenied = {
 
 export type AdmitResult = AdmitResultAllowed | AdmitResultDenied;
 
-export type RecordResultOutcome =
-  | { ok: true; state: "closed" | "ok" }
-  | { ok: false; state: "opened" | "failed" };
+export type CircuitState = "open" | "half_open" | "closed_recovery" | "closed";
+
+export type RecordResultOutcome = {
+  circuitState: CircuitState;
+  stateChanged: boolean;
+};
 
 export type EndpointGateConfig = {
   burstCapacity: number;
@@ -154,15 +157,14 @@ export async function recordResult(
     recordResultSha,
     [epKey],
     args,
-  )) as [number, string];
+  )) as [string, number];
 
-  const [ok, state] = raw;
+  const [circuitState, stateChanged] = raw;
 
-  if (ok === 1) {
-    return { ok: true, state: state as "closed" | "ok" };
-  }
-
-  return { ok: false, state: state as "opened" | "failed" };
+  return {
+    circuitState: circuitState as CircuitState,
+    stateChanged: stateChanged === 1,
+  };
 }
 
 export function resetAdmitSha(): void {

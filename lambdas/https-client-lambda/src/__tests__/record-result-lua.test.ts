@@ -3,7 +3,9 @@ import { createRedisStore, evalLua } from "__tests__/helpers/lua-redis-mock";
 
 // ARGV: [now, consumedTokens, processingFailures, cooldownPeriodMs, recoveryPeriodMs, failureThreshold, minAttempts, samplePeriodMs]
 // KEYS: [epKey]
-// Returns: [ok (0|1), state]  state: "ok" | "closed" | "opened" | "failed"
+// Returns: [circuitState, stateChanged]
+//   circuitState: "open" | "half_open" | "closed_recovery" | "closed"
+//   stateChanged: 0 | 1
 
 type RecordResultArgs = {
   now: number;
@@ -27,7 +29,7 @@ const defaultArgs: RecordResultArgs = {
   samplePeriodMs: 300_000,
 };
 
-type RecordResultResult = [number, string];
+type RecordResultResult = [string, number];
 
 function runRecordResult(
   store: ReturnType<typeof createRedisStore>,
@@ -54,22 +56,36 @@ function runRecordResult(
 
 describe("record-result.lua", () => {
   describe("success recording", () => {
-    it("returns ok state for a successful batch with no state change", () => {
+    it("returns closed state for a successful batch with no state change", () => {
       const store = createRedisStore();
-      store.set("ep:t1", new Map([["sample_till", "9999999999"]]));
+      store.set(
+        "ep:t1",
+        new Map([
+          ["is_open", "0"],
+          ["switched_at", "0"],
+          ["sample_till", "9999999999"],
+        ]),
+      );
 
-      const [ok, state] = runRecordResult(store, {
+      const [circuitState, stateChanged] = runRecordResult(store, {
         consumedTokens: 5,
         processingFailures: 0,
       });
 
-      expect(ok).toBe(1);
-      expect(state).toBe("ok");
+      expect(circuitState).toBe("closed");
+      expect(stateChanged).toBe(0);
     });
 
     it("increments cur_attempts without incrementing cur_failures", () => {
       const store = createRedisStore();
-      store.set("ep:t1", new Map([["sample_till", "9999999999"]]));
+      store.set(
+        "ep:t1",
+        new Map([
+          ["is_open", "0"],
+          ["switched_at", "0"],
+          ["sample_till", "9999999999"],
+        ]),
+      );
 
       runRecordResult(store, { consumedTokens: 3, processingFailures: 0 });
 
@@ -82,7 +98,14 @@ describe("record-result.lua", () => {
   describe("failure recording", () => {
     it("increments both cur_attempts and cur_failures", () => {
       const store = createRedisStore();
-      store.set("ep:t1", new Map([["sample_till", "9999999999"]]));
+      store.set(
+        "ep:t1",
+        new Map([
+          ["is_open", "0"],
+          ["switched_at", "0"],
+          ["sample_till", "9999999999"],
+        ]),
+      );
 
       runRecordResult(store, { consumedTokens: 5, processingFailures: 1 });
 
@@ -91,17 +114,24 @@ describe("record-result.lua", () => {
       expect(epHash.get("cur_failures")).toBe("1");
     });
 
-    it("returns failed state for failures below threshold", () => {
+    it("returns closed state for failures below threshold", () => {
       const store = createRedisStore();
-      store.set("ep:t1", new Map([["sample_till", "9999999999"]]));
+      store.set(
+        "ep:t1",
+        new Map([
+          ["is_open", "0"],
+          ["switched_at", "0"],
+          ["sample_till", "9999999999"],
+        ]),
+      );
 
-      const [ok, state] = runRecordResult(store, {
+      const [circuitState, stateChanged] = runRecordResult(store, {
         consumedTokens: 1,
         processingFailures: 1,
       });
 
-      expect(ok).toBe(0);
-      expect(state).toBe("failed");
+      expect(circuitState).toBe("closed");
+      expect(stateChanged).toBe(0);
     });
   });
 
@@ -134,7 +164,7 @@ describe("record-result.lua", () => {
       expect(epHash.get("cur_failures")).toBe("0");
     });
 
-    it("returns failed when circuit is fully open and state unchanged", () => {
+    it("returns open when circuit is fully open and state unchanged", () => {
       const store = createRedisStore();
       const now = 1_000_000;
       const switchedAt = now - 10_000;
@@ -148,51 +178,72 @@ describe("record-result.lua", () => {
         ]),
       );
 
-      const [ok, state] = runRecordResult(store, {
+      const [circuitState, stateChanged] = runRecordResult(store, {
         now,
         cooldownPeriodMs: 120_000,
         consumedTokens: 1,
         processingFailures: 0,
       });
 
-      expect(ok).toBe(0);
-      expect(state).toBe("failed");
+      expect(circuitState).toBe("open");
+      expect(stateChanged).toBe(0);
     });
   });
 
   describe("circuit opening", () => {
     it("opens circuit when failure rate exceeds threshold", () => {
       const store = createRedisStore();
-      store.set("ep:t1", new Map([["sample_till", "9999999999"]]));
+      store.set(
+        "ep:t1",
+        new Map([
+          ["is_open", "0"],
+          ["switched_at", "0"],
+          ["sample_till", "9999999999"],
+        ]),
+      );
 
-      const [ok, state] = runRecordResult(store, {
+      const [circuitState, stateChanged] = runRecordResult(store, {
         consumedTokens: 5,
         processingFailures: 5,
         minAttempts: 5,
         failureThreshold: 0.3,
       });
-      expect(ok).toBe(0);
-      expect(state).toBe("opened");
+      expect(circuitState).toBe("open");
+      expect(stateChanged).toBe(1);
     });
 
     it("does not open circuit when below minimum attempts", () => {
       const store = createRedisStore();
-      store.set("ep:t1", new Map([["sample_till", "9999999999"]]));
+      store.set(
+        "ep:t1",
+        new Map([
+          ["is_open", "0"],
+          ["switched_at", "0"],
+          ["sample_till", "9999999999"],
+        ]),
+      );
 
-      const [ok, state] = runRecordResult(store, {
+      const [circuitState, stateChanged] = runRecordResult(store, {
         consumedTokens: 3,
         processingFailures: 3,
         minAttempts: 5,
         failureThreshold: 0.3,
       });
-      expect(ok).toBe(0);
-      expect(state).toBe("failed");
+      expect(circuitState).toBe("closed");
+      expect(stateChanged).toBe(0);
     });
 
     it("sets is_open and switched_at on open", () => {
       const store = createRedisStore();
       const now = 1_000_000;
-      store.set("ep:t1", new Map([["sample_till", "9999999999"]]));
+      store.set(
+        "ep:t1",
+        new Map([
+          ["is_open", "0"],
+          ["switched_at", "0"],
+          ["sample_till", "9999999999"],
+        ]),
+      );
 
       runRecordResult(store, {
         now,
@@ -211,7 +262,14 @@ describe("record-result.lua", () => {
       const store = createRedisStore();
       const now = 1_000_000;
       const samplePeriodMs = 300_000;
-      store.set("ep:t1", new Map([["sample_till", "9999999999"]]));
+      store.set(
+        "ep:t1",
+        new Map([
+          ["is_open", "0"],
+          ["switched_at", "0"],
+          ["sample_till", "9999999999"],
+        ]),
+      );
 
       runRecordResult(store, {
         now,
@@ -246,15 +304,15 @@ describe("record-result.lua", () => {
         ]),
       );
 
-      const [ok, state] = runRecordResult(store, {
+      const [circuitState, stateChanged] = runRecordResult(store, {
         now,
         cooldownPeriodMs: 120_000,
         consumedTokens: 1,
         processingFailures: 0,
       });
 
-      expect(ok).toBe(1);
-      expect(state).toBe("closed");
+      expect(circuitState).toBe("closed_recovery");
+      expect(stateChanged).toBe(1);
 
       const epHash = store.get("ep:t1")!;
       expect(epHash.get("is_open")).toBe("0");
@@ -275,15 +333,15 @@ describe("record-result.lua", () => {
         ]),
       );
 
-      const [ok, state] = runRecordResult(store, {
+      const [circuitState, stateChanged] = runRecordResult(store, {
         now,
         cooldownPeriodMs: 120_000,
         consumedTokens: 1,
         processingFailures: 1,
       });
 
-      expect(ok).toBe(0);
-      expect(state).toBe("failed");
+      expect(circuitState).toBe("half_open");
+      expect(stateChanged).toBe(0);
     });
   });
 
@@ -297,6 +355,8 @@ describe("record-result.lua", () => {
       store.set(
         "ep:t1",
         new Map([
+          ["is_open", "0"],
+          ["switched_at", "0"],
           ["sample_till", sampleTill.toString()],
           ["cur_attempts", "10"],
           ["cur_failures", "3"],
@@ -324,6 +384,8 @@ describe("record-result.lua", () => {
       store.set(
         "ep:t1",
         new Map([
+          ["is_open", "0"],
+          ["switched_at", "0"],
           ["sample_till", sampleTill.toString()],
           ["cur_attempts", "10"],
           ["cur_failures", "3"],
@@ -349,6 +411,8 @@ describe("record-result.lua", () => {
       store.set(
         "ep:t1",
         new Map([
+          ["is_open", "0"],
+          ["switched_at", "0"],
           ["sample_till", sampleTill.toString()],
           ["prev_attempts", "10"],
           ["prev_failures", "10"],
@@ -359,7 +423,7 @@ describe("record-result.lua", () => {
       // interpolated attempts = 10 * 1.0 + 5 = 15 (>= minAttempts 5)
       // interpolated failures = 10 * 1.0 + 5 = 15
       // failure rate = 15/15 = 1.0 > 0.3 → opens
-      const [ok, state] = runRecordResult(store, {
+      const [circuitState, stateChanged] = runRecordResult(store, {
         now,
         samplePeriodMs,
         consumedTokens: 5,
@@ -367,15 +431,22 @@ describe("record-result.lua", () => {
         minAttempts: 5,
         failureThreshold: 0.3,
       });
-      expect(ok).toBe(0);
-      expect(state).toBe("opened");
+      expect(circuitState).toBe("open");
+      expect(stateChanged).toBe(1);
     });
   });
 
   describe("state persistence", () => {
     it("writes all sampling fields to redis", () => {
       const store = createRedisStore();
-      store.set("ep:t1", new Map([["sample_till", "9999999999"]]));
+      store.set(
+        "ep:t1",
+        new Map([
+          ["is_open", "0"],
+          ["switched_at", "0"],
+          ["sample_till", "9999999999"],
+        ]),
+      );
       runRecordResult(store);
 
       const epHash = store.get("ep:t1")!;
