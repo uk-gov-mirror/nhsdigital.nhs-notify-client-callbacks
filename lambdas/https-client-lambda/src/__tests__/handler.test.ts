@@ -336,7 +336,9 @@ describe("processRecords", () => {
     const failures = await processRecords([makeRecord()]);
 
     expect(failures).toEqual([{ itemIdentifier: "msg-1" }]);
-    expect(mockChangeVisibility).toHaveBeenCalledWith("receipt-1", 2);
+    const visibilityDelay = mockChangeVisibility.mock.calls[0]![1] as number;
+    expect(visibilityDelay).toBeGreaterThanOrEqual(2);
+    expect(visibilityDelay).toBeLessThanOrEqual(6);
     expect(mockSendToDlq).not.toHaveBeenCalled();
     expect(mockDeliverPayload).not.toHaveBeenCalled();
   });
@@ -352,7 +354,9 @@ describe("processRecords", () => {
     const failures = await processRecords([makeRecord()]);
 
     expect(failures).toEqual([{ itemIdentifier: "msg-1" }]);
-    expect(mockChangeVisibility).toHaveBeenCalledWith("receipt-1", 30);
+    const visibilityDelay = mockChangeVisibility.mock.calls[0]![1] as number;
+    expect(visibilityDelay).toBeGreaterThanOrEqual(30);
+    expect(visibilityDelay).toBeLessThanOrEqual(34);
     expect(mockSendToDlq).not.toHaveBeenCalled();
     expect(mockDeliverPayload).not.toHaveBeenCalled();
   });

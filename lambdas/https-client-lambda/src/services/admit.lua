@@ -68,8 +68,16 @@ end
 -- Generate tokens based on elapsed time, then consume as many as needed for
 -- the batch, up to the number available.
 --
--- Refill precision: bucketRefilledAt advances by exactly the time required to
--- generate the whole tokens (not set to `now`), preserving fractional time.
+-- bucketRefilledAt tracks the point in time up to which tokens have been
+-- generated. We advance it by exactly the time needed to produce the whole
+-- tokens we generated (generationTime), rather than setting it to `now`.
+--
+-- Why not `now`? Token generation uses floor(), so any sub-token fractional
+-- time is truncated. Setting bucketRefilledAt = now would discard that
+-- remainder, meaning the next call starts its elapsed-time calculation from
+-- a later point than it should. Over many calls this causes token leakage —
+-- the bucket refills slower than the configured rate. By advancing only by
+-- generationTime, the leftover fractional time carries over to the next call.
 --------------------------------------------------------------------------------
 
 if isOpen then

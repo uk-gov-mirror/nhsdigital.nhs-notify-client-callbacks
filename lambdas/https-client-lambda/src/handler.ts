@@ -199,11 +199,13 @@ async function processTargetBatch(
   );
 
   if (!gateResult.allowed) {
-    const delaySec = Math.ceil(gateResult.retryAfterMs / 1000);
+    const baseDelaySec = Math.ceil(gateResult.retryAfterMs / 1000);
     recordAdmissionDenied(clientId, batch.targetId, gateResult.reason);
     const failures: SQSBatchItemFailure[] = [];
     for (const record of batch.records) {
-      await changeVisibility(record.receiptHandle, delaySec);
+      // eslint-disable-next-line sonarjs/pseudo-random -- jitter for backoff, not security-sensitive
+      const jitterSec = Math.floor(Math.random() * 5);
+      await changeVisibility(record.receiptHandle, baseDelaySec + jitterSec);
       failures.push({ itemIdentifier: record.messageId });
     }
     return failures;
