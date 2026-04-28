@@ -319,11 +319,10 @@ describe("record-result.lua", () => {
       expect(Number(epHash.get("switched_at"))).toBe(now);
     });
 
-    it("resets to fully open when half-open and all probes fail", () => {
+    it("does not close when half-open but all attempts failed", () => {
       const store = createRedisStore();
       const now = 1_000_000;
       const switchedAt = now - 130_000;
-      const samplePeriodMs = 300_000;
 
       store.set(
         "ep:t1",
@@ -331,34 +330,18 @@ describe("record-result.lua", () => {
           ["is_open", "1"],
           ["switched_at", switchedAt.toString()],
           ["sample_till", "9999999999"],
-          ["cur_attempts", "3"],
-          ["cur_failures", "3"],
-          ["prev_attempts", "2"],
-          ["prev_failures", "1"],
         ]),
       );
 
       const [circuitState, stateChanged] = runRecordResult(store, {
         now,
         cooldownPeriodMs: 120_000,
-        samplePeriodMs,
         consumedTokens: 1,
         processingFailures: 1,
       });
 
-      // Circuit reset to fully open; cooldown restarts
-      expect(circuitState).toBe("open");
-      expect(stateChanged).toBe(1);
-
-      const epHash = store.get("ep:t1")!;
-      expect(epHash.get("is_open")).toBe("1");
-      expect(Number(epHash.get("switched_at"))).toBe(now);
-      // Sampling counters cleared so the next half-open window starts fresh
-      expect(epHash.get("cur_attempts")).toBe("0");
-      expect(epHash.get("cur_failures")).toBe("0");
-      expect(epHash.get("prev_attempts")).toBe("0");
-      expect(epHash.get("prev_failures")).toBe("0");
-      expect(Number(epHash.get("sample_till"))).toBe(now + samplePeriodMs);
+      expect(circuitState).toBe("half_open");
+      expect(stateChanged).toBe(0);
     });
   });
 

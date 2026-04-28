@@ -115,17 +115,6 @@ if isHalfOpen and processingSuccesses > 0 then
   -- fall through, allow circuit to immediately re-open
 end
 
--- Reset to fully open when half-open probe fails entirely; restarts cooldown
-if isHalfOpen and processingSuccesses == 0 then
-  switchedAt   = now
-  curAttempts  = 0
-  curFailures  = 0
-  prevAttempts = 0
-  prevFailures = 0
-  sampleTill   = now + samplePeriodMs
-  stateChanged = true
-end
-
 -- Open circuit when closed, enough samples, and threshold exceeded
 local hasSampledEnough = attempts >= minAttempts
 if not isOpen and hasSampledEnough and (failures / attempts) > failureThreshold then
