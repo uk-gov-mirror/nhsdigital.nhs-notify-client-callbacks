@@ -45,6 +45,7 @@
 | <a name="input_s3_enable_force_destroy"></a> [s3\_enable\_force\_destroy](#input\_s3\_enable\_force\_destroy) | Whether to enable force destroy for the S3 buckets created in this module | `bool` | `false` | no |
 | <a name="input_sqs_inbound_event_max_receive_count"></a> [sqs\_inbound\_event\_max\_receive\_count](#input\_sqs\_inbound\_event\_max\_receive\_count) | n/a | `number` | `3` | no |
 | <a name="input_sqs_inbound_event_visibility_timeout_seconds"></a> [sqs\_inbound\_event\_visibility\_timeout\_seconds](#input\_sqs\_inbound\_event\_visibility\_timeout\_seconds) | n/a | `number` | `60` | no |
+| <a name="input_token_bucket_burst_capacity"></a> [token\_bucket\_burst\_capacity](#input\_token\_bucket\_burst\_capacity) | Token bucket burst capacity used by the rate limiter | `number` | `2250` | no |
 ## Modules
 
 | Name | Source | Version |

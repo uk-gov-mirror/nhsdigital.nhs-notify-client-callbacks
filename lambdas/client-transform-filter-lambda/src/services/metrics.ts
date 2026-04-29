@@ -1,4 +1,8 @@
-import { Unit, createMetricsLogger } from "aws-embedded-metrics";
+import {
+  StorageResolution,
+  Unit,
+  createMetricsLogger,
+} from "aws-embedded-metrics";
 import type { MetricsLogger } from "aws-embedded-metrics";
 
 export const createMetricLogger = (): MetricsLogger => {
@@ -21,30 +25,65 @@ export class CallbackMetrics {
   constructor(private readonly metrics: MetricsLogger) {}
 
   emitEventReceived(): void {
-    this.metrics.putMetric("EventsReceived", 1, Unit.Count);
+    this.metrics.putMetric(
+      "EventsReceived",
+      1,
+      Unit.Count,
+      StorageResolution.High,
+    );
   }
 
   emitTransformationSuccess(): void {
-    this.metrics.putMetric("TransformationsSuccessful", 1, Unit.Count);
+    this.metrics.putMetric(
+      "TransformationsSuccessful",
+      1,
+      Unit.Count,
+      StorageResolution.High,
+    );
   }
 
   emitTransformationFailure(): void {
-    this.metrics.putMetric("TransformationsFailed", 1, Unit.Count);
+    this.metrics.putMetric(
+      "TransformationsFailed",
+      1,
+      Unit.Count,
+      StorageResolution.High,
+    );
   }
 
   emitDeliveryInitiated(): void {
-    this.metrics.putMetric("CallbacksInitiated", 1, Unit.Count);
+    this.metrics.putMetric(
+      "CallbacksInitiated",
+      1,
+      Unit.Count,
+      StorageResolution.High,
+    );
   }
 
   emitValidationError(): void {
-    this.metrics.putMetric("ValidationErrors", 1, Unit.Count);
+    this.metrics.putMetric(
+      "ValidationErrors",
+      1,
+      Unit.Count,
+      StorageResolution.High,
+    );
   }
 
   emitFilteringStarted(): void {
-    this.metrics.putMetric("FilteringStarted", 1, Unit.Count);
+    this.metrics.putMetric(
+      "FilteringStarted",
+      1,
+      Unit.Count,
+      StorageResolution.High,
+    );
   }
 
   emitFilteringMatched(): void {
-    this.metrics.putMetric("FilteringMatched", 1, Unit.Count);
+    this.metrics.putMetric(
+      "FilteringMatched",
+      1,
+      Unit.Count,
+      StorageResolution.High,
+    );
   }
 }

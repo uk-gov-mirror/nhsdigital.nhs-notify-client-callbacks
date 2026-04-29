@@ -16,9 +16,17 @@ export function recordDeliveryAttempt(
   clientId: string,
   targetId: string,
   correlationId?: string,
+  sqsMessageId?: string,
+  receiveCount?: number,
 ): void {
   emitDeliveryAttempt(targetId);
-  logger.info("Attempting delivery", { clientId, targetId, correlationId });
+  logger.info("Attempting delivery", {
+    clientId,
+    targetId,
+    correlationId,
+    sqsMessageId,
+    receiveCount,
+  });
 }
 
 export function recordDeliverySuccess(
@@ -108,14 +116,15 @@ export function recordAdmissionDenied(
   clientId: string,
   targetId: string,
   reason: string,
-  correlationId?: string,
+  correlationIds: (string | undefined)[],
 ): void {
-  emitAdmissionDenied(targetId, reason);
+  emitAdmissionDenied(targetId, reason, correlationIds.length);
   logger.warn("Admission denied", {
     clientId,
     targetId,
-    correlationId,
     reason,
+    deniedCount: correlationIds.length,
+    correlationIds,
   });
 }
 

@@ -1,32 +1,34 @@
 import admitLuaSrc from "services/admit.lua";
 import { createRedisStore, evalLua } from "__tests__/helpers/lua-redis-mock";
 
-// ARGV: [now, capacity, refillPerSec, cooldownMs, decayPeriodMs, cbWindowPeriodMs, cbProbeIntervalMs]
-// KEYS: [cbKey, rlKey]
-// Returns: [allowed (0|1), reason, retryAfterMs, effectiveRate]
+// ARGV: [now, capacity, targetRateLimit, cooldownMs, recoveryPeriodMs, probeRateLimit, targetBatchSize, cbEnabled]
+// KEYS: [epKey]
+// Returns: [consumedTokens, reason, retryAfterMs, effectiveRate]
 
 type AdmitArgs = {
   now: number;
   capacity: number;
-  refillPerSec: number;
+  targetRateLimit: number;
   cooldownMs: number;
-  decayPeriodMs: number;
-  cbWindowPeriodMs: number;
-  cbProbeIntervalMs: number;
+  recoveryPeriodMs: number;
+  probeRateLimit: number;
+  targetBatchSize: number;
+  cbEnabled: boolean;
 };
 
 const defaultArgs: AdmitArgs = {
   now: 1_000_000,
-  capacity: 10,
-  refillPerSec: 10,
-  cooldownMs: 60_000,
-  decayPeriodMs: 300_000,
-  cbWindowPeriodMs: 60_000,
-  cbProbeIntervalMs: 60_000,
+  capacity: 2250,
+  targetRateLimit: 10,
+  cooldownMs: 120_000,
+  recoveryPeriodMs: 600_000,
+  probeRateLimit: 1 / 60,
+  targetBatchSize: 1,
+  cbEnabled: true,
 };
 
 type AdmitResult = {
-  allowed: number;
+  consumedTokens: number;
   reason: string;
   retryAfterMs: number;
   effectiveRate: number;
@@ -40,20 +42,21 @@ function runAdmit(
   const merged = { ...defaultArgs, ...args };
   const raw = evalLua(
     admitLuaSrc,
-    [`cb:${targetId}`, `rl:${targetId}`],
+    [`ep:${targetId}`],
     [
       merged.now.toString(),
       merged.capacity.toString(),
-      merged.refillPerSec.toString(),
+      merged.targetRateLimit.toString(),
       merged.cooldownMs.toString(),
-      merged.decayPeriodMs.toString(),
-      merged.cbWindowPeriodMs.toString(),
-      merged.cbProbeIntervalMs.toString(),
+      merged.recoveryPeriodMs.toString(),
+      merged.probeRateLimit.toString(),
+      merged.targetBatchSize.toString(),
+      merged.cbEnabled ? "1" : "0",
     ],
     store,
   ) as [number, string, number, number];
   return {
-    allowed: raw[0],
+    consumedTokens: raw[0],
     reason: raw[1],
     retryAfterMs: raw[2],
     effectiveRate: raw[3],
@@ -62,399 +65,585 @@ function runAdmit(
 
 describe("admit.lua", () => {
   describe("rate limiting", () => {
-    it("allows the first request with full token bucket", () => {
+    it("rate-limits on a fresh endpoint with no prior state", () => {
       const store = createRedisStore();
-      const { allowed, effectiveRate, reason, retryAfterMs } = runAdmit(store);
+      const now = 1_000_000;
 
-      expect(allowed).toBe(1);
-      expect(reason).toBe("allowed");
-      expect(retryAfterMs).toBe(0);
-      expect(effectiveRate).toBe(10);
-    });
+      const { consumedTokens, effectiveRate, reason } = runAdmit(store, {
+        now,
+        targetRateLimit: 10,
+      });
 
-    it("depletes tokens on consecutive calls and rejects when empty", () => {
-      const store = createRedisStore();
-
-      for (let i = 0; i < 10; i++) {
-        const { allowed } = runAdmit(store);
-        expect(allowed).toBe(1);
-      }
-
-      const { allowed, reason } = runAdmit(store);
-      expect(allowed).toBe(0);
+      expect(consumedTokens).toBe(0);
       expect(reason).toBe("rate_limited");
+      expect(effectiveRate).toBeCloseTo(1 / 60, 5);
     });
 
-    it("returns retryAfterMs when rate limited", () => {
+    it("generates a probe token on the second call after enough elapsed time", () => {
       const store = createRedisStore();
 
-      for (let i = 0; i < 10; i++) {
-        runAdmit(store);
-      }
+      runAdmit(store, { now: 1_000_000, targetRateLimit: 10 });
 
-      const { retryAfterMs } = runAdmit(store);
+      const { consumedTokens, effectiveRate, reason } = runAdmit(store, {
+        now: 1_060_001,
+        targetRateLimit: 10,
+      });
+
+      expect(effectiveRate).toBeCloseTo(1 / 60, 5);
+      expect(consumedTokens).toBe(1);
+      expect(reason).toBe("some_allowed");
+    });
+
+    it("does not persist circuit state on first contact", () => {
+      const store = createRedisStore();
+      const now = 1_000_000;
+
+      runAdmit(store, { now, targetRateLimit: 10 });
+
+      const epHash = store.get("ep:t1")!;
+      expect(epHash.has("is_open")).toBe(false);
+      expect(epHash.has("switched_at")).toBe(false);
+    });
+
+    it("allows full rate after record-result closes the circuit", () => {
+      const store = createRedisStore();
+      const now = 1_000_000;
+
+      store.set(
+        "ep:t1",
+        new Map([
+          ["is_open", "0"],
+          ["switched_at", now.toString()],
+          ["bucket_tokens", "0"],
+          ["bucket_refilled_at", now.toString()],
+        ]),
+      );
+
+      const later = now + 60_000;
+      const { consumedTokens, reason } = runAdmit(store, {
+        now: later,
+        targetRateLimit: 10,
+        recoveryPeriodMs: 600_000,
+      });
+
+      expect(consumedTokens).toBeGreaterThanOrEqual(1);
+      expect(reason).toBe("some_allowed");
+    });
+
+    it("allows a single request when bucket has tokens from refill", () => {
+      const store = createRedisStore();
+      const now = 1_000_000;
+      store.set(
+        "ep:t1",
+        new Map([
+          ["is_open", "0"],
+          ["bucket_tokens", "0"],
+          ["bucket_refilled_at", "0"],
+          ["switched_at", "0"],
+        ]),
+      );
+
+      const { consumedTokens, reason, retryAfterMs } = runAdmit(store, {
+        now,
+        targetRateLimit: 10,
+      });
+
+      expect(consumedTokens).toBe(1);
+      expect(reason).toBe("some_allowed");
+      expect(retryAfterMs).toBe(0);
+    });
+
+    it("consumes up to targetBatchSize tokens", () => {
+      const store = createRedisStore();
+      const now = 1_000_000;
+      store.set(
+        "ep:t1",
+        new Map([
+          ["is_open", "0"],
+          ["bucket_tokens", "5"],
+          ["bucket_refilled_at", now.toString()],
+          ["switched_at", "0"],
+        ]),
+      );
+
+      const { consumedTokens } = runAdmit(store, {
+        now,
+        targetBatchSize: 3,
+      });
+      expect(consumedTokens).toBe(3);
+    });
+
+    it("consumes all available when batch exceeds available tokens", () => {
+      const store = createRedisStore();
+      const now = 1_000_000;
+      store.set(
+        "ep:t1",
+        new Map([
+          ["is_open", "0"],
+          ["bucket_tokens", "2"],
+          ["bucket_refilled_at", now.toString()],
+          ["switched_at", "0"],
+        ]),
+      );
+
+      const { consumedTokens } = runAdmit(store, {
+        now,
+        targetBatchSize: 5,
+      });
+      expect(consumedTokens).toBe(2);
+    });
+
+    it("returns rate_limited when no tokens available", () => {
+      const store = createRedisStore();
+      const now = 1_000_000;
+      store.set(
+        "ep:t1",
+        new Map([
+          ["is_open", "0"],
+          ["bucket_tokens", "0"],
+          ["bucket_refilled_at", now.toString()],
+          ["switched_at", "0"],
+        ]),
+      );
+
+      const { consumedTokens, reason, retryAfterMs } = runAdmit(store, { now });
+      expect(consumedTokens).toBe(0);
+      expect(reason).toBe("rate_limited");
       expect(retryAfterMs).toBe(1000);
-    });
-
-    it("reports effective rate when rate limited", () => {
-      const store = createRedisStore();
-
-      for (let i = 0; i < 10; i++) {
-        runAdmit(store);
-      }
-
-      const { effectiveRate } = runAdmit(store);
-      expect(effectiveRate).toBe(10);
     });
 
     it("refills tokens over time", () => {
       const store = createRedisStore();
       const now = 1_000_000;
+      store.set(
+        "ep:t1",
+        new Map([
+          ["is_open", "0"],
+          ["bucket_tokens", "0"],
+          ["bucket_refilled_at", now.toString()],
+          ["switched_at", "0"],
+        ]),
+      );
 
-      for (let i = 0; i < 10; i++) {
-        runAdmit(store, { now });
-      }
-
-      const denied = runAdmit(store, { now });
-      expect(denied.allowed).toBe(0);
-
-      const refilled = runAdmit(store, { now: now + 1000 });
-      expect(refilled.allowed).toBe(1);
+      const { consumedTokens } = runAdmit(store, {
+        now: now + 1000,
+        targetRateLimit: 10,
+      });
+      expect(consumedTokens).toBe(1);
     });
 
     it("caps tokens at capacity", () => {
       const store = createRedisStore();
       const now = 1_000_000;
+      store.set(
+        "ep:t1",
+        new Map([
+          ["is_open", "0"],
+          ["bucket_tokens", "0"],
+          ["bucket_refilled_at", "0"],
+          ["switched_at", "0"],
+        ]),
+      );
 
-      runAdmit(store, { now, capacity: 5, refillPerSec: 100 });
-
-      // Advance 10 seconds — would add 1000 tokens without cap
-      runAdmit(store, { now: now + 10_000, capacity: 5, refillPerSec: 100 });
-
-      const rlHash = store.get("rl:t1")!;
-      // Refill capped to capacity (5), then one consumed → 4
-      expect(Number(rlHash.get("tokens"))).toBe(4);
+      const { consumedTokens } = runAdmit(store, {
+        now,
+        capacity: 5,
+        targetRateLimit: 100,
+        targetBatchSize: 10,
+      });
+      expect(consumedTokens).toBe(5);
     });
 
     it("handles zero refill rate", () => {
       const store = createRedisStore();
-
-      for (let i = 0; i < 10; i++) {
-        runAdmit(store, { refillPerSec: 0 });
-      }
-
-      const { allowed, reason, retryAfterMs } = runAdmit(store, {
-        refillPerSec: 0,
-      });
-      expect(allowed).toBe(0);
-      expect(reason).toBe("rate_limited");
-      expect(retryAfterMs).toBe(1000);
-    });
-  });
-
-  describe("circuit breaker", () => {
-    it("rejects when circuit is open", () => {
-      const store = createRedisStore();
       const now = 1_000_000;
-      const openedUntil = now + 60_000;
-
       store.set(
-        "cb:t1",
+        "ep:t1",
         new Map([
-          ["opened_until_ms", openedUntil.toString()],
-          ["last_probe_ms", now.toString()],
+          ["is_open", "0"],
+          ["bucket_tokens", "0"],
+          ["bucket_refilled_at", now.toString()],
+          ["switched_at", "0"],
         ]),
       );
 
-      const { allowed, effectiveRate, reason } = runAdmit(store, { now });
-      expect(allowed).toBe(0);
+      const { consumedTokens, reason } = runAdmit(store, {
+        now: now + 10_000,
+        targetRateLimit: 0,
+      });
+      expect(consumedTokens).toBe(0);
+      expect(reason).toBe("rate_limited");
+    });
+
+    it("preserves fractional refill time (bucketRefilledAt += generationTime, not now)", () => {
+      const store = createRedisStore();
+      const now = 1_000_000;
+      store.set(
+        "ep:t1",
+        new Map([
+          ["is_open", "0"],
+          ["bucket_tokens", "0"],
+          ["bucket_refilled_at", (now - 150).toString()],
+          ["switched_at", "0"],
+        ]),
+      );
+
+      runAdmit(store, { now, targetRateLimit: 10 });
+
+      const epHash = store.get("ep:t1")!;
+      const refilledAt = Number(epHash.get("bucket_refilled_at"));
+      // 1 token generated at rate 10/s takes 100ms, so refilledAt = (now-150) + 100 = now - 50
+      expect(refilledAt).toBe(now - 50);
+    });
+  });
+
+  describe("circuit breaker states", () => {
+    it("blocks completely when circuit is open during cooldown", () => {
+      const store = createRedisStore();
+      const now = 1_000_000;
+      const switchedAt = now - 10_000;
+
+      store.set(
+        "ep:t1",
+        new Map([
+          ["is_open", "1"],
+          ["switched_at", switchedAt.toString()],
+          ["bucket_tokens", "100"],
+        ]),
+      );
+
+      const { consumedTokens, reason } = runAdmit(store, {
+        now,
+        cooldownMs: 120_000,
+      });
+      expect(consumedTokens).toBe(0);
       expect(reason).toBe("circuit_open");
-      expect(effectiveRate).toBe(0);
+    });
+
+    it("does not consume bucket tokens when fully open", () => {
+      const store = createRedisStore();
+      const now = 1_000_000;
+      const switchedAt = now - 10_000;
+
+      store.set(
+        "ep:t1",
+        new Map([
+          ["is_open", "1"],
+          ["switched_at", switchedAt.toString()],
+          ["bucket_tokens", "100"],
+          ["bucket_refilled_at", now.toString()],
+        ]),
+      );
+
+      runAdmit(store, { now, cooldownMs: 120_000 });
+
+      const epHash = store.get("ep:t1")!;
+      expect(Number(epHash.get("bucket_tokens"))).toBe(100);
     });
 
     it("returns retryAfterMs for open circuit", () => {
       const store = createRedisStore();
       const now = 1_000_000;
-      const openedUntil = now + 30_000;
+      const switchedAt = now - 10_000;
 
       store.set(
-        "cb:t1",
+        "ep:t1",
         new Map([
-          ["opened_until_ms", openedUntil.toString()],
-          ["last_probe_ms", now.toString()],
+          ["is_open", "1"],
+          ["switched_at", switchedAt.toString()],
         ]),
       );
 
-      const { retryAfterMs } = runAdmit(store, { now });
-      expect(retryAfterMs).toBe(30_000);
+      const { retryAfterMs } = runAdmit(store, { now, cooldownMs: 120_000 });
+      expect(retryAfterMs).toBe(110_000);
     });
 
-    it("allows probe when probe interval has elapsed", () => {
+    it("uses probeRateLimit when half-open (after cooldown)", () => {
       const store = createRedisStore();
       const now = 1_000_000;
-      const openedUntil = now + 120_000;
-      const lastProbe = now - 61_000;
+      const switchedAt = now - 130_000;
 
       store.set(
-        "cb:t1",
+        "ep:t1",
         new Map([
-          ["opened_until_ms", openedUntil.toString()],
-          ["last_probe_ms", lastProbe.toString()],
+          ["is_open", "1"],
+          ["switched_at", switchedAt.toString()],
+          ["bucket_tokens", "0"],
+          ["bucket_refilled_at", (now - 60_000).toString()],
         ]),
       );
-
-      const { allowed, effectiveRate, reason, retryAfterMs } = runAdmit(store, {
-        now,
-        cbProbeIntervalMs: 60_000,
-      });
-      expect(allowed).toBe(1);
-      expect(reason).toBe("probe");
-      expect(retryAfterMs).toBe(0);
-      expect(effectiveRate).toBe(0);
-    });
-
-    it("updates last_probe_ms after allowing a probe", () => {
-      const store = createRedisStore();
-      const now = 1_000_000;
-      const openedUntil = now + 120_000;
-      const lastProbe = now - 61_000;
-
-      store.set(
-        "cb:t1",
-        new Map([
-          ["opened_until_ms", openedUntil.toString()],
-          ["last_probe_ms", lastProbe.toString()],
-        ]),
-      );
-
-      runAdmit(store, { now, cbProbeIntervalMs: 60_000 });
-
-      const cbHash = store.get("cb:t1")!;
-      expect(cbHash.get("last_probe_ms")).toBe(now.toString());
-    });
-
-    it("does not probe when interval has not elapsed", () => {
-      const store = createRedisStore();
-      const now = 1_000_000;
-      const openedUntil = now + 120_000;
-      const lastProbe = now - 30_000;
-
-      store.set(
-        "cb:t1",
-        new Map([
-          ["opened_until_ms", openedUntil.toString()],
-          ["last_probe_ms", lastProbe.toString()],
-        ]),
-      );
-
-      const { allowed, reason } = runAdmit(store, {
-        now,
-        cbProbeIntervalMs: 60_000,
-      });
-      expect(allowed).toBe(0);
-      expect(reason).toBe("circuit_open");
-    });
-
-    it("does not probe when cbProbeIntervalMs is 0", () => {
-      const store = createRedisStore();
-      const now = 1_000_000;
-      const openedUntil = now + 120_000;
-
-      store.set(
-        "cb:t1",
-        new Map([
-          ["opened_until_ms", openedUntil.toString()],
-          ["last_probe_ms", "0"],
-        ]),
-      );
-
-      const { allowed, reason } = runAdmit(store, {
-        now,
-        cbProbeIntervalMs: 0,
-      });
-      expect(allowed).toBe(0);
-      expect(reason).toBe("circuit_open");
-    });
-  });
-
-  describe("sliding window", () => {
-    it("initialises cbWindowFrom on first call", () => {
-      const store = createRedisStore();
-      const now = 1_000_000;
-
-      runAdmit(store, { now });
-
-      const cbHash = store.get("cb:t1")!;
-      expect(cbHash.get("cb_window_from")).toBe(now.toString());
-    });
-
-    it("rolls current window to previous when period expires", () => {
-      const store = createRedisStore();
-      const cbWindowPeriodMs = 60_000;
-      const t0 = 1_000_000;
-      const t1 = t0 + cbWindowPeriodMs + 1;
-
-      store.set(
-        "cb:t1",
-        new Map([
-          ["cb_window_from", t0.toString()],
-          ["cb_failures", "5"],
-          ["cb_attempts", "10"],
-          ["cb_prev_failures", "0"],
-          ["cb_prev_attempts", "0"],
-        ]),
-      );
-
-      runAdmit(store, { now: t1, cbWindowPeriodMs });
-
-      const cbHash = store.get("cb:t1")!;
-      expect(cbHash.get("cb_prev_failures")).toBe("5");
-      expect(cbHash.get("cb_prev_attempts")).toBe("10");
-      expect(cbHash.get("cb_failures")).toBe("0");
-      expect(cbHash.get("cb_attempts")).toBe("0");
-      expect(cbHash.get("cb_window_from")).toBe(t1.toString());
-    });
-
-    it("clears both windows when gap exceeds two periods", () => {
-      const store = createRedisStore();
-      const cbWindowPeriodMs = 60_000;
-      const t0 = 1_000_000;
-      const t1 = t0 + 2 * cbWindowPeriodMs + 1;
-
-      store.set(
-        "cb:t1",
-        new Map([
-          ["cb_window_from", t0.toString()],
-          ["cb_failures", "5"],
-          ["cb_attempts", "10"],
-          ["cb_prev_failures", "3"],
-          ["cb_prev_attempts", "7"],
-        ]),
-      );
-
-      runAdmit(store, { now: t1, cbWindowPeriodMs });
-
-      const cbHash = store.get("cb:t1")!;
-      expect(cbHash.get("cb_prev_failures")).toBe("0");
-      expect(cbHash.get("cb_prev_attempts")).toBe("0");
-      expect(cbHash.get("cb_failures")).toBe("0");
-      expect(cbHash.get("cb_attempts")).toBe("0");
-      expect(cbHash.get("cb_window_from")).toBe(t1.toString());
-    });
-  });
-
-  describe("decay scaling", () => {
-    it("applies reduced rate during decay period", () => {
-      const store = createRedisStore();
-      const closedAt = 1_000_000;
-      const decayPeriodMs = 300_000;
-      const halfwayThrough = closedAt + decayPeriodMs / 2;
-
-      store.set("cb:t1", new Map([["opened_until_ms", closedAt.toString()]]));
 
       const { effectiveRate } = runAdmit(store, {
-        now: halfwayThrough,
-        refillPerSec: 10,
-        decayPeriodMs,
+        now,
+        cooldownMs: 120_000,
+        probeRateLimit: 1 / 60,
       });
-      expect(effectiveRate).toBe(5);
+      expect(effectiveRate).toBeCloseTo(1 / 60, 5);
     });
 
-    it("uses full rate after decay period ends", () => {
+    it("zeroes residual bucket tokens when circuit is half-open", () => {
       const store = createRedisStore();
-      const closedAt = 1_000_000;
-      const decayPeriodMs = 300_000;
-      const afterDecay = closedAt + decayPeriodMs + 1;
+      const now = 1_000_000;
+      const switchedAt = now - 130_000;
 
-      store.set("cb:t1", new Map([["opened_until_ms", closedAt.toString()]]));
+      store.set(
+        "ep:t1",
+        new Map([
+          ["is_open", "1"],
+          ["switched_at", switchedAt.toString()],
+          ["bucket_tokens", "100"],
+          ["bucket_refilled_at", (now - 60_000).toString()],
+        ]),
+      );
 
-      const { allowed, effectiveRate } = runAdmit(store, {
-        now: afterDecay,
-        refillPerSec: 10,
-        decayPeriodMs,
+      const { consumedTokens } = runAdmit(store, {
+        now,
+        cooldownMs: 120_000,
+        probeRateLimit: 1 / 60,
       });
-      expect(allowed).toBe(1);
-      expect(effectiveRate).toBe(10);
+
+      expect(consumedTokens).toBe(1);
+      const epHash = store.get("ep:t1")!;
+      expect(Number(epHash.get("bucket_tokens"))).toBe(0);
     });
 
-    it("clamps minimum effective rate to 1", () => {
+    it("uses recovery ramp when closed during recovery period", () => {
       const store = createRedisStore();
-      const closedAt = 1_000_000;
-      const decayPeriodMs = 300_000;
-      const veryEarly = closedAt + 1;
+      const switchedAt = 1_000_000;
+      const recoveryPeriodMs = 600_000;
+      const now = switchedAt + recoveryPeriodMs / 2;
 
-      store.set("cb:t1", new Map([["opened_until_ms", closedAt.toString()]]));
+      store.set(
+        "ep:t1",
+        new Map([
+          ["is_open", "0"],
+          ["switched_at", switchedAt.toString()],
+          ["bucket_tokens", "0"],
+          ["bucket_refilled_at", "0"],
+        ]),
+      );
 
       const { effectiveRate } = runAdmit(store, {
-        now: veryEarly,
-        refillPerSec: 10,
-        decayPeriodMs,
+        now,
+        targetRateLimit: 10,
+        recoveryPeriodMs,
       });
-      expect(effectiveRate).toBeGreaterThanOrEqual(1);
+      const probeRate = defaultArgs.probeRateLimit;
+      const expectedRate = probeRate + 0.5 * (10 - probeRate);
+      expect(effectiveRate).toBeCloseTo(expectedRate, 5);
     });
 
-    it("clears openedUntil when decay period fully elapses", () => {
+    it("uses full rate when closed and past recovery period", () => {
       const store = createRedisStore();
-      const closedAt = 1_000_000;
-      const decayPeriodMs = 300_000;
-      const afterDecay = closedAt + decayPeriodMs + 1;
+      const switchedAt = 100_000;
+      const recoveryPeriodMs = 600_000;
+      const now = switchedAt + recoveryPeriodMs + 1;
 
-      store.set("cb:t1", new Map([["opened_until_ms", closedAt.toString()]]));
+      store.set(
+        "ep:t1",
+        new Map([
+          ["is_open", "0"],
+          ["switched_at", switchedAt.toString()],
+          ["bucket_tokens", "0"],
+          ["bucket_refilled_at", "0"],
+        ]),
+      );
 
-      runAdmit(store, { now: afterDecay, decayPeriodMs });
-
-      const cbHash = store.get("cb:t1")!;
-      expect(cbHash.get("opened_until_ms")).toBe("0");
-    });
-
-    it("does not decay when decayPeriodMs is 0", () => {
-      const store = createRedisStore();
-      const closedAt = 1_000_000;
-
-      store.set("cb:t1", new Map([["opened_until_ms", closedAt.toString()]]));
-
-      const { allowed, effectiveRate } = runAdmit(store, {
-        now: closedAt + 1,
-        refillPerSec: 10,
-        decayPeriodMs: 0,
+      const { effectiveRate } = runAdmit(store, {
+        now,
+        targetRateLimit: 10,
+        recoveryPeriodMs,
       });
-      expect(allowed).toBe(1);
       expect(effectiveRate).toBe(10);
     });
   });
 
   describe("state persistence", () => {
-    it("persists token count and last_refill_ms", () => {
+    it("persists bucket_tokens and bucket_refilled_at", () => {
       const store = createRedisStore();
-      runAdmit(store, { now: 1_000_000, capacity: 5 });
+      const now = 1_000_000;
+      store.set(
+        "ep:t1",
+        new Map([
+          ["is_open", "0"],
+          ["bucket_tokens", "5"],
+          ["bucket_refilled_at", now.toString()],
+          ["switched_at", "0"],
+        ]),
+      );
 
-      const rlHash = store.get("rl:t1")!;
-      expect(rlHash.get("tokens")).toBeDefined();
-      expect(rlHash.get("last_refill_ms")).toBe("1000000");
+      runAdmit(store, { now, targetBatchSize: 2 });
+
+      const epHash = store.get("ep:t1")!;
+      expect(Number(epHash.get("bucket_tokens"))).toBe(3);
     });
 
-    it("persists circuit breaker fields", () => {
+    it("does not write any fields when circuit_open early return", () => {
       const store = createRedisStore();
-      runAdmit(store, { now: 1_000_000 });
+      runAdmit(store, {
+        now: 10_000,
+      });
 
-      const cbHash = store.get("cb:t1")!;
-      expect(cbHash.has("opened_until_ms")).toBe(true);
-      expect(cbHash.has("cb_window_from")).toBe(true);
-      expect(cbHash.has("cb_failures")).toBe(true);
-      expect(cbHash.has("cb_attempts")).toBe(true);
-      expect(cbHash.has("cb_prev_failures")).toBe(true);
-      expect(cbHash.has("cb_prev_attempts")).toBe(true);
+      expect(store.has("ep:t1")).toBe(false);
+    });
+
+    it("does not write sampling or circuit fields on half-open path", () => {
+      const store = createRedisStore();
+      runAdmit(store, {
+        now: 200_000,
+      });
+
+      const epHash = store.get("ep:t1")!;
+      expect(epHash.has("bucket_tokens")).toBe(true);
+      expect(epHash.has("bucket_refilled_at")).toBe(true);
+      expect(epHash.has("cur_attempts")).toBe(false);
+      expect(epHash.has("cur_failures")).toBe(false);
+      expect(epHash.has("sample_till")).toBe(false);
+      expect(epHash.has("is_open")).toBe(false);
+      expect(epHash.has("switched_at")).toBe(false);
     });
 
     it("isolates state between targets", () => {
       const store = createRedisStore();
-      runAdmit(store, {}, "target-a");
-      runAdmit(store, {}, "target-b");
+      store.set(
+        "ep:target-a",
+        new Map([
+          ["is_open", "0"],
+          ["bucket_tokens", "5"],
+          ["bucket_refilled_at", "10000"],
+        ]),
+      );
+      store.set(
+        "ep:target-b",
+        new Map([
+          ["is_open", "0"],
+          ["bucket_tokens", "3"],
+          ["bucket_refilled_at", "10000"],
+        ]),
+      );
 
-      expect(store.has("cb:target-a")).toBe(true);
-      expect(store.has("cb:target-b")).toBe(true);
-      expect(store.has("rl:target-a")).toBe(true);
-      expect(store.has("rl:target-b")).toBe(true);
+      runAdmit(store, { now: 10_000 }, "target-a");
+      runAdmit(store, { now: 10_000 }, "target-b");
+
+      expect(store.has("ep:target-a")).toBe(true);
+      expect(store.has("ep:target-b")).toBe(true);
+    });
+  });
+
+  describe("circuit breaker disabled (cbEnabled = false)", () => {
+    it("uses full targetRateLimit on a fresh endpoint with no prior state", () => {
+      const store = createRedisStore();
+      const now = 1_000_000;
+
+      const { effectiveRate } = runAdmit(store, {
+        now,
+        targetRateLimit: 10,
+        cbEnabled: false,
+      });
+
+      expect(effectiveRate).toBe(10);
+    });
+
+    it("applies initial values on fresh endpoint so first call has no tokens", () => {
+      const store = createRedisStore();
+      const now = 1_000_000;
+
+      const { consumedTokens, effectiveRate, reason } = runAdmit(store, {
+        now,
+        targetRateLimit: 10,
+        cbEnabled: false,
+      });
+
+      expect(effectiveRate).toBe(10);
+      expect(consumedTokens).toBe(0);
+      expect(reason).toBe("rate_limited");
+    });
+
+    it("generates tokens at full rate after initial contact", () => {
+      const store = createRedisStore();
+
+      runAdmit(store, {
+        now: 1_000_000,
+        targetRateLimit: 10,
+        cbEnabled: false,
+      });
+      const { consumedTokens, reason } = runAdmit(store, {
+        now: 1_000_100,
+        targetRateLimit: 10,
+        cbEnabled: false,
+      });
+
+      expect(consumedTokens).toBe(1);
+      expect(reason).toBe("some_allowed");
+    });
+
+    it("ignores is_open state when CB is disabled", () => {
+      const store = createRedisStore();
+      const now = 1_000_000;
+      store.set(
+        "ep:t1",
+        new Map([
+          ["is_open", "1"],
+          ["switched_at", now.toString()],
+          ["bucket_tokens", "5"],
+          ["bucket_refilled_at", now.toString()],
+        ]),
+      );
+
+      const { consumedTokens, effectiveRate, reason } = runAdmit(store, {
+        now,
+        targetRateLimit: 10,
+        cbEnabled: false,
+      });
+
+      expect(effectiveRate).toBe(10);
+      expect(consumedTokens).toBe(1);
+      expect(reason).toBe("some_allowed");
+    });
+
+    it("does not zero bucket tokens when is_open and CB disabled", () => {
+      const store = createRedisStore();
+      const now = 1_000_000;
+      store.set(
+        "ep:t1",
+        new Map([
+          ["is_open", "1"],
+          ["switched_at", now.toString()],
+          ["bucket_tokens", "5"],
+          ["bucket_refilled_at", now.toString()],
+        ]),
+      );
+
+      const { consumedTokens } = runAdmit(store, {
+        now,
+        targetRateLimit: 10,
+        cbEnabled: false,
+        targetBatchSize: 3,
+      });
+
+      expect(consumedTokens).toBe(3);
+    });
+
+    it("never returns circuit_open when CB is disabled", () => {
+      const store = createRedisStore();
+      const now = 1_000_000;
+      store.set(
+        "ep:t1",
+        new Map([
+          ["is_open", "1"],
+          ["switched_at", (now - 10_000).toString()],
+          ["bucket_tokens", "0"],
+          ["bucket_refilled_at", now.toString()],
+        ]),
+      );
+
+      const { reason } = runAdmit(store, {
+        now,
+        cooldownMs: 120_000,
+        cbEnabled: false,
+      });
+
+      expect(reason).not.toBe("circuit_open");
     });
   });
 });

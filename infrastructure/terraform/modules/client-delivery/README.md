@@ -45,6 +45,7 @@ No requirements.
 | <a name="input_sqs_visibility_timeout_seconds"></a> [sqs\_visibility\_timeout\_seconds](#input\_sqs\_visibility\_timeout\_seconds) | Visibility timeout for the per-client delivery queue | `number` | `60` | no |
 | <a name="input_subscription_targets"></a> [subscription\_targets](#input\_subscription\_targets) | Flattened subscription-target fanout map keyed by subscription-target composite key | <pre>map(object({<br/>    subscription_id = string<br/>    target_id       = string<br/>  }))</pre> | n/a | yes |
 | <a name="input_subscriptions"></a> [subscriptions](#input\_subscriptions) | Subscription definitions for this client, keyed by subscription\_id | <pre>map(object({<br/>    subscription_id = string<br/>    target_ids      = list(string)<br/>  }))</pre> | n/a | yes |
+| <a name="input_token_bucket_burst_capacity"></a> [token\_bucket\_burst\_capacity](#input\_token\_bucket\_burst\_capacity) | Token bucket burst capacity used by the rate limiter | `number` | `2250` | no |
 | <a name="input_vpc_subnet_ids"></a> [vpc\_subnet\_ids](#input\_vpc\_subnet\_ids) | VPC subnet IDs for Lambda execution | `list(string)` | `[]` | no |
 ## Modules
 

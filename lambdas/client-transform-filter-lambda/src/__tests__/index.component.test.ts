@@ -33,6 +33,7 @@ jest.mock("aws-embedded-metrics", () => ({
     Count: "Count",
     Milliseconds: "Milliseconds",
   },
+  StorageResolution: { High: 1, Standard: 60 },
 }));
 
 import { GetObjectCommand, NoSuchKey } from "@aws-sdk/client-s3";

@@ -108,7 +108,7 @@ describe("Delivery Resilience", () => {
   });
 
   describe("Rate Limiting", () => {
-    const BURST_SIZE = 15;
+    const BURST_SIZE = 30;
     let dlqUrl: string;
     let deliveryUrl: string;
     let httpsClientLogGroup: string;
@@ -200,8 +200,26 @@ describe("Delivery Resilience", () => {
 
     it("should open the circuit breaker after repeated failures and not affect other clients", async () => {
       const cbConfig = getClientConfig("clientCircuitBreaker");
+      const cbTargetPath = buildMockWebhookTargetPath("clientCircuitBreaker");
       const singleTargetConfig = getClientConfig("clientSingleTarget");
       const singleTargetPath = buildMockWebhookTargetPath("clientSingleTarget");
+
+      // Send a successful message first so the circuit is confirmed closed (it starts half-open)
+      const warmupEvent = createMessageStatusPublishEvent({
+        data: {
+          clientId: cbConfig.clientId,
+          messageId: `cb-warmup-${crypto.randomUUID()}`,
+        },
+      });
+      await sendSqsEvent(ctx.sqs, ctx.inboundQueueUrl, warmupEvent);
+      const warmupCallback = await awaitCallback(
+        ctx.cwLogs,
+        ctx.webhookLogGroup,
+        warmupEvent.data.messageId,
+        "MessageStatus",
+        ctx.startTime,
+      );
+      expect(warmupCallback.path).toBe(cbTargetPath);
 
       const cbEvents = Array.from({ length: CB_BURST_SIZE }, () =>
         createMessageStatusPublishEvent({

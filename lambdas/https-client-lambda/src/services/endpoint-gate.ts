@@ -5,7 +5,7 @@ import recordResultLuaSrc from "services/record-result.lua";
 
 export type AdmitResultAllowed = {
   allowed: true;
-  probe: boolean;
+  consumedTokens: number;
   effectiveRate: number;
 };
 
@@ -18,18 +18,21 @@ export type AdmitResultDenied = {
 
 export type AdmitResult = AdmitResultAllowed | AdmitResultDenied;
 
-export type RecordResultOutcome =
-  | { ok: true; state: "closed" }
-  | { ok: false; state: "opened" | "failed" };
+export type CircuitState = "open" | "half_open" | "closed_recovery" | "closed";
+
+export type RecordResultOutcome = {
+  circuitState: CircuitState;
+  stateChanged: boolean;
+};
 
 export type EndpointGateConfig = {
   burstCapacity: number;
-  cbProbeIntervalMs: number;
-  decayPeriodMs: number;
-  cbWindowPeriodMs: number;
-  cbErrorThreshold: number;
-  cbMinAttempts: number;
-  cbCooldownMs: number;
+  probeRateLimit: number;
+  recoveryPeriodMs: number;
+  samplePeriodMs: number;
+  failureThreshold: number;
+  minAttempts: number;
+  cooldownPeriodMs: number;
 };
 
 let admitSha: string | undefined;
@@ -76,22 +79,21 @@ export async function admit(
   targetId: string,
   refillPerSec: number,
   cbEnabled: boolean,
+  targetBatchSize: number,
   config: EndpointGateConfig,
 ): Promise<AdmitResult> {
-  const cbKey = `cb:{${targetId}}`;
-  const rlKey = `rl:{${targetId}}`;
+  const epKey = `ep:{${targetId}}`;
   const now = Date.now().toString();
-  const probeIntervalMs = cbEnabled ? config.cbProbeIntervalMs.toString() : "0";
 
   const args = [
     now,
     config.burstCapacity.toString(),
-    // eslint-disable-next-line sonarjs/null-dereference
-    refillPerSec.toString(),
-    config.cbCooldownMs.toString(),
-    config.decayPeriodMs.toString(),
-    config.cbWindowPeriodMs.toString(),
-    probeIntervalMs,
+    String(refillPerSec),
+    config.cooldownPeriodMs.toString(),
+    config.recoveryPeriodMs.toString(),
+    config.probeRateLimit.toString(),
+    String(targetBatchSize),
+    cbEnabled ? "1" : "0",
   ];
 
   if (!admitSha) {
@@ -102,16 +104,16 @@ export async function admit(
     client,
     admitLuaSrc,
     admitSha,
-    [cbKey, rlKey],
+    [epKey],
     args,
   )) as [number, string, number, number];
 
-  const [allowed, reason, retryAfterMs, effectiveRate] = raw;
+  const [consumedOrFlag, reason, retryAfterMs, effectiveRate] = raw;
 
-  if (allowed === 1) {
+  if (reason === "some_allowed") {
     return {
       allowed: true,
-      probe: reason === "probe",
+      consumedTokens: Number(consumedOrFlag),
       effectiveRate: Number(effectiveRate),
     };
   }
@@ -127,20 +129,22 @@ export async function admit(
 export async function recordResult(
   client: RedisClientType,
   targetId: string,
-  success: boolean,
+  consumedTokens: number,
+  processingFailures: number,
   config: EndpointGateConfig,
 ): Promise<RecordResultOutcome> {
-  const cbKey = `cb:{${targetId}}`;
+  const epKey = `ep:{${targetId}}`;
   const now = Date.now().toString();
 
   const args = [
     now,
-    success ? "1" : "0",
-    config.cbCooldownMs.toString(),
-    config.decayPeriodMs.toString(),
-    config.cbErrorThreshold.toString(),
-    config.cbMinAttempts.toString(),
-    config.cbWindowPeriodMs.toString(),
+    String(consumedTokens),
+    String(processingFailures),
+    config.cooldownPeriodMs.toString(),
+    config.recoveryPeriodMs.toString(),
+    config.failureThreshold.toString(),
+    config.minAttempts.toString(),
+    config.samplePeriodMs.toString(),
   ];
 
   if (!recordResultSha) {
@@ -151,17 +155,16 @@ export async function recordResult(
     client,
     recordResultLuaSrc,
     recordResultSha,
-    [cbKey],
+    [epKey],
     args,
-  )) as [number, string];
+  )) as [string, number];
 
-  const [ok, state] = raw;
+  const [circuitState, stateChanged] = raw;
 
-  if (ok === 1) {
-    return { ok: true, state: "closed" };
-  }
-
-  return { ok: false, state: state as "opened" | "failed" };
+  return {
+    circuitState: circuitState as CircuitState,
+    stateChanged: stateChanged === 1,
+  };
 }
 
 export function resetAdmitSha(): void {

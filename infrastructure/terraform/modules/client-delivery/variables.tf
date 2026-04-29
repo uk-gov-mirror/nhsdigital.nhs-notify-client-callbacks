@@ -181,6 +181,12 @@ variable "mtls_test_ca_s3_key" {
   default     = ""
 }
 
+variable "token_bucket_burst_capacity" {
+  type        = number
+  description = "Token bucket burst capacity used by the rate limiter"
+  default     = 2250
+}
+
 variable "elasticache_endpoint" {
   type        = string
   description = "ElastiCache Serverless endpoint URL"

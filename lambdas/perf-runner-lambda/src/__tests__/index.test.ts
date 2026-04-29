@@ -32,6 +32,7 @@ const mockResult: PerformanceResult = {
   phases: [],
   metrics: [],
   deliveryMetrics: [],
+  circuitBreakerMetrics: [],
 };
 
 beforeEach(() => {
@@ -42,6 +43,11 @@ beforeEach(() => {
     "/aws/lambda/nhs-dev-callbacks-client-transform-filter";
   process.env.DELIVERY_LOG_GROUP_PREFIX =
     "/aws/lambda/nhs-dev-callbacks-https-client-";
+  process.env.MOCK_WEBHOOK_LOG_GROUP =
+    "/aws/lambda/nhs-dev-callbacks-mock-webhook";
+  process.env.ELASTICACHE_ENDPOINT = "cache.example.invalid";
+  process.env.ELASTICACHE_CACHE_NAME = "test-cache";
+  process.env.ELASTICACHE_IAM_USERNAME = "test-user";
   process.env.AWS_REGION = "eu-west-2";
 });
 
@@ -55,9 +61,17 @@ describe("handler", () => {
         queueUrl: "https://sqs.example.invalid/queue",
         logGroupName: "/aws/lambda/nhs-dev-callbacks-client-transform-filter",
         deliveryLogGroupPrefix: "/aws/lambda/nhs-dev-callbacks-https-client-",
+        mockWebhookLogGroup: "/aws/lambda/nhs-dev-callbacks-mock-webhook",
       }),
       DEFAULT_SCENARIO,
       "test-id",
+      undefined,
+      expect.objectContaining({
+        endpoint: "cache.example.invalid",
+        cacheName: "test-cache",
+        iamUsername: "test-user",
+        region: "eu-west-2",
+      }),
     );
   });
 
@@ -73,6 +87,8 @@ describe("handler", () => {
       expect.anything(),
       customScenario,
       "custom-test",
+      undefined,
+      expect.anything(),
     );
   });
 
@@ -117,6 +133,38 @@ describe("handler", () => {
       }),
       DEFAULT_SCENARIO,
       "no-prefix-test",
+      undefined,
+      expect.anything(),
+    );
+  });
+
+  it("passes undefined elastiCacheDeps when ElastiCache env vars are missing", async () => {
+    delete process.env.ELASTICACHE_ENDPOINT;
+    delete process.env.ELASTICACHE_CACHE_NAME;
+    delete process.env.ELASTICACHE_IAM_USERNAME;
+
+    await handler({ testId: "no-cache-test" });
+
+    expect(mockRunPerformanceTest).toHaveBeenCalledWith(
+      expect.anything(),
+      DEFAULT_SCENARIO,
+      "no-cache-test",
+      undefined,
+      undefined,
+    );
+  });
+
+  it("passes mockWebhookLogGroup from env var", async () => {
+    await handler({ testId: "webhook-test" });
+
+    expect(mockRunPerformanceTest).toHaveBeenCalledWith(
+      expect.objectContaining({
+        mockWebhookLogGroup: "/aws/lambda/nhs-dev-callbacks-mock-webhook",
+      }),
+      expect.anything(),
+      "webhook-test",
+      undefined,
+      expect.anything(),
     );
   });
 });

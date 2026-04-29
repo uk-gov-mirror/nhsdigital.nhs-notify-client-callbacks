@@ -13,13 +13,17 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@aws-crypto/sha256-js": "catalog:aws",
     "@aws-sdk/client-cloudwatch-logs": "catalog:aws",
     "@aws-sdk/client-sqs": "catalog:aws",
+    "@aws-sdk/credential-providers": "catalog:aws",
+    "@smithy/signature-v4": "catalog:aws",
     "@nhs-notify-client-callbacks/logger": "workspace:*",
     "@nhs-notify-client-callbacks/models": "workspace:*",
-    "esbuild": "catalog:tools"
+    "@redis/client": "catalog:app"
   },
   "devDependencies": {
+    "esbuild": "catalog:tools",
     "@tsconfig/node22": "catalog:tools",
     "@types/aws-lambda": "catalog:tools",
     "@types/jest": "catalog:test",
