@@ -41,6 +41,8 @@ module "client_delivery" {
   mtls_ca_s3_key      = local.mtls_ca_s3_key   # gitleaks:allow
 
   token_bucket_burst_capacity = var.token_bucket_burst_capacity
+  cb_cooldown_period_ms       = var.cb_cooldown_period_ms
+  cb_recovery_period_ms       = var.cb_recovery_period_ms
 
   vpc_subnet_ids           = try(local.acct.private_subnets[local.bc_name], [])
   lambda_security_group_id = aws_security_group.https_client_lambda.id

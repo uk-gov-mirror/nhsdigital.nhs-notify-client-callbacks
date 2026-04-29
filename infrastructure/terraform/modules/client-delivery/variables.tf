@@ -216,3 +216,15 @@ variable "lambda_security_group_id" {
   description = "Security group ID for the Lambda function"
   default     = ""
 }
+
+variable "cb_cooldown_period_ms" {
+  type        = number
+  description = "Full block duration after circuit opens, before half-open probes begin (ms)"
+  default     = 120000
+}
+
+variable "cb_recovery_period_ms" {
+  type        = number
+  description = "Linear ramp-up duration after circuit closes (ms)"
+  default     = 600000
+}

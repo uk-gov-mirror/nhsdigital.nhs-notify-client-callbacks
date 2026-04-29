@@ -53,6 +53,8 @@ module "https_client_lambda" {
     MTLS_CERT_S3_KEY                      = var.mtls_cert_s3_key # gitleaks:allow
     QUEUE_URL                             = module.sqs_delivery.sqs_queue_url
     TOKEN_BUCKET_BURST_CAPACITY           = tostring(var.token_bucket_burst_capacity)
+    CB_COOLDOWN_PERIOD_MS                 = tostring(var.cb_cooldown_period_ms)
+    CB_RECOVERY_PERIOD_MS                 = tostring(var.cb_recovery_period_ms)
   }
 
   vpc_config = var.lambda_security_group_id != "" ? {

@@ -213,3 +213,15 @@ variable "token_bucket_burst_capacity" {
   description = "Token bucket burst capacity used by the rate limiter"
   default     = 2250
 }
+
+variable "cb_cooldown_period_ms" {
+  type        = number
+  description = "Full block duration after circuit opens, before half-open probes begin (ms)"
+  default     = 120000
+}
+
+variable "cb_recovery_period_ms" {
+  type        = number
+  description = "Linear ramp-up duration after circuit closes (ms)"
+  default     = 600000
+}
