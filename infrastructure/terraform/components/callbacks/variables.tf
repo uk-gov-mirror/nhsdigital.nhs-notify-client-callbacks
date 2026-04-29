@@ -35,11 +35,7 @@ variable "group" {
 # a default within its declaration in this file, because the variables
 # purpose is as an identifier unique to this component, rather
 # then to the environment from where all other variables come.
-variable "component" {
-  type        = string
-  description = "The variable encapsulating the name of this component"
-  default     = "callbacks"
-}
+
 
 variable "default_tags" {
   type        = map(string)
