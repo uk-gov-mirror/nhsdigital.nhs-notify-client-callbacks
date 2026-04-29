@@ -48,6 +48,14 @@ describe("jitteredBackoffSeconds", () => {
 });
 
 describe("parseRetryAfter", () => {
+  beforeEach(() => {
+    jest.useFakeTimers({ now: 10_000_000 });
+  });
+
+  afterEach(() => {
+    jest.useRealTimers();
+  });
+
   it("parses integer string", () => {
     expect(parseRetryAfter("120")).toBe(120);
   });
@@ -57,14 +65,12 @@ describe("parseRetryAfter", () => {
   });
 
   it("parses HTTP date string", () => {
-    const futureDate = new Date(Date.now() + 60_000);
-    const result = parseRetryAfter(futureDate.toUTCString());
-    expect(result).toBeGreaterThanOrEqual(58);
-    expect(result).toBeLessThanOrEqual(61);
+    const futureDate = new Date(10_060_000);
+    expect(parseRetryAfter(futureDate.toUTCString())).toBe(60);
   });
 
   it("returns 0 for past HTTP date", () => {
-    const pastDate = new Date(Date.now() - 60_000);
+    const pastDate = new Date(9_940_000);
     expect(parseRetryAfter(pastDate.toUTCString())).toBe(0);
   });
 
@@ -74,19 +80,24 @@ describe("parseRetryAfter", () => {
 });
 
 describe("isWindowExhausted", () => {
+  beforeEach(() => {
+    jest.useFakeTimers({ now: 10_000 });
+  });
+
+  afterEach(() => {
+    jest.useRealTimers();
+  });
+
   it("returns false just below limit", () => {
-    const firstReceived = Date.now() - 999;
-    expect(isWindowExhausted(firstReceived, 1000)).toBe(false);
+    expect(isWindowExhausted(9001, 1000)).toBe(false);
   });
 
   it("returns true at limit", () => {
-    const firstReceived = Date.now() - 1000;
-    expect(isWindowExhausted(firstReceived, 1000)).toBe(true);
+    expect(isWindowExhausted(9000, 1000)).toBe(true);
   });
 
   it("returns true beyond limit", () => {
-    const firstReceived = Date.now() - 2000;
-    expect(isWindowExhausted(firstReceived, 1000)).toBe(true);
+    expect(isWindowExhausted(8000, 1000)).toBe(true);
   });
 });
 
