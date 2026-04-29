@@ -29,7 +29,7 @@ local CIRCUIT_OPEN     = "circuit_open"
 local SOME_ALLOWED     = "some_allowed"
 
 -- Keys
-local epKey            = KEYS[1]    -- ep:{targetId}  combined endpoint state hash
+local epKey            = KEYS[1] -- ep:{targetId}  combined endpoint state hash
 
 -- Arguments
 local now              = tonumber(ARGV[1]) or 0
@@ -104,6 +104,9 @@ end
 
 if isOpen then
   bucketTokens = 0
+  if rlNeedInit and isHalfOpen then
+    bucketTokens = 1
+  end
 end
 
 local generatedTokens = math.floor((now - bucketRefilledAt) * effectiveRate / 1000)
