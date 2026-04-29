@@ -17,7 +17,7 @@ module "client_config_bucket" {
   name = "subscription-config"
 
   aws_account_id = var.aws_account_id
-  component      = var.component
+  component      = local.component
   environment    = var.environment
   project        = var.project
   region         = var.region

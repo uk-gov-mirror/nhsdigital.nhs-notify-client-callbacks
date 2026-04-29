@@ -4,7 +4,7 @@ module "client_destination" {
   project         = var.project
   aws_account_id  = var.aws_account_id
   region          = var.region
-  component       = var.component
+  component       = local.component
   environment     = var.environment
   client_bus_name = aws_cloudwatch_event_bus.main.name
 

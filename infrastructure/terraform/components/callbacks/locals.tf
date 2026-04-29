@@ -62,5 +62,5 @@ locals {
     }
   ]...)
 
-  applications_map_parameter_name = coalesce(var.applications_map_parameter_name, "/${var.project}/${var.environment}/${var.component}/applications-map")
+  applications_map_parameter_name = coalesce(var.applications_map_parameter_name, "/${var.project}/${var.environment}/${local.component}/applications-map")
 }

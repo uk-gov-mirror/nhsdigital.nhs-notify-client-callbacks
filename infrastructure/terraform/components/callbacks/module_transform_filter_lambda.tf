@@ -5,7 +5,7 @@ module "client_transform_filter_lambda" {
   description   = "Lambda function that transforms and filters events coming to through the eventpipe"
 
   aws_account_id = var.aws_account_id
-  component      = var.component
+  component      = local.component
   environment    = var.environment
   project        = var.project
   region         = var.region
