@@ -1,4 +1,4 @@
-import { timingSafeEqual } from "node:crypto";
+import { createHash, timingSafeEqual } from "node:crypto";
 import type { APIGatewayProxyEvent, APIGatewayProxyResult } from "aws-lambda";
 import { Logger } from "@nhs-notify-client-callbacks/logger";
 import type { ClientCallbackPayload } from "@nhs-notify-client-callbacks/models";
@@ -62,10 +62,9 @@ async function buildResponse(
   if (
     !expectedApiKey ||
     !providedApiKey ||
-    expectedApiKey.length !== providedApiKey.length ||
     !timingSafeEqual(
-      Buffer.from(expectedApiKey),
-      Buffer.from(providedApiKey),
+      createHash("sha256").update(expectedApiKey).digest(),
+      createHash("sha256").update(providedApiKey).digest(),
     )
   ) {
     logger.error("Unauthorized: invalid or missing x-api-key");
