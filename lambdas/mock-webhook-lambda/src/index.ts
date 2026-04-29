@@ -1,3 +1,4 @@
+import { timingSafeEqual } from "node:crypto";
 import type { APIGatewayProxyEvent, APIGatewayProxyResult } from "aws-lambda";
 import { Logger } from "@nhs-notify-client-callbacks/logger";
 import type { ClientCallbackPayload } from "@nhs-notify-client-callbacks/models";
@@ -58,7 +59,15 @@ async function buildResponse(
   const expectedApiKey = process.env.API_KEY;
   const providedApiKey = headers["x-api-key"];
 
-  if (!expectedApiKey || providedApiKey !== expectedApiKey) {
+  if (
+    !expectedApiKey ||
+    !providedApiKey ||
+    expectedApiKey.length !== providedApiKey.length ||
+    !timingSafeEqual(
+      Buffer.from(expectedApiKey),
+      Buffer.from(providedApiKey),
+    )
+  ) {
     logger.error("Unauthorized: invalid or missing x-api-key");
     return {
       statusCode: 401,

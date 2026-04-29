@@ -1,14 +1,14 @@
 {
   "dependencies": {
     "@nhs-notify-client-callbacks/logger": "workspace:*",
-    "@nhs-notify-client-callbacks/models": "workspace:*",
-    "esbuild": "catalog:tools"
+    "@nhs-notify-client-callbacks/models": "workspace:*"
   },
   "devDependencies": {
     "@tsconfig/node22": "catalog:tools",
     "@types/aws-lambda": "catalog:tools",
     "@types/jest": "catalog:test",
     "@types/node": "catalog:tools",
+    "esbuild": "catalog:tools",
     "eslint": "catalog:lint",
     "jest": "catalog:test",
     "jest-html-reporter": "catalog:test",

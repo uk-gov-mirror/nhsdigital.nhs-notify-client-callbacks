@@ -88,10 +88,3 @@ resource "aws_lambda_permission" "mock_webhook_function_url" {
   function_url_auth_type = "NONE"
 }
 
-resource "aws_lambda_permission" "mock_webhook_function_invoke" {
-  count               = var.deploy_mock_clients ? 1 : 0
-  statement_id_prefix = "FunctionURLAllowInvokeAction"
-  action              = "lambda:InvokeFunction"
-  function_name       = module.mock_webhook_lambda[0].function_name
-  principal           = "*"
-}

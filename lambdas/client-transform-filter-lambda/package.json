@@ -6,7 +6,6 @@
     "@nhs-notify-client-callbacks/models": "workspace:*",
     "aws-embedded-metrics": "catalog:app",
     "cloudevents": "catalog:app",
-    "esbuild": "catalog:tools",
     "p-map": "catalog:app",
     "zod": "catalog:app"
   },
@@ -15,6 +14,7 @@
     "@types/aws-lambda": "catalog:tools",
     "@types/jest": "catalog:test",
     "@types/node": "catalog:tools",
+    "esbuild": "catalog:tools",
     "eslint": "catalog:lint",
     "jest": "catalog:test",
     "typescript": "catalog:tools"
