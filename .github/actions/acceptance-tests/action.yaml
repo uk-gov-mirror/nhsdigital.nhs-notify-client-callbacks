@@ -49,6 +49,7 @@ runs:
       shell: bash
       env:
         PROJECT: nhs
-        COMPONENT: ${{ inputs.targetComponent }}
+        COMPONENT: cb
+        CLIENT_COMPONENT: cbc
       run: |
         make test-${{ inputs.testType }}

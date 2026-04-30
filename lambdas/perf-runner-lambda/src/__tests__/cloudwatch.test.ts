@@ -24,7 +24,7 @@ describe("queryMetricsSnapshot", () => {
 
     const result = await queryMetricsSnapshot(
       mockCloudWatchClient,
-      "/aws/lambda/nhs-dev-callbacks-client-transform-filter",
+      "/aws/lambda/nhs-dev-cb-client-transform-filter",
       1_700_000_000,
       1_700_000_060,
     );

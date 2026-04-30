@@ -20,6 +20,7 @@ export async function handler(
   const queueUrl = process.env.INBOUND_QUEUE_URL;
   const logGroupName = process.env.TRANSFORM_FILTER_LOG_GROUP;
   const deliveryLogGroupPrefix = process.env.DELIVERY_LOG_GROUP_PREFIX;
+  const deliveryQueueUrlPrefix = process.env.DELIVERY_QUEUE_URL_PREFIX;
   const mockWebhookLogGroup = process.env.MOCK_WEBHOOK_LOG_GROUP;
   const elasticacheEndpoint = process.env.ELASTICACHE_ENDPOINT;
   const elasticacheCacheName = process.env.ELASTICACHE_CACHE_NAME;
@@ -58,6 +59,7 @@ export async function handler(
         queueUrl,
         logGroupName,
         deliveryLogGroupPrefix,
+        deliveryQueueUrlPrefix,
         mockWebhookLogGroup,
       },
       scenario,

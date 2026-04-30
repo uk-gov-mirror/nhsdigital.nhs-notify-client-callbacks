@@ -98,8 +98,10 @@ const deps: RunnerDeps = {
   sqsClient: {} as SQSClient,
   cloudWatchClient: {} as CloudWatchLogsClient,
   queueUrl: "https://sqs.example.invalid/queue",
-  logGroupName: "/aws/lambda/nhs-dev-callbacks-client-transform-filter",
-  deliveryLogGroupPrefix: "/aws/lambda/nhs-dev-callbacks-https-client-",
+  logGroupName: "/aws/lambda/nhs-dev-cb-client-transform-filter",
+  deliveryLogGroupPrefix: "/aws/lambda/nhs-dev-cbc-https-client-",
+  deliveryQueueUrlPrefix:
+    "https://sqs.eu-west-2.amazonaws.com/123456789/nhs-dev-cbc-",
 };
 
 beforeEach(() => {
@@ -355,8 +357,8 @@ describe("runPerformanceTest", () => {
     expect(mockQueryDeliveryMetricsSnapshot).toHaveBeenCalledWith(
       deps.cloudWatchClient,
       expect.arrayContaining([
-        "/aws/lambda/nhs-dev-callbacks-https-client-perf-client-1",
-        "/aws/lambda/nhs-dev-callbacks-https-client-perf-client-2",
+        "/aws/lambda/nhs-dev-cbc-https-client-perf-client-1",
+        "/aws/lambda/nhs-dev-cbc-https-client-perf-client-2",
       ]),
       expect.any(Number),
       expect.any(Number),
@@ -482,13 +484,13 @@ describe("runPerformanceTest", () => {
     expect(mockQueryPerClientRateTimeline).toHaveBeenCalledTimes(2);
     expect(mockQueryPerClientRateTimeline).toHaveBeenCalledWith(
       deps.cloudWatchClient,
-      "/aws/lambda/nhs-dev-callbacks-https-client-perf-client-1",
+      "/aws/lambda/nhs-dev-cbc-https-client-perf-client-1",
       expect.any(Number),
       expect.any(Number),
     );
     expect(mockQueryPerClientRateTimeline).toHaveBeenCalledWith(
       deps.cloudWatchClient,
-      "/aws/lambda/nhs-dev-callbacks-https-client-perf-client-2",
+      "/aws/lambda/nhs-dev-cbc-https-client-perf-client-2",
       expect.any(Number),
       expect.any(Number),
     );
@@ -553,7 +555,11 @@ describe("runPerformanceTest", () => {
 
     await runPerformanceTest(deps, scenario, "test-purge", immediateSleep);
 
-    expect(mockDeriveQueueUrls).toHaveBeenCalledWith(deps.queueUrl, scenario);
+    expect(mockDeriveQueueUrls).toHaveBeenCalledWith(
+      deps.queueUrl,
+      scenario,
+      deps.deliveryQueueUrlPrefix,
+    );
     expect(mockPurgeQueues).toHaveBeenCalledTimes(2);
   });
 

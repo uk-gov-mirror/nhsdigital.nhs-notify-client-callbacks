@@ -5,23 +5,25 @@ module "client_delivery" {
   project        = var.project
   aws_account_id = var.aws_account_id
   region         = var.region
-  component      = var.component
+  component      = local.component
   environment    = var.environment
   group          = var.group
 
   client_id       = each.key
-  client_bus_name = aws_cloudwatch_event_bus.main.name
-  kms_key_arn     = module.kms.key_arn
+  client_bus_name = local.callbacks.eventbus_name.name
+  kms_key_arn     = local.callbacks.kms_key_arn
 
   subscriptions        = local.client_subscriptions[each.key]
   subscription_targets = local.client_subscription_targets[each.key]
 
-  client_config_bucket     = module.client_config_bucket.bucket
-  client_config_bucket_arn = module.client_config_bucket.arn
+  client_config_bucket     = var.client_config_s3_bucket
+  client_config_bucket_arn = local.callbacks.client_config_bucket.arn
+  client_config_key_prefix = "${var.environment}/client_subscriptions/"
 
-  applications_map_parameter_name = local.applications_map_parameter_name
+  applications_map_s3_bucket = var.applications_map_s3_bucket
+  applications_map_s3_key    = local.applications_map_s3_key
 
-  lambda_s3_bucket      = local.acct.s3_buckets["lambda_function_artefacts"]["id"]
+  lambda_s3_bucket      = local.callbacks.lambda_s3_bucket
   lambda_code_base_path = local.aws_lambda_functions_dir_path
 
   force_lambda_code_deploy = var.force_lambda_code_deploy
@@ -30,11 +32,11 @@ module "client_delivery" {
   enable_xray_tracing      = var.enable_xray_tracing
 
   log_destination_arn       = local.log_destination_arn
-  log_subscription_role_arn = local.acct.log_subscription_role_arn
+  log_subscription_role_arn = local.log_subscription_role_arn
 
-  elasticache_endpoint     = aws_elasticache_serverless_cache.delivery_state.endpoint[0].address
-  elasticache_cache_name   = aws_elasticache_serverless_cache.delivery_state.name
-  elasticache_iam_username = "${var.project}-${var.environment}-${var.component}-elasticache-user"
+  elasticache_endpoint     = local.callbacks.elasticache.endpoint
+  elasticache_cache_name   = local.callbacks.elasticache.cache_name
+  elasticache_iam_username = local.callbacks.elasticache.iam_username
 
   mtls_cert_s3_bucket = local.mtls_cert_s3_bucket
   mtls_cert_s3_key    = local.mtls_cert_s3_key # gitleaks:allow
@@ -42,6 +44,6 @@ module "client_delivery" {
 
   token_bucket_burst_capacity = var.token_bucket_burst_capacity
 
-  vpc_subnet_ids           = try(local.acct.private_subnets[local.bc_name], [])
-  lambda_security_group_id = aws_security_group.https_client_lambda.id
+  vpc_subnet_ids           = local.callbacks.vpc_subnet_ids
+  lambda_security_group_id = local.callbacks.security_group_id
 }

@@ -46,7 +46,7 @@ jobs:
     strategy:
       max-parallel: 1
       matrix:
-        component: [callbacks]
+        component: [callbacks, callback-clients]
 
     steps:
       - name: Checkout repository

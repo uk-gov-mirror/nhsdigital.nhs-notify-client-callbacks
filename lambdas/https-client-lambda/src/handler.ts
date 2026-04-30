@@ -3,7 +3,7 @@ import type { ClientCallbackPayload } from "@nhs-notify-client-callbacks/models"
 import pMap from "p-map";
 import { logger } from "@nhs-notify-client-callbacks/logger";
 import { loadTargetConfig } from "services/config-loader";
-import { getApplicationId } from "services/ssm-applications-map";
+import { getApplicationId } from "services/applications-map";
 import { signPayload } from "services/payload-signer";
 import { buildAgent } from "services/delivery/tls-agent-factory";
 import {
@@ -273,6 +273,7 @@ async function processTargetBatch(
       try {
         const outcome = await deliverRecord(
           record,
+          // eslint-disable-next-line security/detect-object-injection
           admittedMessages[index],
           target,
           applicationId,
@@ -280,6 +281,7 @@ async function processTargetBatch(
         );
         return { record, success: outcome.success, dlq: outcome.dlq };
       } catch (error) {
+        // eslint-disable-next-line security/detect-object-injection
         const correlationId = extractCorrelationId(admittedMessages[index]);
         logger.error("Failed to process record", {
           messageId: record.messageId,

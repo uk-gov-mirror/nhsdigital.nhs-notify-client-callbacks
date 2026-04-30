@@ -3,6 +3,7 @@ export type DeploymentDetails = {
   environment: string;
   project: string;
   component: string;
+  clientComponent: string;
   accountId: string;
 };
 
@@ -10,7 +11,8 @@ export function getDeploymentDetails(): DeploymentDetails {
   const region = process.env.AWS_REGION ?? "eu-west-2";
   const environment = process.env.ENVIRONMENT;
   const project = process.env.PROJECT ?? "nhs";
-  const component = process.env.COMPONENT ?? "callbacks";
+  const component = process.env.COMPONENT ?? "cb";
+  const clientComponent = process.env.CLIENT_COMPONENT ?? "cbc";
   const accountId = process.env.AWS_ACCOUNT_ID;
 
   if (!environment) {
@@ -21,7 +23,14 @@ export function getDeploymentDetails(): DeploymentDetails {
     throw new Error("AWS_ACCOUNT_ID environment variable must be set");
   }
 
-  return { region, environment, project, component, accountId };
+  return {
+    region,
+    environment,
+    project,
+    component,
+    clientComponent,
+    accountId,
+  };
 }
 
 export function buildSubscriptionConfigBucketName({

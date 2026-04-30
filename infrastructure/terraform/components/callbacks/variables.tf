@@ -147,13 +147,13 @@ variable "event_anomaly_band_width" {
 
 variable "deploy_mock_clients" {
   type        = bool
-  description = "Flag to deploy mock webhook lambda for integration testing (test/dev environments only)"
+  description = "Flag indicating whether mock clients are deployed in callback-clients component (used by perf runner for log group references)"
   default     = false
 }
 
 variable "deploy_perf_runner" {
   type        = bool
-  description = "Flag to deploy the perf-runner lambda for performance testing (test/dev environments only)"
+  description = "Flag to deploy the perf-runner lambda for performance testing"
   default     = false
 }
 
@@ -163,49 +163,20 @@ variable "enable_xray_tracing" {
   default     = false
 }
 
+variable "client_config_s3_bucket" {
+  type        = string
+  description = "S3 bucket for client subscription configuration"
+}
+
 variable "message_root_uri" {
   type        = string
   description = "The root URI used for constructing message links in callback payloads"
 }
 
-variable "applications_map_parameter_name" {
-  type        = string
-  default     = null
-  description = "SSM Parameter Store path for the clientId-to-applicationData map, where applicationData is currently only the applicationId"
-}
 
-variable "s3_enable_force_destroy" {
-  type        = bool
-  description = "Whether to enable force destroy for the S3 buckets created in this module"
-  default     = false
-}
-
-variable "mtls_cert_s3_bucket" {
-  type        = string
-  description = "S3 bucket containing the mTLS client certificate bundle"
-  default     = ""
-}
-
-variable "mtls_cert_s3_key" {
-  type        = string
-  description = "S3 key for the mTLS client certificate PEM bundle"
-  default     = ""
-}
-
-variable "mtls_ca_s3_key" {
-  type        = string
-  description = "S3 key for the CA certificate PEM bundle used for server verification"
-  default     = ""
-}
 
 variable "elasticache_data_storage_maximum_gb" {
   type        = number
   description = "Maximum data storage in GB for the ElastiCache Serverless delivery state cache"
   default     = 1
-}
-
-variable "token_bucket_burst_capacity" {
-  type        = number
-  description = "Token bucket burst capacity used by the rate limiter"
-  default     = 2250
 }

@@ -1,9 +1,8 @@
 import { S3Client } from "@aws-sdk/client-s3";
-import { SSMClient } from "@aws-sdk/client-ssm";
 import { GetCallerIdentityCommand, STSClient } from "@aws-sdk/client-sts";
 import { fromIni } from "@aws-sdk/credential-providers";
 import { ClientSubscriptionRepository } from "src/repository/client-subscriptions";
-import SsmApplicationsMapRepository from "src/repository/ssm-applications-map";
+import S3ApplicationsMapRepository from "src/repository/s3-applications-map";
 import { S3Repository } from "src/repository/s3";
 
 export const resolveProfile = (
@@ -28,8 +27,7 @@ export const deriveBucketName = (
   accountId: string,
   environment: string,
   region: string,
-): string =>
-  `nhs-${accountId}-${region}-${environment}-callbacks-subscription-config`;
+): string => `nhs-${accountId}-${region}-${environment}-cb-subscription-config`;
 
 export const resolveRegion = (
   regionArg?: string,
@@ -90,48 +88,57 @@ export const createRepository = (options: {
   return new ClientSubscriptionRepository(s3Repository);
 };
 
-export const createSsmClient = (
-  region?: string,
-  profile?: string,
-  env: NodeJS.ProcessEnv = process.env,
-): SSMClient => {
-  const endpoint = env.AWS_ENDPOINT_URL;
-  const credentials = profile ? fromIni({ profile }) : undefined;
-  return new SSMClient({ region, endpoint, credentials });
-};
+export const deriveApplicationsMapBucketName = (
+  accountId: string,
+  region: string,
+): string => `nhs-${accountId}-${region}-main-acct-clie-apps-map`;
 
-export const deriveParameterName = (environment: string): string =>
-  `/nhs/${environment}/callbacks/applications-map`;
+export const deriveApplicationsMapKey = (environment: string): string =>
+  `${environment}/applications-map.json`;
 
-export const resolveParameterName = (args: {
-  parameterName?: string;
+export const resolveApplicationsMapLocation = async (args: {
+  bucket?: string;
+  key?: string;
   environment?: string;
-  env?: NodeJS.ProcessEnv;
-}): string => {
-  const { env = process.env, environment, parameterName } = args;
+  profile?: string;
+  region?: string;
+}): Promise<{ bucket: string; key: string }> => {
+  const { bucket, environment, key, profile, region } = args;
 
-  if (parameterName) {
-    return parameterName;
-  }
-
-  const resolvedEnvironment = environment ?? env.ENVIRONMENT;
-  if (!resolvedEnvironment) {
+  const resolvedEnvironment = environment ?? process.env.ENVIRONMENT;
+  if (!resolvedEnvironment && (!bucket || !key)) {
     throw new Error(
-      "Environment is required to derive parameter name. Please provide via --environment or ENVIRONMENT env var.",
+      "Environment is required to derive applications map location. Provide via --environment or ENVIRONMENT env var.",
     );
   }
 
-  return deriveParameterName(resolvedEnvironment);
+  const resolvedKey = key ?? deriveApplicationsMapKey(resolvedEnvironment!);
+
+  if (bucket) {
+    return { bucket, key: resolvedKey };
+  }
+
+  const resolvedRegion = resolveRegion(region) ?? "eu-west-2";
+  const resolvedAccountId =
+    process.env.AWS_ACCOUNT_ID ??
+    (await resolveAccountId(profile, resolvedRegion));
+
+  return {
+    bucket: deriveApplicationsMapBucketName(resolvedAccountId, resolvedRegion),
+    key: resolvedKey,
+  };
 };
 
-export const createSsmApplicationsMapRepository = (options: {
-  parameterName: string;
+export const createS3ApplicationsMapRepository = (options: {
+  bucket: string;
+  key: string;
   region?: string;
   profile?: string;
-}): SsmApplicationsMapRepository =>
-  new SsmApplicationsMapRepository(
-    createSsmClient(options.region, options.profile),
-    options.parameterName,
+}): S3ApplicationsMapRepository =>
+  new S3ApplicationsMapRepository(
+    createS3Client(options.region, options.profile),
+    options.bucket,
+    options.key,
   );
 
-export { default as SsmApplicationsMapRepository } from "src/repository/ssm-applications-map";
+export { default as S3ApplicationsMapRepository } from "src/repository/s3-applications-map";

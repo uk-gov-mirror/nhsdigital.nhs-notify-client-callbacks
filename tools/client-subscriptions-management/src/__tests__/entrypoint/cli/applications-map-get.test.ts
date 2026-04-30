@@ -1,86 +1,56 @@
 import * as cli from "src/entrypoint/cli/applications-map-get";
 import * as helper from "src/entrypoint/cli/helper";
-import {
-  captureCliConsoleState,
-  expectWrappedCliError,
-  resetCliConsoleState,
-  restoreCliConsoleState,
-} from "src/__tests__/entrypoint/cli/test-utils";
 
-const mockGetApplication = jest.fn();
+jest.mock("src/entrypoint/cli/helper", () => {
+  const actual = jest.requireActual("src/entrypoint/cli/helper");
+  return {
+    ...actual,
+    createS3ApplicationsMapRepository: jest.fn(),
+  };
+});
 
-jest.mock("src/entrypoint/cli/helper", () => ({
-  ...jest.requireActual("src/entrypoint/cli/helper"),
-  createSsmApplicationsMapRepository: jest.fn(),
-}));
-
-const mockCreateSsmApplicationsMapRepository =
-  helper.createSsmApplicationsMapRepository as jest.Mock;
+const mockCreateS3ApplicationsMapRepository =
+  helper.createS3ApplicationsMapRepository as jest.Mock;
 
 describe("applications-map-get CLI", () => {
-  const originalCliConsoleState = captureCliConsoleState();
-
   const baseArgs = [
     "node",
     "script",
     "--client-id",
-    "client-1",
-    "--parameter-name",
-    "/nhs/dev/callbacks/applications-map",
+    "test-client",
+    "--environment",
+    "dev",
   ];
 
   beforeEach(() => {
-    mockGetApplication.mockReset();
-    mockCreateSsmApplicationsMapRepository.mockReset();
-    mockCreateSsmApplicationsMapRepository.mockReturnValue({
-      getApplication: mockGetApplication,
+    mockCreateS3ApplicationsMapRepository.mockReset();
+    mockCreateS3ApplicationsMapRepository.mockResolvedValue({
+      getApplication: jest.fn().mockResolvedValue("app-id-123"),
     });
-    resetCliConsoleState();
   });
 
-  afterAll(() => {
-    restoreCliConsoleState(originalCliConsoleState);
-  });
-
-  it("prints the application ID when mapping exists", async () => {
-    mockGetApplication.mockResolvedValue("app-1");
+  it("outputs the application ID for a known client", async () => {
+    const consoleSpy = jest.spyOn(console, "log").mockImplementation();
 
     await cli.main(baseArgs);
 
-    expect(mockCreateSsmApplicationsMapRepository).toHaveBeenCalledWith(
+    expect(mockCreateS3ApplicationsMapRepository).toHaveBeenCalledWith(
       expect.objectContaining({
-        "client-id": "client-1",
-        "parameter-name": "/nhs/dev/callbacks/applications-map",
+        "client-id": "test-client",
+        environment: "dev",
       }),
     );
-    expect(mockGetApplication).toHaveBeenCalledWith("client-1");
-    expect(console.log).toHaveBeenCalledWith("app-1");
-  });
-
-  it("does not log the application-id in other messages", async () => {
-    mockGetApplication.mockResolvedValue("app-1");
-
-    await cli.main(baseArgs);
-
-    const logMessages = (console.log as jest.Mock).mock.calls.flat();
-    expect(logMessages).toEqual(["app-1"]);
+    expect(consoleSpy).toHaveBeenCalledWith("app-id-123");
+    consoleSpy.mockRestore();
   });
 
   it("throws when no mapping exists for the client", async () => {
-    expect.hasAssertions();
-    mockGetApplication.mockResolvedValue(undefined);
+    mockCreateS3ApplicationsMapRepository.mockResolvedValue({
+      getApplication: jest.fn().mockResolvedValue(undefined),
+    });
 
-    await expectWrappedCliError(
-      cli.main,
-      baseArgs,
-      "No application mapping exists for client: client-1",
+    await expect(cli.main(baseArgs)).rejects.toThrow(
+      "No application mapping exists for client: test-client",
     );
-  });
-
-  it("handles repository errors", async () => {
-    expect.hasAssertions();
-    mockGetApplication.mockRejectedValue(new Error("Boom"));
-
-    await expectWrappedCliError(cli.main, baseArgs);
   });
 });

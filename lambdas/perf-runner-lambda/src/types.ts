@@ -123,6 +123,7 @@ export type RunnerDeps = {
   queueUrl: string;
   logGroupName: string;
   deliveryLogGroupPrefix?: string;
+  deliveryQueueUrlPrefix?: string;
   mockWebhookLogGroup?: string;
 };
 

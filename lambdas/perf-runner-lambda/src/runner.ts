@@ -108,7 +108,11 @@ export async function runPerformanceTest(
 
   const testStartMs = Date.now();
 
-  const queueUrls = deriveQueueUrls(deps.queueUrl, scenario);
+  const queueUrls = deriveQueueUrls(
+    deps.queueUrl,
+    scenario,
+    deps.deliveryQueueUrlPrefix,
+  );
   await purgeQueues(deps.sqsClient, queueUrls);
   if (elastiCacheDeps) {
     await flushElastiCache(elastiCacheDeps);

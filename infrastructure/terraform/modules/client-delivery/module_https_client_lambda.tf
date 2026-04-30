@@ -36,11 +36,12 @@ module "https_client_lambda" {
   log_subscription_role_arn = var.log_subscription_role_arn
 
   lambda_env_vars = {
-    APPLICATIONS_MAP_PARAMETER            = var.applications_map_parameter_name
+    APPLICATIONS_MAP_S3_BUCKET            = var.applications_map_s3_bucket
+    APPLICATIONS_MAP_S3_KEY               = var.applications_map_s3_key
     CLIENT_ID                             = var.client_id
     CLIENT_SUBSCRIPTION_CACHE_TTL_SECONDS = "60"
     CLIENT_SUBSCRIPTION_CONFIG_BUCKET     = var.client_config_bucket
-    CLIENT_SUBSCRIPTION_CONFIG_PREFIX     = "client_subscriptions/"
+    CLIENT_SUBSCRIPTION_CONFIG_PREFIX     = var.client_config_key_prefix
     DLQ_URL                               = module.dlq_delivery.sqs_queue_url
     ELASTICACHE_CACHE_NAME                = var.elasticache_cache_name
     ELASTICACHE_ENDPOINT                  = var.elasticache_endpoint

@@ -4,17 +4,19 @@ import type { Scenario } from "types";
 export function deriveQueueUrls(
   inboundQueueUrl: string,
   scenario: Scenario,
+  deliveryQueueUrlPrefix?: string,
 ): string[] {
   // eslint-disable-next-line sonarjs/null-dereference -- String.replace always returns a string
-  const baseUrl = inboundQueueUrl.replace(/inbound-event-queue$/, "");
+  const inboundBase = inboundQueueUrl.replace(/inbound-event-queue$/, "");
+  const deliveryBase = deliveryQueueUrlPrefix ?? inboundBase;
   const clientIds = [...new Set(scenario.eventMix.map((e) => e.clientId))];
 
   return [
     inboundQueueUrl,
-    `${baseUrl}inbound-event-dlq-queue`,
+    `${inboundBase}inbound-event-dlq-queue`,
     ...clientIds.flatMap((id) => [
-      `${baseUrl}${id}-delivery-queue`,
-      `${baseUrl}${id}-delivery-dlq-queue`,
+      `${deliveryBase}${id}-delivery-queue`,
+      `${deliveryBase}${id}-delivery-dlq-queue`,
     ]),
   ];
 }

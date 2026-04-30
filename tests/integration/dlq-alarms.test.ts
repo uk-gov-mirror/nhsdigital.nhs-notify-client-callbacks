@@ -13,10 +13,10 @@ import {
 import { buildMockClientDlqQueueUrl } from "./helpers/sqs";
 
 function buildDlqDepthAlarmName(
-  { component, environment, project }: DeploymentDetails,
+  { clientComponent, environment, project }: DeploymentDetails,
   clientId: string,
 ): string {
-  return `${project}-${environment}-${component}-${clientId}-dlq-depth`;
+  return `${project}-${environment}-${clientComponent}-${clientId}-dlq-depth`;
 }
 
 function getQueueNameFromUrl(queueUrl: string): string {

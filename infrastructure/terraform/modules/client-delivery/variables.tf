@@ -70,9 +70,19 @@ variable "client_config_bucket_arn" {
   description = "S3 bucket ARN containing client subscription configuration"
 }
 
-variable "applications_map_parameter_name" {
+variable "client_config_key_prefix" {
   type        = string
-  description = "SSM Parameter Store path for the clientId-to-applicationData map"
+  description = "S3 key prefix for client subscription config objects"
+}
+
+variable "applications_map_s3_bucket" {
+  type        = string
+  description = "S3 bucket containing the applications map JSON"
+}
+
+variable "applications_map_s3_key" {
+  type        = string
+  description = "S3 key for the applications map JSON file"
 }
 
 variable "lambda_s3_bucket" {

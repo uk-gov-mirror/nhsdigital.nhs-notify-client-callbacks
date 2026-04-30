@@ -1,7 +1,8 @@
 import type { DeploymentDetails } from "./deployment";
 
 function buildQueueUrl(
-  { accountId, component, environment, project, region }: DeploymentDetails,
+  { accountId, environment, project, region }: DeploymentDetails,
+  component: string,
   name: string,
   options?: { appendQueueSuffix?: boolean },
 ): string {
@@ -15,13 +16,22 @@ function buildQueueUrl(
 export function buildInboundEventQueueUrl(
   deploymentDetails: DeploymentDetails,
 ): string {
-  return buildQueueUrl(deploymentDetails, "inbound-event");
+  return buildQueueUrl(
+    deploymentDetails,
+    deploymentDetails.component,
+    "inbound-event",
+  );
 }
 
 export function buildInboundEventDlqQueueUrl(
   deploymentDetails: DeploymentDetails,
 ): string {
-  return buildQueueUrl(deploymentDetails, "inbound-event-dlq", {
-    appendQueueSuffix: false,
-  });
+  return buildQueueUrl(
+    deploymentDetails,
+    deploymentDetails.component,
+    "inbound-event-dlq",
+    {
+      appendQueueSuffix: false,
+    },
+  );
 }

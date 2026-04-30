@@ -36,7 +36,10 @@ export function createTestContext(): TestContext {
     deployment,
     inboundQueueUrl: buildInboundEventQueueUrl(deployment),
     inboundDlqUrl: buildInboundEventDlqQueueUrl(deployment),
-    webhookLogGroup: buildLambdaLogGroupName(deployment, "mock-webhook"),
+    webhookLogGroup: buildLambdaLogGroupName(
+      { ...deployment, component: deployment.clientComponent },
+      "mock-webhook",
+    ),
     startTime: Date.now(),
     clientDlqUrl: (clientId) =>
       buildMockClientDlqQueueUrl(deployment, clientId),

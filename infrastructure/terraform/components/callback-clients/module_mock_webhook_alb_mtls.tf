@@ -15,7 +15,7 @@ resource "aws_security_group" "mock_webhook_alb" {
 resource "aws_vpc_security_group_ingress_rule" "mock_webhook_alb_https" {
   count                        = var.deploy_mock_clients ? 1 : 0
   security_group_id            = aws_security_group.mock_webhook_alb[0].id
-  referenced_security_group_id = aws_security_group.https_client_lambda.id
+  referenced_security_group_id = local.callbacks.security_group_id
   from_port                    = 443
   to_port                      = 443
   ip_protocol                  = "tcp"
@@ -41,17 +41,17 @@ resource "aws_acm_certificate" "mock_webhook_server" {
 
 resource "aws_lb" "mock_webhook_mtls" {
   count              = var.deploy_mock_clients ? 1 : 0
-  name               = substr("${local.csi}-mock-mtls", 0, 32)
+  name               = "${local.csi}-mock-mtls"
   internal           = true
   load_balancer_type = "application"
   security_groups    = [aws_security_group.mock_webhook_alb[0].id]
-  subnets            = try(local.acct.private_subnets[local.bc_name], [])
+  subnets            = local.callbacks.vpc_subnet_ids
   tags               = local.default_tags
 }
 
 resource "aws_lb_target_group" "mock_webhook_mtls" {
   count       = var.deploy_mock_clients ? 1 : 0
-  name        = substr("${local.csi}-mock-mtls", 0, 32)
+  name        = "${local.csi}-mock-mtls"
   target_type = "lambda"
   tags        = local.default_tags
 }

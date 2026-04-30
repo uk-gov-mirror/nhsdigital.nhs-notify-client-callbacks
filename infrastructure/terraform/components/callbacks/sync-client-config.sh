@@ -7,8 +7,8 @@
 set -euo pipefail
 
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-# shellcheck source=_paths.sh
-source "${script_dir}/_paths.sh"
+repo_root="$(cd "${script_dir}/../../../.." && pwd)"
+clients_dir="${repo_root}/infrastructure/terraform/modules/clients"
 
 : "${ENVIRONMENT:?ENVIRONMENT must be set}"
 : "${AWS_REGION:?AWS_REGION must be set}"
@@ -18,9 +18,9 @@ cd "${repo_root}"
 
 rm -f "${clients_dir}"/*.json
 
-bucket_name="nhs-${AWS_ACCOUNT_ID}-${AWS_REGION}-${ENVIRONMENT}-callbacks-subscription-config"
+bucket_name="nhs-${AWS_ACCOUNT_ID}-${AWS_REGION}-main-acct-clie-client-configs"
 
-s3_prefix="client_subscriptions/"
+s3_prefix="${ENVIRONMENT}/client_subscriptions/"
 
 echo "Seeding client configs from s3://${bucket_name}/${s3_prefix} for ${ENVIRONMENT}/${AWS_REGION}"
 

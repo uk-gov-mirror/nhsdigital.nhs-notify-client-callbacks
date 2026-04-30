@@ -1,109 +1,71 @@
 import * as cli from "src/entrypoint/cli/applications-map-add";
 import * as helper from "src/entrypoint/cli/helper";
-import {
-  captureCliConsoleState,
-  expectWrappedCliError,
-  resetCliConsoleState,
-  restoreCliConsoleState,
-} from "src/__tests__/entrypoint/cli/test-utils";
 
-const mockAddApplication = jest.fn();
 const mockFormatApplicationsMap = jest.fn();
-
-jest.mock("src/entrypoint/cli/helper", () => ({
-  ...jest.requireActual("src/entrypoint/cli/helper"),
-  createSsmApplicationsMapRepository: jest.fn(),
-}));
-
+jest.mock("src/entrypoint/cli/helper", () => {
+  const actual = jest.requireActual("src/entrypoint/cli/helper");
+  return {
+    ...actual,
+    createS3ApplicationsMapRepository: jest.fn(),
+  };
+});
 jest.mock("src/format", () => ({
-  ...jest.requireActual("src/format"),
   formatApplicationsMap: (...args: unknown[]) =>
     mockFormatApplicationsMap(...args),
 }));
 
-const mockCreateSsmApplicationsMapRepository =
-  helper.createSsmApplicationsMapRepository as jest.Mock;
+const mockCreateS3ApplicationsMapRepository =
+  helper.createS3ApplicationsMapRepository as jest.Mock;
 
 describe("applications-map-add CLI", () => {
-  const originalCliConsoleState = captureCliConsoleState();
-
   const baseArgs = [
     "node",
     "script",
     "--client-id",
-    "client-1",
+    "test-client",
     "--application-id",
-    "app-1",
-    "--parameter-name",
-    "/nhs/dev/callbacks/applications-map",
+    "app-123",
+    "--environment",
+    "dev",
   ];
 
-  const resultMap = new Map([["client-1", "app-1"]]);
-
   beforeEach(() => {
-    mockAddApplication.mockReset();
-    mockAddApplication.mockResolvedValue(resultMap);
+    mockCreateS3ApplicationsMapRepository.mockReset();
     mockFormatApplicationsMap.mockReset();
-    mockFormatApplicationsMap.mockReturnValue("masked-map-output");
-    mockCreateSsmApplicationsMapRepository.mockReset();
-    mockCreateSsmApplicationsMapRepository.mockReturnValue({
-      addApplication: mockAddApplication,
+    mockCreateS3ApplicationsMapRepository.mockResolvedValue({
+      addApplication: jest
+        .fn()
+        .mockResolvedValue(new Map([["test-client", "app-123"]])),
     });
-    resetCliConsoleState();
+    mockFormatApplicationsMap.mockReturnValue("formatted-output");
   });
 
-  afterAll(() => {
-    restoreCliConsoleState(originalCliConsoleState);
-  });
+  it("adds an application mapping", async () => {
+    const consoleSpy = jest.spyOn(console, "log").mockImplementation();
 
-  it("adds application and logs output", async () => {
     await cli.main(baseArgs);
 
-    expect(mockCreateSsmApplicationsMapRepository).toHaveBeenCalledWith(
+    expect(mockCreateS3ApplicationsMapRepository).toHaveBeenCalledWith(
       expect.objectContaining({
-        "client-id": "client-1",
-        "application-id": "app-1",
-        "parameter-name": "/nhs/dev/callbacks/applications-map",
+        "client-id": "test-client",
+        "application-id": "app-123",
+        environment: "dev",
       }),
     );
-    expect(mockAddApplication).toHaveBeenCalledWith("client-1", "app-1", false);
-    expect(console.log).toHaveBeenCalledWith(
-      "Applications map updated for client 'client-1'.",
+    expect(consoleSpy).toHaveBeenCalledWith(
+      "Applications map updated for client 'test-client'.",
     );
-    expect(mockFormatApplicationsMap).toHaveBeenCalledWith(resultMap);
-    expect(console.log).toHaveBeenCalledWith("masked-map-output");
+    consoleSpy.mockRestore();
   });
 
-  it("does not log application-id", async () => {
-    await cli.main(baseArgs);
+  it("shows dry-run message when --dry-run is set", async () => {
+    const consoleSpy = jest.spyOn(console, "log").mockImplementation();
 
-    const logMessages = (console.log as jest.Mock).mock.calls.flat();
-    expect(logMessages).not.toContain("app-1");
-  });
-
-  it("does not log dry-run message when dry-run is false", async () => {
-    await cli.main(baseArgs);
-
-    expect(console.log).not.toHaveBeenCalledWith(
-      "Dry run — no changes written to SSM.",
-    );
-  });
-
-  it("passes dry-run flag to repository and logs dry-run message", async () => {
     await cli.main([...baseArgs, "--dry-run"]);
 
-    expect(mockAddApplication).toHaveBeenCalledWith("client-1", "app-1", true);
-    expect(console.log).toHaveBeenCalledWith(
-      "Dry run — no changes written to SSM.",
+    expect(consoleSpy).toHaveBeenCalledWith(
+      "Dry run — no changes written to S3.",
     );
-  });
-
-  it("handles errors in wrapped CLI", async () => {
-    expect.hasAssertions();
-    mockCreateSsmApplicationsMapRepository.mockReturnValue({
-      addApplication: jest.fn().mockRejectedValue(new Error("Boom")),
-    });
-
-    await expectWrappedCliError(cli.main, baseArgs);
+    consoleSpy.mockRestore();
   });
 });

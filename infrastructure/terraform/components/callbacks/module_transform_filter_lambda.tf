@@ -38,8 +38,8 @@ module "client_transform_filter_lambda" {
   lambda_env_vars = {
     ENVIRONMENT                           = var.environment
     METRICS_NAMESPACE                     = "nhs-notify-client-callbacks"
-    CLIENT_SUBSCRIPTION_CONFIG_BUCKET     = module.client_config_bucket.bucket
-    CLIENT_SUBSCRIPTION_CONFIG_PREFIX     = "client_subscriptions/"
+    CLIENT_SUBSCRIPTION_CONFIG_BUCKET     = var.client_config_s3_bucket
+    CLIENT_SUBSCRIPTION_CONFIG_PREFIX     = "${var.environment}/client_subscriptions/"
     CLIENT_SUBSCRIPTION_CACHE_TTL_SECONDS = "60"
     MESSAGE_ROOT_URI                      = var.message_root_uri
   }

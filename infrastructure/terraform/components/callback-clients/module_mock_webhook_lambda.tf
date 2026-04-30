@@ -13,13 +13,13 @@ module "mock_webhook_lambda" {
   group          = var.group
 
   log_retention_in_days = var.log_retention_in_days
-  kms_key_arn           = module.kms.key_arn
+  kms_key_arn           = local.callbacks.kms_key_arn
 
   iam_policy_document = {
     body = data.aws_iam_policy_document.mock_webhook_lambda[0].json
   }
 
-  function_s3_bucket      = local.acct.s3_buckets["lambda_function_artefacts"]["id"]
+  function_s3_bucket      = local.callbacks.lambda_s3_bucket
   function_code_base_path = local.aws_lambda_functions_dir_path
   function_code_dir       = "mock-webhook-lambda/dist"
   function_include_common = true
@@ -33,7 +33,7 @@ module "mock_webhook_lambda" {
   enable_lambda_insights   = false
 
   log_destination_arn       = local.log_destination_arn
-  log_subscription_role_arn = local.acct.log_subscription_role_arn
+  log_subscription_role_arn = local.log_subscription_role_arn
 
   lambda_env_vars = {
     LOG_LEVEL = var.log_level
@@ -60,7 +60,7 @@ data "aws_iam_policy_document" "mock_webhook_lambda" {
     ]
 
     resources = [
-      module.kms.key_arn,
+      local.callbacks.kms_key_arn,
     ]
   }
 }
