@@ -35,10 +35,9 @@ No requirements.
 | <a name="input_log_retention_in_days"></a> [log\_retention\_in\_days](#input\_log\_retention\_in\_days) | CloudWatch log retention period in days | `number` | `0` | no |
 | <a name="input_log_subscription_role_arn"></a> [log\_subscription\_role\_arn](#input\_log\_subscription\_role\_arn) | IAM role ARN for CloudWatch log subscription | `string` | `""` | no |
 | <a name="input_max_retry_duration_seconds"></a> [max\_retry\_duration\_seconds](#input\_max\_retry\_duration\_seconds) | Maximum retry window before messages are sent to DLQ | `number` | `7200` | no |
-| <a name="input_mtls_cert_secret_arn"></a> [mtls\_cert\_secret\_arn](#input\_mtls\_cert\_secret\_arn) | Secrets Manager ARN for the mTLS client certificate | `string` | `""` | no |
-| <a name="input_mtls_test_ca_s3_key"></a> [mtls\_test\_ca\_s3\_key](#input\_mtls\_test\_ca\_s3\_key) | S3 key for dev CA certificate PEM bundle used for server verification | `string` | `""` | no |
-| <a name="input_mtls_test_cert_s3_bucket"></a> [mtls\_test\_cert\_s3\_bucket](#input\_mtls\_test\_cert\_s3\_bucket) | S3 bucket for dev mTLS test certificates | `string` | `""` | no |
-| <a name="input_mtls_test_cert_s3_key"></a> [mtls\_test\_cert\_s3\_key](#input\_mtls\_test\_cert\_s3\_key) | S3 key for dev mTLS test certificate bundle | `string` | `""` | no |
+| <a name="input_mtls_ca_s3_key"></a> [mtls\_ca\_s3\_key](#input\_mtls\_ca\_s3\_key) | S3 key for the CA certificate PEM bundle used for server verification | `string` | `""` | no |
+| <a name="input_mtls_cert_s3_bucket"></a> [mtls\_cert\_s3\_bucket](#input\_mtls\_cert\_s3\_bucket) | S3 bucket containing the mTLS client certificate bundle | `string` | `""` | no |
+| <a name="input_mtls_cert_s3_key"></a> [mtls\_cert\_s3\_key](#input\_mtls\_cert\_s3\_key) | S3 key for the mTLS client certificate PEM bundle | `string` | `""` | no |
 | <a name="input_project"></a> [project](#input\_project) | The name of the tfscaffold project | `string` | n/a | yes |
 | <a name="input_region"></a> [region](#input\_region) | AWS Region | `string` | n/a | yes |
 | <a name="input_sqs_max_receive_count"></a> [sqs\_max\_receive\_count](#input\_sqs\_max\_receive\_count) | Safety-net maximum receive count before a message moves to DLQ. Supplements the time-based retry window for cases where the Lambda fails before reaching the window check. | `number` | `100` | no |

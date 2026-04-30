@@ -36,10 +36,9 @@ module "client_delivery" {
   elasticache_cache_name   = aws_elasticache_serverless_cache.delivery_state.name
   elasticache_iam_username = "${var.project}-${var.environment}-${var.component}-elasticache-user"
 
-  mtls_cert_secret_arn     = var.mtls_cert_secret_arn
-  mtls_test_cert_s3_bucket = var.deploy_mock_clients ? module.mtls_test_certs_bucket[0].bucket : ""
-  mtls_test_cert_s3_key    = local.mtls_test_cert_s3_key # gitleaks:allow
-  mtls_test_ca_s3_key      = local.mtls_test_ca_s3_key   # gitleaks:allow
+  mtls_cert_s3_bucket = local.mtls_cert_s3_bucket
+  mtls_cert_s3_key    = local.mtls_cert_s3_key # gitleaks:allow
+  mtls_ca_s3_key      = local.mtls_ca_s3_key   # gitleaks:allow
 
   token_bucket_burst_capacity = var.token_bucket_burst_capacity
 

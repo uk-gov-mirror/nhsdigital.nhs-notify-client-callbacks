@@ -48,10 +48,9 @@ module "https_client_lambda" {
     ENVIRONMENT                           = var.environment
     MAX_RETRY_DURATION_SECONDS            = tostring(var.max_retry_duration_seconds)
     METRICS_NAMESPACE                     = "nhs-notify-client-callbacks"
-    MTLS_CERT_SECRET_ARN                  = var.mtls_cert_secret_arn
-    MTLS_TEST_CA_S3_KEY                   = var.mtls_test_ca_s3_key # gitleaks:allow
-    MTLS_TEST_CERT_S3_BUCKET              = var.mtls_test_cert_s3_bucket
-    MTLS_TEST_CERT_S3_KEY                 = var.mtls_test_cert_s3_key # gitleaks:allow
+    MTLS_CA_S3_KEY                        = var.mtls_ca_s3_key # gitleaks:allow
+    MTLS_CERT_S3_BUCKET                   = var.mtls_cert_s3_bucket
+    MTLS_CERT_S3_KEY                      = var.mtls_cert_s3_key # gitleaks:allow
     QUEUE_URL                             = module.sqs_delivery.sqs_queue_url
     TOKEN_BUCKET_BURST_CAPACITY           = tostring(var.token_bucket_burst_capacity)
   }

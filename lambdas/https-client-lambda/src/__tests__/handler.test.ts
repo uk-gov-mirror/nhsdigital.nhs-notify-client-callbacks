@@ -3,6 +3,7 @@ import {
   DEFAULT_TARGET,
   makeRecord,
 } from "__tests__/fixtures/handler-fixtures";
+import { VisibilityManagedError } from "services/visibility-managed-error";
 
 jest.mock("@nhs-notify-client-callbacks/logger", () => ({
   logger: {
@@ -108,7 +109,7 @@ describe("processRecords", () => {
     mockJitteredBackoff.mockReturnValue(5);
     mockIsWindowExhausted.mockReturnValue(false);
     mockHandleRateLimitedRecord.mockRejectedValue(
-      new Error("Rate limited — requeue"),
+      new VisibilityManagedError("Rate limited — requeue"),
     );
     mockGetRedisClient.mockResolvedValue({});
     mockAdmit.mockResolvedValue({
@@ -248,16 +249,29 @@ describe("processRecords", () => {
 
     const failures = await processRecords([record1, record2]);
 
-    expect(failures).toEqual([{ itemIdentifier: "msg-1" }]);
-    expect(mockChangeVisibility).toHaveBeenCalledWith("receipt-1", 5);
+    expect(failures).toEqual([]);
+    expect(mockSendToDlq).toHaveBeenCalledWith(record1.body);
   });
 
-  it("applies jittered backoff cooldown on unexpected errors", async () => {
+  it("sends unhandled errors to DLQ", async () => {
     mockDeliverPayload.mockRejectedValue(new Error("Infrastructure error"));
 
     const failures = await processRecords([makeRecord()]);
 
+    expect(failures).toEqual([]);
+    expect(mockSendToDlq).toHaveBeenCalledWith(makeRecord().body);
+    expect(mockChangeVisibility).not.toHaveBeenCalled();
+  });
+
+  it("retries VisibilityManagedError without DLQ", async () => {
+    mockDeliverPayload.mockRejectedValue(
+      new VisibilityManagedError("Rate limited — requeue"),
+    );
+
+    const failures = await processRecords([makeRecord()]);
+
     expect(failures).toEqual([{ itemIdentifier: "msg-1" }]);
+    expect(mockSendToDlq).not.toHaveBeenCalled();
     expect(mockChangeVisibility).toHaveBeenCalledWith("receipt-1", 5);
   });
 
@@ -399,9 +413,47 @@ describe("processRecords", () => {
       10,
       false,
       1,
-      expect.any(Object),
+      expect.objectContaining({ burstCapacity: 50 }),
     );
     expect(mockDeliverPayload).toHaveBeenCalled();
+  });
+
+  it("computes burst capacity as invocationRateLimit * 5", async () => {
+    const targetHighRate = {
+      ...DEFAULT_TARGET,
+      invocationRateLimit: 100,
+    };
+    mockLoadTargetConfig.mockResolvedValue(targetHighRate);
+
+    await processRecords([makeRecord()]);
+
+    expect(mockAdmit).toHaveBeenCalledWith(
+      expect.anything(),
+      "target-1",
+      100,
+      false,
+      1,
+      expect.objectContaining({ burstCapacity: 500 }),
+    );
+  });
+
+  it("caps burst capacity at TOKEN_BUCKET_BURST_CAPACITY", async () => {
+    const targetVeryHighRate = {
+      ...DEFAULT_TARGET,
+      invocationRateLimit: 1000,
+    };
+    mockLoadTargetConfig.mockResolvedValue(targetVeryHighRate);
+
+    await processRecords([makeRecord()]);
+
+    expect(mockAdmit).toHaveBeenCalledWith(
+      expect.anything(),
+      "target-1",
+      1000,
+      false,
+      1,
+      expect.objectContaining({ burstCapacity: 2250 }),
+    );
   });
 
   it("calls recordResult with batch counts on successful delivery when CB enabled", async () => {

@@ -61,6 +61,9 @@ locals {
   mtls_test_certs_s3_prefix = "callbacks/mtls-test"
   mtls_test_cert_s3_key     = "${local.mtls_test_certs_s3_prefix}/client-bundle.pem"
   mtls_test_ca_s3_key       = "${local.mtls_test_certs_s3_prefix}/ca.pem"
+  mtls_cert_s3_bucket       = var.deploy_mock_clients ? module.mtls_test_certs_bucket[0].bucket : var.mtls_cert_s3_bucket
+  mtls_cert_s3_key          = var.deploy_mock_clients ? local.mtls_test_cert_s3_key : var.mtls_cert_s3_key # gitleaks:allow
+  mtls_ca_s3_key            = var.deploy_mock_clients ? local.mtls_test_ca_s3_key : var.mtls_ca_s3_key     # gitleaks:allow
 }
 
 # --- TLS provider: generate test CA, client, and server certificates ---

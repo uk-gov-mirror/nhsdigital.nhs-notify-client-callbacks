@@ -128,10 +128,10 @@ resource "aws_vpc_security_group_egress_rule" "lambda_to_elasticache" {
 resource "aws_vpc_security_group_egress_rule" "lambda_to_https" {
   security_group_id = aws_security_group.https_client_lambda.id
   cidr_ipv4         = "0.0.0.0/0"
-  from_port         = 0
-  to_port           = 65535
+  from_port         = 443
+  to_port           = 443
   ip_protocol       = "tcp"
-  description       = "Allow Lambda outbound TCP for HTTPS webhook delivery (port defined per-client in webhook URL)"
+  description       = "Allow Lambda outbound HTTPS for webhook delivery"
 
   tags = local.default_tags
 }

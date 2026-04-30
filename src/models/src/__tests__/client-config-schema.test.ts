@@ -259,13 +259,6 @@ describe("parseClientSubscriptionConfiguration", () => {
     expect(result.success).toBe(false);
   });
 
-  it("accepts maxRetryDurationSeconds below 60", () => {
-    const config = createValidConfig();
-    config.targets[0].delivery = { maxRetryDurationSeconds: 10 };
-
-    expect(parseClientSubscriptionConfiguration(config).success).toBe(true);
-  });
-
   it("accepts maxRetryDurationSeconds at boundary value 1", () => {
     const config = createValidConfig();
     config.targets[0].delivery = { maxRetryDurationSeconds: 1 };

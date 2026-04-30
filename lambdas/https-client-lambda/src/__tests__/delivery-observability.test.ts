@@ -20,15 +20,16 @@ jest.mock("@nhs-notify-client-callbacks/logger", () => ({
 }));
 
 jest.mock("services/delivery-metrics", () => ({
-  emitAdmissionDenied: jest.fn(),
+  emitCircuitBlocked: jest.fn(),
   emitCircuitBreakerClosed: jest.fn(),
   emitCircuitBreakerOpen: jest.fn(),
+  emitClientRateLimited: jest.fn(),
   emitDeliveryAttempt: jest.fn(),
   emitDeliveryDuration: jest.fn(),
   emitDeliveryFailure: jest.fn(),
   emitDeliveryPermanentFailure: jest.fn(),
   emitDeliverySuccess: jest.fn(),
-  emitRateLimited: jest.fn(),
+  emitServerRateLimited: jest.fn(),
   emitRetryWindowExhausted: jest.fn(),
 }));
 
@@ -98,15 +99,44 @@ describe("delivery-observability", () => {
     );
   });
 
+  it("recordDeliveryPermanentFailure includes statusCode and errorCode when provided", () => {
+    const { emitDeliveryPermanentFailure } = jest.requireMock(
+      "services/delivery-metrics",
+    );
+    const { logger } = jest.requireMock("@nhs-notify-client-callbacks/logger");
+
+    recordDeliveryPermanentFailure(
+      "client-1",
+      "target-1",
+      400,
+      "INVALID_PAYLOAD",
+      "msg-456",
+    );
+
+    expect(emitDeliveryPermanentFailure).toHaveBeenCalledWith("target-1");
+    expect(logger.warn).toHaveBeenCalledWith(
+      "Permanent delivery failure \u2014 sending to DLQ",
+      expect.objectContaining({
+        clientId: "client-1",
+        targetId: "target-1",
+        correlationId: "msg-456",
+        statusCode: 400,
+        errorCode: "INVALID_PAYLOAD",
+      }),
+    );
+  });
+
   it("recordDeliveryRateLimited emits metric and logs", () => {
-    const { emitRateLimited } = jest.requireMock("services/delivery-metrics");
+    const { emitServerRateLimited } = jest.requireMock(
+      "services/delivery-metrics",
+    );
     const { logger } = jest.requireMock("@nhs-notify-client-callbacks/logger");
 
     recordDeliveryRateLimited("client-1", "target-1", "msg-123");
 
-    expect(emitRateLimited).toHaveBeenCalledWith("target-1");
+    expect(emitServerRateLimited).toHaveBeenCalledWith("target-1");
     expect(logger.info).toHaveBeenCalledWith(
-      "Rate limited (429)",
+      "Server rate limited (429)",
       expect.objectContaining({
         clientId: "client-1",
         targetId: "target-1",
@@ -192,8 +222,8 @@ describe("delivery-observability", () => {
     );
   });
 
-  it("recordAdmissionDenied emits per-record metrics and logs", () => {
-    const { emitAdmissionDenied } = jest.requireMock(
+  it("recordAdmissionDenied emits rate limited metric for rate_limited reason", () => {
+    const { emitClientRateLimited } = jest.requireMock(
       "services/delivery-metrics",
     );
     const { logger } = jest.requireMock("@nhs-notify-client-callbacks/logger");
@@ -203,11 +233,7 @@ describe("delivery-observability", () => {
       "msg-b",
     ]);
 
-    expect(emitAdmissionDenied).toHaveBeenCalledWith(
-      "target-1",
-      "rate_limited",
-      2,
-    );
+    expect(emitClientRateLimited).toHaveBeenCalledWith("target-1", 2);
     expect(logger.warn).toHaveBeenCalledWith(
       "Admission denied",
       expect.objectContaining({
@@ -216,6 +242,27 @@ describe("delivery-observability", () => {
         reason: "rate_limited",
         deniedCount: 2,
         correlationIds: ["msg-a", "msg-b"],
+      }),
+    );
+  });
+
+  it("recordAdmissionDenied emits circuit blocked metric for circuit_open reason", () => {
+    const { emitCircuitBlocked } = jest.requireMock(
+      "services/delivery-metrics",
+    );
+    const { logger } = jest.requireMock("@nhs-notify-client-callbacks/logger");
+
+    recordAdmissionDenied("client-1", "target-1", "circuit_open", ["msg-a"]);
+
+    expect(emitCircuitBlocked).toHaveBeenCalledWith("target-1", 1);
+    expect(logger.warn).toHaveBeenCalledWith(
+      "Admission denied",
+      expect.objectContaining({
+        clientId: "client-1",
+        targetId: "target-1",
+        reason: "circuit_open",
+        deniedCount: 1,
+        correlationIds: ["msg-a"],
       }),
     );
   });

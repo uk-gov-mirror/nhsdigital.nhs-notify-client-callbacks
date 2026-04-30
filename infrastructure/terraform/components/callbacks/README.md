@@ -34,7 +34,9 @@
 | <a name="input_log_level"></a> [log\_level](#input\_log\_level) | The log level to be used in lambda functions within the component. Any log with a lower severity than the configured value will not be logged: https://docs.python.org/3/library/logging.html#levels | `string` | `"INFO"` | no |
 | <a name="input_log_retention_in_days"></a> [log\_retention\_in\_days](#input\_log\_retention\_in\_days) | The retention period in days for the Cloudwatch Logs events to be retained, default of 0 is indefinite | `number` | `0` | no |
 | <a name="input_message_root_uri"></a> [message\_root\_uri](#input\_message\_root\_uri) | The root URI used for constructing message links in callback payloads | `string` | n/a | yes |
-| <a name="input_mtls_cert_secret_arn"></a> [mtls\_cert\_secret\_arn](#input\_mtls\_cert\_secret\_arn) | Secrets Manager ARN for the shared mTLS client certificate (production) | `string` | `""` | no |
+| <a name="input_mtls_ca_s3_key"></a> [mtls\_ca\_s3\_key](#input\_mtls\_ca\_s3\_key) | S3 key for the CA certificate PEM bundle used for server verification | `string` | `""` | no |
+| <a name="input_mtls_cert_s3_bucket"></a> [mtls\_cert\_s3\_bucket](#input\_mtls\_cert\_s3\_bucket) | S3 bucket containing the mTLS client certificate bundle | `string` | `""` | no |
+| <a name="input_mtls_cert_s3_key"></a> [mtls\_cert\_s3\_key](#input\_mtls\_cert\_s3\_key) | S3 key for the mTLS client certificate PEM bundle | `string` | `""` | no |
 | <a name="input_parent_acct_environment"></a> [parent\_acct\_environment](#input\_parent\_acct\_environment) | Name of the environment responsible for the acct resources used, affects things like DNS zone. Useful for named dev environments | `string` | `"main"` | no |
 | <a name="input_pipe_event_patterns"></a> [pipe\_event\_patterns](#input\_pipe\_event\_patterns) | value | `list(string)` | `[]` | no |
 | <a name="input_pipe_log_level"></a> [pipe\_log\_level](#input\_pipe\_log\_level) | Log level for the EventBridge Pipe. | `string` | `"ERROR"` | no |

@@ -184,9 +184,21 @@ variable "s3_enable_force_destroy" {
   default     = false
 }
 
-variable "mtls_cert_secret_arn" {
+variable "mtls_cert_s3_bucket" {
   type        = string
-  description = "Secrets Manager ARN for the shared mTLS client certificate (production)"
+  description = "S3 bucket containing the mTLS client certificate bundle"
+  default     = ""
+}
+
+variable "mtls_cert_s3_key" {
+  type        = string
+  description = "S3 key for the mTLS client certificate PEM bundle"
+  default     = ""
+}
+
+variable "mtls_ca_s3_key" {
+  type        = string
+  description = "S3 key for the CA certificate PEM bundle used for server verification"
   default     = ""
 }
 

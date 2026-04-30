@@ -4,24 +4,14 @@ import { checkServerIdentity } from "node:tls";
 import type { PeerCertificate } from "node:tls";
 import forge from "node-forge";
 import { GetObjectCommand, S3Client } from "@aws-sdk/client-s3";
-import {
-  GetSecretValueCommand,
-  SecretsManagerClient,
-} from "@aws-sdk/client-secrets-manager";
 import type { CallbackTarget } from "@nhs-notify-client-callbacks/models";
 import { logger } from "@nhs-notify-client-callbacks/logger";
 
-const {
-  MTLS_CERT_SECRET_ARN,
-  MTLS_TEST_CA_S3_KEY,
-  MTLS_TEST_CERT_S3_BUCKET,
-  MTLS_TEST_CERT_S3_KEY,
-} = process.env;
+const { MTLS_CA_S3_KEY, MTLS_CERT_S3_BUCKET, MTLS_CERT_S3_KEY } = process.env;
 const CERT_EXPIRY_THRESHOLD_MS =
   Number(process.env.CERT_EXPIRY_THRESHOLD_MS) || 86_400_000; // 24 hours
 
 const s3Client = new S3Client({});
-const secretsClient = new SecretsManagerClient({});
 
 export const PERMANENT_TLS_ERROR_CODES = new Set([
   "CERT_HAS_EXPIRED",
@@ -41,25 +31,6 @@ type CertMaterial = {
 
 let cachedMaterial: CertMaterial | undefined;
 
-async function loadFromSecretsManager(): Promise<{
-  key: string;
-  cert: string;
-}> {
-  const response = await secretsClient.send(
-    new GetSecretValueCommand({ SecretId: MTLS_CERT_SECRET_ARN }),
-  );
-
-  if (!response.SecretString) {
-    throw new Error("mTLS cert secret has no value");
-  }
-
-  const parsed = JSON.parse(response.SecretString) as {
-    key: string;
-    cert: string;
-  };
-  return { key: parsed.key, cert: parsed.cert };
-}
-
 async function loadS3Object(bucket: string, key: string): Promise<string> {
   const response = await s3Client.send(
     new GetObjectCommand({ Bucket: bucket, Key: key }),
@@ -77,16 +48,11 @@ async function loadFromS3(): Promise<{
   cert: string;
   ca?: string;
 }> {
-  if (!MTLS_TEST_CERT_S3_BUCKET || !MTLS_TEST_CERT_S3_KEY) {
-    throw new Error(
-      "MTLS_TEST_CERT_S3_BUCKET and MTLS_TEST_CERT_S3_KEY are required in non-production",
-    );
+  if (!MTLS_CERT_S3_BUCKET || !MTLS_CERT_S3_KEY) {
+    throw new Error("MTLS_CERT_S3_BUCKET and MTLS_CERT_S3_KEY are required");
   }
 
-  const pem = await loadS3Object(
-    MTLS_TEST_CERT_S3_BUCKET,
-    MTLS_TEST_CERT_S3_KEY,
-  );
+  const pem = await loadS3Object(MTLS_CERT_S3_BUCKET, MTLS_CERT_S3_KEY);
 
   const pemObjects = forge.pem.decode(pem);
   const keyObj = pemObjects.find((obj) => obj.type.includes("PRIVATE KEY"));
@@ -95,31 +61,28 @@ async function loadFromS3(): Promise<{
   const cert = certObj ? forge.pem.encode(certObj) : "";
 
   let ca: string | undefined;
-  if (MTLS_TEST_CA_S3_KEY) {
-    ca = await loadS3Object(MTLS_TEST_CERT_S3_BUCKET, MTLS_TEST_CA_S3_KEY);
+  if (MTLS_CA_S3_KEY) {
+    ca = await loadS3Object(MTLS_CERT_S3_BUCKET, MTLS_CA_S3_KEY);
   }
 
   return { key, cert, ca };
 }
 
 async function loadCertMaterial(): Promise<CertMaterial> {
-  const isProduction = Boolean(MTLS_CERT_SECRET_ARN);
-  const raw = isProduction
-    ? await loadFromSecretsManager()
-    : await loadFromS3();
+  const raw = await loadFromS3();
 
   const x509 = new X509Certificate(raw.cert);
   const validTo = new Date(x509.validTo);
 
   logger.info("mTLS certificate loaded", {
-    source: isProduction ? "SecretsManager" : "S3",
+    source: "S3",
     validTo: validTo.toISOString(),
   });
 
   return {
     key: raw.key,
     cert: raw.cert,
-    ca: "ca" in raw ? (raw.ca as string | undefined) : undefined,
+    ca: raw.ca,
     validTo,
   };
 }
@@ -150,10 +113,9 @@ export async function buildAgent(target: CallbackTarget): Promise<Agent> {
     );
   }
 
-  // Always load the CA in test environments (MTLS_TEST_CA_S3_KEY set) so that
-  // targets with mtls.enabled: false can still verify the server's cert chain.
-  // In production the CA comes from SecretsManager only when mTLS is in use.
-  if (target.delivery?.mtls?.enabled || MTLS_TEST_CA_S3_KEY) {
+  // Load CA from S3 when configured so targets with mtls.enabled: false can
+  // still verify the server's cert chain.
+  if (target.delivery?.mtls?.enabled || MTLS_CA_S3_KEY) {
     const material = await getMaterial();
 
     if (material.ca) {

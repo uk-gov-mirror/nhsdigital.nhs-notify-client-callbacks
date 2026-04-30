@@ -20,11 +20,13 @@ describe("delivery-metrics", () => {
     mockCreateMetricsLogger.mockReturnValue(mockMetrics);
     process.env.METRICS_NAMESPACE = "TestNamespace";
     process.env.ENVIRONMENT = "test";
+    process.env.CLIENT_ID = "client-1";
   });
 
   afterEach(() => {
     delete process.env.METRICS_NAMESPACE;
     delete process.env.ENVIRONMENT;
+    delete process.env.CLIENT_ID;
   });
 
   it("throws when METRICS_NAMESPACE is not set", async () => {
@@ -47,6 +49,16 @@ describe("delivery-metrics", () => {
     );
   });
 
+  it("throws when CLIENT_ID is not set", async () => {
+    delete process.env.CLIENT_ID;
+    // @ts-expect-error -- modulePaths resolves at runtime
+    const { emitDeliveryAttempt } = await import("services/delivery-metrics");
+
+    expect(() => emitDeliveryAttempt("t-1")).toThrow(
+      "CLIENT_ID environment variable is not set",
+    );
+  });
+
   it("creates metrics logger with correct namespace and dimensions", async () => {
     // @ts-expect-error -- modulePaths resolves at runtime
     const { emitDeliveryAttempt } = await import("services/delivery-metrics");
@@ -56,6 +68,7 @@ describe("delivery-metrics", () => {
     expect(mockMetrics.setNamespace).toHaveBeenCalledWith("TestNamespace");
     expect(mockMetrics.setDimensions).toHaveBeenCalledWith({
       Environment: "test",
+      ClientId: "client-1",
     });
   });
 
@@ -146,15 +159,15 @@ describe("delivery-metrics", () => {
     );
   });
 
-  it("emitRateLimited emits correct metric", async () => {
+  it("emitServerRateLimited emits correct metric", async () => {
     // @ts-expect-error -- modulePaths resolves at runtime
     const mod = await import("services/delivery-metrics");
-    const { emitRateLimited } = mod;
+    const { emitServerRateLimited } = mod;
 
-    emitRateLimited("target-42");
+    emitServerRateLimited("target-42");
 
     expect(mockMetrics.putMetric).toHaveBeenCalledWith(
-      "DeliveryRateLimited",
+      "DeliveryServerRateLimited",
       1,
       "Count",
       1,
@@ -191,24 +204,39 @@ describe("delivery-metrics", () => {
     );
   });
 
-  it("emitAdmissionDenied emits correct metric with reason", async () => {
+  it("emitClientRateLimited emits correct metric", async () => {
     // @ts-expect-error -- modulePaths resolves at runtime
     const mod = await import("services/delivery-metrics");
-    const { emitAdmissionDenied } = mod;
+    const { emitClientRateLimited } = mod;
 
-    emitAdmissionDenied("target-42", "rate_limited");
+    emitClientRateLimited("target-42", 3);
 
     expect(mockMetrics.setProperty).toHaveBeenCalledWith(
       "targetId",
       "target-42",
     );
+    expect(mockMetrics.putMetric).toHaveBeenCalledWith(
+      "DeliveryRateLimited",
+      3,
+      "Count",
+      1,
+    );
+  });
+
+  it("emitCircuitBlocked emits correct metric", async () => {
+    // @ts-expect-error -- modulePaths resolves at runtime
+    const mod = await import("services/delivery-metrics");
+    const { emitCircuitBlocked } = mod;
+
+    emitCircuitBlocked("target-42", 2);
+
     expect(mockMetrics.setProperty).toHaveBeenCalledWith(
-      "reason",
-      "rate_limited",
+      "targetId",
+      "target-42",
     );
     expect(mockMetrics.putMetric).toHaveBeenCalledWith(
-      "AdmissionDenied",
-      1,
+      "DeliveryCircuitBlocked",
+      2,
       "Count",
       1,
     );

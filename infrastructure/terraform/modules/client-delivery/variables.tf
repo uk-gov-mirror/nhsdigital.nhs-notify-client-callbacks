@@ -157,27 +157,21 @@ variable "enable_xray_tracing" {
   default     = false
 }
 
-variable "mtls_cert_secret_arn" {
+variable "mtls_cert_s3_bucket" {
   type        = string
-  description = "Secrets Manager ARN for the mTLS client certificate"
+  description = "S3 bucket containing the mTLS client certificate bundle"
   default     = ""
 }
 
-variable "mtls_test_cert_s3_bucket" {
+variable "mtls_cert_s3_key" {
   type        = string
-  description = "S3 bucket for dev mTLS test certificates"
+  description = "S3 key for the mTLS client certificate PEM bundle"
   default     = ""
 }
 
-variable "mtls_test_cert_s3_key" {
+variable "mtls_ca_s3_key" {
   type        = string
-  description = "S3 key for dev mTLS test certificate bundle"
-  default     = ""
-}
-
-variable "mtls_test_ca_s3_key" {
-  type        = string
-  description = "S3 key for dev CA certificate PEM bundle used for server verification"
+  description = "S3 key for the CA certificate PEM bundle used for server verification"
   default     = ""
 }
 

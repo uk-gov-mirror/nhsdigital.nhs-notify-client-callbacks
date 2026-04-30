@@ -1,15 +1,16 @@
 import { logger } from "@nhs-notify-client-callbacks/logger";
 import {
-  emitAdmissionDenied,
+  emitCircuitBlocked,
   emitCircuitBreakerClosed,
   emitCircuitBreakerOpen,
+  emitClientRateLimited,
   emitDeliveryAttempt,
   emitDeliveryDuration,
   emitDeliveryFailure,
   emitDeliveryPermanentFailure,
   emitDeliverySuccess,
-  emitRateLimited,
   emitRetryWindowExhausted,
+  emitServerRateLimited,
 } from "services/delivery-metrics";
 
 export function recordDeliveryAttempt(
@@ -60,8 +61,12 @@ export function recordDeliveryRateLimited(
   targetId: string,
   correlationId?: string,
 ): void {
-  emitRateLimited(targetId);
-  logger.info("Rate limited (429)", { clientId, targetId, correlationId });
+  emitServerRateLimited(targetId);
+  logger.info("Server rate limited (429)", {
+    clientId,
+    targetId,
+    correlationId,
+  });
 }
 
 export function recordDeliveryFailure(
@@ -118,7 +123,11 @@ export function recordAdmissionDenied(
   reason: string,
   correlationIds: (string | undefined)[],
 ): void {
-  emitAdmissionDenied(targetId, reason, correlationIds.length);
+  if (reason === "circuit_open") {
+    emitCircuitBlocked(targetId, correlationIds.length);
+  } else {
+    emitClientRateLimited(targetId, correlationIds.length);
+  }
   logger.warn("Admission denied", {
     clientId,
     targetId,

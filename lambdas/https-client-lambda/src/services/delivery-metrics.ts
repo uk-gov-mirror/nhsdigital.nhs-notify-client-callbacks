@@ -14,6 +14,7 @@ function getMetrics(): MetricsLogger {
 
   const namespace = process.env.METRICS_NAMESPACE;
   const environment = process.env.ENVIRONMENT;
+  const clientId = process.env.CLIENT_ID;
 
   if (!namespace) {
     throw new Error("METRICS_NAMESPACE environment variable is not set");
@@ -21,10 +22,16 @@ function getMetrics(): MetricsLogger {
   if (!environment) {
     throw new Error("ENVIRONMENT environment variable is not set");
   }
+  if (!clientId) {
+    throw new Error("CLIENT_ID environment variable is not set");
+  }
 
   metricsInstance = createMetricsLogger();
   metricsInstance.setNamespace(namespace);
-  metricsInstance.setDimensions({ Environment: environment });
+  metricsInstance.setDimensions({
+    Environment: environment,
+    ClientId: clientId,
+  });
 
   return metricsInstance;
 }
@@ -58,11 +65,11 @@ export function emitDeliveryPermanentFailure(targetId: string): void {
   );
 }
 
-export function emitRateLimited(targetId: string): void {
+export function emitServerRateLimited(targetId: string): void {
   const metrics = getMetrics();
   metrics.setProperty("targetId", targetId);
   metrics.putMetric(
-    "DeliveryRateLimited",
+    "DeliveryServerRateLimited",
     1,
     Unit.Count,
     StorageResolution.High,
@@ -102,16 +109,22 @@ export function emitRetryWindowExhausted(targetId: string): void {
   );
 }
 
-export function emitAdmissionDenied(
-  targetId: string,
-  reason: string,
-  count = 1,
-): void {
+export function emitClientRateLimited(targetId: string, count = 1): void {
   const metrics = getMetrics();
   metrics.setProperty("targetId", targetId);
-  metrics.setProperty("reason", reason);
   metrics.putMetric(
-    "AdmissionDenied",
+    "DeliveryRateLimited",
+    count,
+    Unit.Count,
+    StorageResolution.High,
+  );
+}
+
+export function emitCircuitBlocked(targetId: string, count = 1): void {
+  const metrics = getMetrics();
+  metrics.setProperty("targetId", targetId);
+  metrics.putMetric(
+    "DeliveryCircuitBlocked",
     count,
     Unit.Count,
     StorageResolution.High,

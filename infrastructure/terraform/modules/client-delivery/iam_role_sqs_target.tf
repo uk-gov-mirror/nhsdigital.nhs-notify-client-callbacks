@@ -100,25 +100,9 @@ data "aws_iam_policy_document" "https_client_lambda" {
   }
 
   dynamic "statement" {
-    for_each = var.mtls_cert_secret_arn != "" ? [1] : []
+    for_each = var.mtls_cert_s3_bucket != "" ? [1] : []
     content {
-      sid    = "SecretsManagerMTLSCert"
-      effect = "Allow"
-
-      actions = [
-        "secretsmanager:GetSecretValue",
-      ]
-
-      resources = [
-        var.mtls_cert_secret_arn,
-      ]
-    }
-  }
-
-  dynamic "statement" {
-    for_each = var.mtls_test_cert_s3_bucket != "" ? [1] : []
-    content {
-      sid    = "S3MTLSTestCertReadAccess"
+      sid    = "S3MTLSCertReadAccess"
       effect = "Allow"
 
       actions = [
@@ -126,8 +110,8 @@ data "aws_iam_policy_document" "https_client_lambda" {
       ]
 
       resources = [
-        "arn:aws:s3:::${var.mtls_test_cert_s3_bucket}/${var.mtls_test_cert_s3_key}",
-        "arn:aws:s3:::${var.mtls_test_cert_s3_bucket}/${var.mtls_test_ca_s3_key}",
+        "arn:aws:s3:::${var.mtls_cert_s3_bucket}/${var.mtls_cert_s3_key}",
+        "arn:aws:s3:::${var.mtls_cert_s3_bucket}/${var.mtls_ca_s3_key}",
       ]
     }
   }

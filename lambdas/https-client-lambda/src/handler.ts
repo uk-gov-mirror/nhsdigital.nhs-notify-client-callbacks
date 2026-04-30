@@ -19,6 +19,7 @@ import {
   isWindowExhausted,
   jitteredBackoffSeconds,
 } from "services/delivery/retry-policy";
+import { VisibilityManagedError } from "services/visibility-managed-error";
 import {
   type EndpointGateConfig,
   admit,
@@ -43,10 +44,14 @@ type RedisClientType = Awaited<ReturnType<typeof getRedisClient>>;
 
 const DEFAULT_MAX_RETRY_DURATION_MS = 7_200_000; // 2 hours
 const DEFAULT_CONCURRENCY_LIMIT = 5;
+const BURST_MULTIPLIER = 5;
+const MAX_BURST_CAPACITY = Number(
+  process.env.TOKEN_BUCKET_BURST_CAPACITY ?? "2250",
+);
 
 const gateConfig: EndpointGateConfig = {
-  // Max tokens the bucket can hold — absorbs short traffic bursts without throttling (default: 2250)
-  burstCapacity: Number(process.env.TOKEN_BUCKET_BURST_CAPACITY ?? "2250"),
+  // Max tokens the bucket can hold — absorbs short traffic bursts without throttling
+  burstCapacity: MAX_BURST_CAPACITY,
   // Probe rate to test endpoint recovery when half-open (default: 1/60 req/s)
   probeRateLimit: Number(process.env.CB_PROBE_RATE_LIMIT ?? String(1 / 60)),
   // Linear ramp-up after circuit closes, avoids flooding a freshly recovered endpoint (default: 10 min)
@@ -226,13 +231,18 @@ async function processTargetBatch(
   const target = await loadTargetConfig(clientId, batch.targetId);
   const cbEnabled = target.delivery?.circuitBreaker?.enabled ?? false;
 
+  const targetBurstCapacity = Math.min(
+    target.invocationRateLimit * BURST_MULTIPLIER,
+    MAX_BURST_CAPACITY,
+  );
+
   const gateResult = await admit(
     redis,
     batch.targetId,
     target.invocationRateLimit,
     cbEnabled,
     batch.records.length,
-    gateConfig,
+    { ...gateConfig, burstCapacity: targetBurstCapacity },
   );
 
   if (!gateResult.allowed) {
@@ -276,12 +286,20 @@ async function processTargetBatch(
           correlationId,
           err: error,
         });
-        const receiveCount = Number(record.attributes.ApproximateReceiveCount);
-        await changeVisibility(
-          record.receiptHandle,
-          jitteredBackoffSeconds(receiveCount),
-        );
-        return { record, success: false, dlq: false };
+
+        if (error instanceof VisibilityManagedError) {
+          const receiveCount = Number(
+            record.attributes.ApproximateReceiveCount,
+          );
+          await changeVisibility(
+            record.receiptHandle,
+            jitteredBackoffSeconds(receiveCount),
+          );
+          return { record, success: false, dlq: false };
+        }
+
+        await sendToDlq(record.body);
+        return { record, success: true, dlq: true };
       }
     },
     { concurrency: concurrencyLimit },

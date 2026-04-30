@@ -9,17 +9,6 @@ jest.mock("@aws-sdk/client-s3", () => {
   };
 });
 
-const mockSecretsManagerSend = jest.fn();
-jest.mock("@aws-sdk/client-secrets-manager", () => {
-  const actual = jest.requireActual("@aws-sdk/client-secrets-manager");
-  return {
-    ...actual,
-    SecretsManagerClient: jest
-      .fn()
-      .mockImplementation(() => ({ send: mockSecretsManagerSend })),
-  };
-});
-
 jest.mock("@nhs-notify-client-callbacks/logger", () => ({
   logger: {
     info: jest.fn(),
@@ -96,10 +85,9 @@ describe("tls-agent-factory", () => {
   beforeEach(async () => {
     jest.resetModules();
 
-    delete process.env.MTLS_CERT_SECRET_ARN;
-    process.env.MTLS_TEST_CERT_S3_BUCKET = "test-certs-bucket";
-    process.env.MTLS_TEST_CERT_S3_KEY = "client.pem";
-    delete process.env.MTLS_TEST_CA_S3_KEY;
+    process.env.MTLS_CERT_S3_BUCKET = "test-certs-bucket";
+    process.env.MTLS_CERT_S3_KEY = "client.pem";
+    delete process.env.MTLS_CA_S3_KEY;
     process.env.CERT_EXPIRY_THRESHOLD_MS = "86400000";
 
     // @ts-expect-error -- modulePaths resolves at runtime
@@ -108,7 +96,6 @@ describe("tls-agent-factory", () => {
     resetCache = mod.resetCache;
 
     mockS3Send.mockReset();
-    mockSecretsManagerSend.mockReset();
   });
 
   it("builds agent with key and cert when mtls is enabled", async () => {
@@ -126,11 +113,10 @@ describe("tls-agent-factory", () => {
 
     expect(agent).toBeDefined();
     expect(mockS3Send).not.toHaveBeenCalled();
-    expect(mockSecretsManagerSend).not.toHaveBeenCalled();
   });
 
-  it("loads test CA for server trust when MTLS_TEST_CA_S3_KEY is set and mtls is disabled", async () => {
-    process.env.MTLS_TEST_CA_S3_KEY = "test-ca.pem";
+  it("loads CA for server trust when MTLS_CA_S3_KEY is set and mtls is disabled", async () => {
+    process.env.MTLS_CA_S3_KEY = "test-ca.pem";
     jest.resetModules();
     // @ts-expect-error -- modulePaths resolves at runtime
     const mod = await import("services/delivery/tls-agent-factory");
@@ -157,8 +143,8 @@ describe("tls-agent-factory", () => {
     expect(agent.options.cert).toBeUndefined();
   });
 
-  it("loads test CA when MTLS_TEST_CA_S3_KEY is set", async () => {
-    process.env.MTLS_TEST_CA_S3_KEY = "test-ca.pem";
+  it("loads CA when MTLS_CA_S3_KEY is set", async () => {
+    process.env.MTLS_CA_S3_KEY = "test-ca.pem";
     jest.resetModules();
     // @ts-expect-error -- modulePaths resolves at runtime
     const mod = await import("services/delivery/tls-agent-factory");
@@ -183,32 +169,11 @@ describe("tls-agent-factory", () => {
     expect(mockS3Send).toHaveBeenCalledTimes(2);
   });
 
-  it("loads cert from S3 in non-production", async () => {
+  it("loads cert from S3", async () => {
     mockS3PemResponse(COMBINED_PEM);
     await buildAgent(createTarget({ delivery: { mtls: { enabled: true } } }));
 
     expect(mockS3Send).toHaveBeenCalledTimes(1);
-    expect(mockSecretsManagerSend).not.toHaveBeenCalled();
-  });
-
-  it("loads cert from SecretsManager in production", async () => {
-    process.env.MTLS_CERT_SECRET_ARN =
-      "arn:aws:secretsmanager:eu-west-2:123:secret:mtls-cert";
-    jest.resetModules();
-    // @ts-expect-error -- modulePaths resolves at runtime
-    const mod = await import("services/delivery/tls-agent-factory");
-
-    mockSecretsManagerSend.mockResolvedValue({
-      SecretString: JSON.stringify({ key: TEST_KEY, cert: TEST_CERT }),
-    });
-
-    const agent = await mod.buildAgent(
-      createTarget({ delivery: { mtls: { enabled: true } } }),
-    );
-
-    expect(agent).toBeDefined();
-    expect(mockSecretsManagerSend).toHaveBeenCalledTimes(1);
-    expect(mockS3Send).not.toHaveBeenCalled();
   });
 
   it("caches cert material on subsequent calls", async () => {
@@ -240,32 +205,16 @@ describe("tls-agent-factory", () => {
     expect(mockS3Send).toHaveBeenCalledTimes(2);
   });
 
-  it("throws when SecretsManager returns empty SecretString", async () => {
-    process.env.MTLS_CERT_SECRET_ARN =
-      "arn:aws:secretsmanager:eu-west-2:123:secret:mtls-cert";
-    jest.resetModules();
-    // @ts-expect-error -- modulePaths resolves at runtime
-    const mod = await import("services/delivery/tls-agent-factory");
-
-    mockSecretsManagerSend.mockResolvedValue({ SecretString: undefined });
-
-    await expect(
-      mod.buildAgent(createTarget({ delivery: { mtls: { enabled: true } } })),
-    ).rejects.toThrow("mTLS cert secret has no value");
-  });
-
-  it("throws when S3 env vars are missing in non-production", async () => {
-    delete process.env.MTLS_TEST_CERT_S3_BUCKET;
-    delete process.env.MTLS_TEST_CERT_S3_KEY;
+  it("throws when S3 env vars are missing", async () => {
+    delete process.env.MTLS_CERT_S3_BUCKET;
+    delete process.env.MTLS_CERT_S3_KEY;
     jest.resetModules();
     // @ts-expect-error -- modulePaths resolves at runtime
     const mod = await import("services/delivery/tls-agent-factory");
 
     await expect(
       mod.buildAgent(createTarget({ delivery: { mtls: { enabled: true } } })),
-    ).rejects.toThrow(
-      "MTLS_TEST_CERT_S3_BUCKET and MTLS_TEST_CERT_S3_KEY are required",
-    );
+    ).rejects.toThrow("MTLS_CERT_S3_BUCKET and MTLS_CERT_S3_KEY are required");
   });
 
   it("throws when S3 object body is empty", async () => {
@@ -392,7 +341,6 @@ describe("tls-agent-factory", () => {
 
     expect(agent).toBeDefined();
     expect(mockS3Send).not.toHaveBeenCalled();
-    expect(mockSecretsManagerSend).not.toHaveBeenCalled();
   });
 
   it("throws when certPinning.enabled is true but spkiHash is missing", async () => {
