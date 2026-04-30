@@ -12,10 +12,10 @@ deploy_perf_runner="false"
 for _tfvar_file in \
   "${base_path}/etc/group_${group}.tfvars" \
   "${base_path}/etc/env_${region}_${environment}.tfvars"; do
-  if [[ -f "${_tfvar_file}" ]]; then
-    _val=$(grep -E '^\s*deploy_mock_clients\s*=' "${_tfvar_file}" | tail -1 | sed 's/.*=\s*//;s/\s*$//')
+  if [ -f "${_tfvar_file}" ]; then
+    _val=$(grep -E '^\s*deploy_mock_clients\s*=' "${_tfvar_file}" | tail -1 | sed 's/.*=\s*//;s/\s*$//;s/^"//;s/"$//')
     [ -n "${_val}" ] && deploy_mock_clients="${_val}"
-    _val=$(grep -E '^\s*deploy_perf_runner\s*=' "${_tfvar_file}" | tail -1 | sed 's/.*=\s*//;s/\s*$//')
+    _val=$(grep -E '^\s*deploy_perf_runner\s*=' "${_tfvar_file}" | tail -1 | sed 's/.*=\s*//;s/\s*$//;s/^"//;s/"$//')
     [ -n "${_val}" ] && deploy_perf_runner="${_val}"
   fi
 done
