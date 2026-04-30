@@ -325,11 +325,11 @@ async function processTargetBatch(
       processingFailures,
       gateConfig,
     );
-    if (cbOutcome.stateChanged && cbOutcome.circuitState === "open") {
+    if (cbOutcome.circuitSwitched && cbOutcome.circuitState === "open") {
       recordCircuitBreakerOpen(batch.targetId);
     }
     if (
-      cbOutcome.stateChanged &&
+      cbOutcome.circuitSwitched &&
       cbOutcome.circuitState === "closed_recovery"
     ) {
       recordCircuitBreakerClosed(batch.targetId);

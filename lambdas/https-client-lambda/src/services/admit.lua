@@ -11,6 +11,22 @@
 --   Normal (closed): full configured rate
 --
 -- Returns: { consumedTokens, reason, retryAfterMs, effectiveRate }
+--
+--   consumedTokens: how many tokens were consumed for this batch
+--
+--   reason: the reason for admission/non-admission, one of:
+--     "rate_limited"      — no tokens available for batch, no admission
+--     "circuit_open"      — circuit is open, no admission
+--     "some_allowed"      — 1 or more tokens consumed, some admission
+--
+--   retryAfterMs: for any not admitted, how long to wait before retrying
+--
+--   effectiveRate: the effective rate (tokens/s) applied to this batch
+
+-- Reason constants
+local RATE_LIMITED     = "rate_limited"
+local CIRCUIT_OPEN     = "circuit_open"
+local SOME_ALLOWED     = "some_allowed"
 
 -- Keys
 local epKey            = KEYS[1]    -- ep:{targetId}  combined endpoint state hash
@@ -56,7 +72,7 @@ if isOpen then
   if isHalfOpen then
     effectiveRate = probeRateLimit
   else
-    return { 0, "circuit_open", (switchedAt + cooldownMs) - now, 0 }
+    return { 0, CIRCUIT_OPEN, (switchedAt + cooldownMs) - now, 0 }
   end
 else
   if isRecovering then
@@ -109,6 +125,6 @@ redis.call("HSET", epKey,
   "bucket_refilled_at", bucketRefilledAt
 )
 
-local reason     = consumedTokens < 1 and "rate_limited" or "some_allowed"
+local reason     = consumedTokens < 1 and RATE_LIMITED or SOME_ALLOWED
 local retryAfter = consumedTokens < 1 and 1000 or 0
 return { consumedTokens, reason, retryAfter, effectiveRate }

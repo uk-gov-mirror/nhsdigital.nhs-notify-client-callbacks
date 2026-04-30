@@ -563,7 +563,7 @@ describe("processRecords", () => {
     });
     mockRecordResult.mockResolvedValue({
       circuitState: "open",
-      stateChanged: true,
+      circuitSwitched: true,
     });
 
     const { recordCircuitBreakerOpen } = jest.requireMock(
@@ -587,7 +587,7 @@ describe("processRecords", () => {
     });
     mockRecordResult.mockResolvedValue({
       circuitState: "open",
-      stateChanged: false,
+      circuitSwitched: false,
     });
 
     const { recordCircuitBreakerOpen } = jest.requireMock(
@@ -611,7 +611,7 @@ describe("processRecords", () => {
     });
     mockRecordResult.mockResolvedValue({
       circuitState: "closed",
-      stateChanged: false,
+      circuitSwitched: false,
     });
 
     const { recordCircuitBreakerOpen } = jest.requireMock(
@@ -635,7 +635,7 @@ describe("processRecords", () => {
     });
     mockRecordResult.mockResolvedValue({
       circuitState: "closed_recovery",
-      stateChanged: true,
+      circuitSwitched: true,
     });
 
     const { recordCircuitBreakerClosed } = jest.requireMock(

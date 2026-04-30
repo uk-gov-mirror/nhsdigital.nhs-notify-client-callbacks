@@ -208,13 +208,13 @@ describe("recordResult", () => {
       defaultConfig,
     );
 
-    expect(result).toEqual({ circuitState: "closed", stateChanged: false });
+    expect(result).toEqual({ circuitState: "closed", circuitSwitched: false });
     expect(mockSendCommand).toHaveBeenCalledWith(
       expect.arrayContaining(["EVALSHA"]),
     );
   });
 
-  it("returns open with stateChanged when failure crosses threshold", async () => {
+  it("returns open with circuitSwitched when failure crosses threshold", async () => {
     mockSendCommand.mockResolvedValueOnce(["open", 1]);
 
     const result = await recordResult(
@@ -225,10 +225,10 @@ describe("recordResult", () => {
       defaultConfig,
     );
 
-    expect(result).toEqual({ circuitState: "open", stateChanged: true });
+    expect(result).toEqual({ circuitState: "open", circuitSwitched: true });
   });
 
-  it("returns closed_recovery with stateChanged when circuit closes", async () => {
+  it("returns closed_recovery with circuitSwitched when circuit closes", async () => {
     mockSendCommand.mockResolvedValueOnce(["closed_recovery", 1]);
 
     const result = await recordResult(
@@ -241,12 +241,12 @@ describe("recordResult", () => {
 
     expect(result).toEqual({
       circuitState: "closed_recovery",
-      stateChanged: true,
+      circuitSwitched: true,
     });
   });
 
-  it("returns half_open without stateChanged when probing", async () => {
-    mockSendCommand.mockResolvedValueOnce(["half_open", 0]);
+  it("returns open_half without circuitSwitched when probing", async () => {
+    mockSendCommand.mockResolvedValueOnce(["open_half", 0]);
 
     const result = await recordResult(
       mockRedis,
@@ -256,7 +256,7 @@ describe("recordResult", () => {
       defaultConfig,
     );
 
-    expect(result).toEqual({ circuitState: "half_open", stateChanged: false });
+    expect(result).toEqual({ circuitState: "open_half", circuitSwitched: false });
   });
 
   it("falls back to EVAL on NOSCRIPT error", async () => {
@@ -272,7 +272,7 @@ describe("recordResult", () => {
       defaultConfig,
     );
 
-    expect(result).toEqual({ circuitState: "closed", stateChanged: false });
+    expect(result).toEqual({ circuitState: "closed", circuitSwitched: false });
     expect(mockSendCommand).toHaveBeenCalledTimes(2);
   });
 

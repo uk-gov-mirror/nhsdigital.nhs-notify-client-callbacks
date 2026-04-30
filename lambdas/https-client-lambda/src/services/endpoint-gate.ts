@@ -18,11 +18,11 @@ export type AdmitResultDenied = {
 
 export type AdmitResult = AdmitResultAllowed | AdmitResultDenied;
 
-export type CircuitState = "open" | "half_open" | "closed_recovery" | "closed";
+export type CircuitState = "open" | "open_half" | "closed_recovery" | "closed";
 
 export type RecordResultOutcome = {
   circuitState: CircuitState;
-  stateChanged: boolean;
+  circuitSwitched: boolean;
 };
 
 export type EndpointGateConfig = {
@@ -159,11 +159,11 @@ export async function recordResult(
     args,
   )) as [string, number];
 
-  const [circuitState, stateChanged] = raw;
+  const [circuitState, circuitSwitched] = raw;
 
   return {
     circuitState: circuitState as CircuitState,
-    stateChanged: stateChanged === 1,
+    circuitSwitched: circuitSwitched === 1,
   };
 }
 

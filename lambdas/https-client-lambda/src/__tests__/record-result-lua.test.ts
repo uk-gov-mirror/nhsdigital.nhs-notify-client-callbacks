@@ -3,9 +3,9 @@ import { createRedisStore, evalLua } from "__tests__/helpers/lua-redis-mock";
 
 // ARGV: [now, consumedTokens, processingFailures, cooldownPeriodMs, recoveryPeriodMs, failureThreshold, minAttempts, samplePeriodMs]
 // KEYS: [epKey]
-// Returns: [circuitState, stateChanged]
-//   circuitState: "open" | "half_open" | "closed_recovery" | "closed"
-//   stateChanged: 0 | 1
+// Returns: [circuitState, circuitSwitched]
+//   circuitState: "open" | "open_half" | "closed_recovery" | "closed"
+//   circuitSwitched: 0 | 1
 
 type RecordResultArgs = {
   now: number;
@@ -67,13 +67,13 @@ describe("record-result.lua", () => {
         ]),
       );
 
-      const [circuitState, stateChanged] = runRecordResult(store, {
+      const [circuitState, circuitSwitched] = runRecordResult(store, {
         consumedTokens: 5,
         processingFailures: 0,
       });
 
       expect(circuitState).toBe("closed");
-      expect(stateChanged).toBe(0);
+      expect(circuitSwitched).toBe(0);
     });
 
     it("increments cur_attempts without incrementing cur_failures", () => {
@@ -125,13 +125,13 @@ describe("record-result.lua", () => {
         ]),
       );
 
-      const [circuitState, stateChanged] = runRecordResult(store, {
+      const [circuitState, circuitSwitched] = runRecordResult(store, {
         consumedTokens: 1,
         processingFailures: 1,
       });
 
       expect(circuitState).toBe("closed");
-      expect(stateChanged).toBe(0);
+      expect(circuitSwitched).toBe(0);
     });
   });
 
@@ -178,7 +178,7 @@ describe("record-result.lua", () => {
         ]),
       );
 
-      const [circuitState, stateChanged] = runRecordResult(store, {
+      const [circuitState, circuitSwitched] = runRecordResult(store, {
         now,
         cooldownPeriodMs: 120_000,
         consumedTokens: 1,
@@ -186,7 +186,7 @@ describe("record-result.lua", () => {
       });
 
       expect(circuitState).toBe("open");
-      expect(stateChanged).toBe(0);
+      expect(circuitSwitched).toBe(0);
     });
   });
 
@@ -202,14 +202,14 @@ describe("record-result.lua", () => {
         ]),
       );
 
-      const [circuitState, stateChanged] = runRecordResult(store, {
+      const [circuitState, circuitSwitched] = runRecordResult(store, {
         consumedTokens: 5,
         processingFailures: 5,
         minAttempts: 5,
         failureThreshold: 0.3,
       });
       expect(circuitState).toBe("open");
-      expect(stateChanged).toBe(1);
+      expect(circuitSwitched).toBe(1);
     });
 
     it("does not open circuit when below minimum attempts", () => {
@@ -223,14 +223,14 @@ describe("record-result.lua", () => {
         ]),
       );
 
-      const [circuitState, stateChanged] = runRecordResult(store, {
+      const [circuitState, circuitSwitched] = runRecordResult(store, {
         consumedTokens: 3,
         processingFailures: 3,
         minAttempts: 5,
         failureThreshold: 0.3,
       });
       expect(circuitState).toBe("closed");
-      expect(stateChanged).toBe(0);
+      expect(circuitSwitched).toBe(0);
     });
 
     it("sets is_open and switched_at on open", () => {
@@ -304,7 +304,7 @@ describe("record-result.lua", () => {
         ]),
       );
 
-      const [circuitState, stateChanged] = runRecordResult(store, {
+      const [circuitState, circuitSwitched] = runRecordResult(store, {
         now,
         cooldownPeriodMs: 120_000,
         consumedTokens: 1,
@@ -312,7 +312,7 @@ describe("record-result.lua", () => {
       });
 
       expect(circuitState).toBe("closed_recovery");
-      expect(stateChanged).toBe(1);
+      expect(circuitSwitched).toBe(1);
 
       const epHash = store.get("ep:t1")!;
       expect(epHash.get("is_open")).toBe("0");
@@ -333,15 +333,15 @@ describe("record-result.lua", () => {
         ]),
       );
 
-      const [circuitState, stateChanged] = runRecordResult(store, {
+      const [circuitState, circuitSwitched] = runRecordResult(store, {
         now,
         cooldownPeriodMs: 120_000,
         consumedTokens: 1,
         processingFailures: 1,
       });
 
-      expect(circuitState).toBe("half_open");
-      expect(stateChanged).toBe(0);
+      expect(circuitState).toBe("open_half");
+      expect(circuitSwitched).toBe(0);
     });
   });
 
@@ -423,7 +423,7 @@ describe("record-result.lua", () => {
       // interpolated attempts = 10 * 1.0 + 5 = 15 (>= minAttempts 5)
       // interpolated failures = 10 * 1.0 + 5 = 15
       // failure rate = 15/15 = 1.0 > 0.3 → opens
-      const [circuitState, stateChanged] = runRecordResult(store, {
+      const [circuitState, circuitSwitched] = runRecordResult(store, {
         now,
         samplePeriodMs,
         consumedTokens: 5,
@@ -432,7 +432,7 @@ describe("record-result.lua", () => {
         failureThreshold: 0.3,
       });
       expect(circuitState).toBe("open");
-      expect(stateChanged).toBe(1);
+      expect(circuitSwitched).toBe(1);
     });
   });
 

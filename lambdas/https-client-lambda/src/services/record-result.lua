@@ -7,23 +7,23 @@
 --   4. Checks whether to close the circuit (half-open + successes)
 --   5. Checks whether to open the circuit (closed + threshold exceeded)
 --
--- Returns: { circuitState, stateChanged }
+-- Returns: { circuitState, curcuitSwitched }
 --
 --   circuitState: the current state of the circuit after this run
 --     "open"             — fully open (during cooldown, no probes)
---     "half_open"        — open but past cooldown (probing)
+--     "open_half"        — open but past cooldown (probing)
 --     "closed_recovery"  — closed but ramping up (recovery period)
 --     "closed"           — closed, running at full rate
 --
---   stateChanged: whether a circuit transition occurred this run
+--   curcuitSwitched: whether the circuit opened or closed during this run
 --     1 — the circuit opened or closed during this execution
 --     0 — no state transition
 
 -- Circuit state constants
-local OPEN             = "open"
-local HALF_OPEN        = "half_open"
-local CLOSED_RECOVERY  = "closed_recovery"
-local CLOSED           = "closed"
+local OPEN               = "open"
+local OPEN_HALF          = "open_half"
+local CLOSED_RECOVERY    = "closed_recovery"
+local CLOSED             = "closed"
 
 -- Keys
 local epKey              = KEYS[1] -- ep:{targetId}  combined endpoint state hash
@@ -46,9 +46,8 @@ local state          = redis.call("HMGET", epKey,
   "is_open", "switched_at",
   "cur_attempts", "prev_attempts", "cur_failures", "prev_failures",
   "sample_till")
-local isOpenRaw      = state[1]
-local needInit       = isOpenRaw == false or isOpenRaw == nil
-local isOpen         = needInit or tonumber(isOpenRaw) == 1
+local needInit       = state[1] == false or state[1] == nil
+local isOpen         = needInit or tonumber(state[1]) == 1
 local switchedAt     = needInit and 0 or tonumber(state[2] or "0")
 local curAttempts    = tonumber(state[3] or "0")
 local prevAttempts   = tonumber(state[4] or "0")
@@ -105,27 +104,27 @@ local failures = prevFailures * weight + curFailures
 --------------------------------------------------------------------------------
 
 local processingSuccesses = consumedTokens - processingFailures
-local stateChanged        = false
+local circuitSwitched     = false
 
 -- Close circuit when half-open and there are successes
 if isHalfOpen and processingSuccesses > 0 then
-  isOpen       = false
-  switchedAt   = now
-  stateChanged = true
+  isOpen          = false
+  switchedAt      = now
+  circuitSwitched = true
   -- fall through, allow circuit to immediately re-open
 end
 
 -- Open circuit when closed, enough samples, and threshold exceeded
 local hasSampledEnough = attempts >= minAttempts
 if not isOpen and hasSampledEnough and (failures / attempts) > failureThreshold then
-  isOpen       = true
-  switchedAt   = now
-  curAttempts  = 0
-  curFailures  = 0
-  prevAttempts = 0
-  prevFailures = 0
-  sampleTill   = now + samplePeriodMs
-  stateChanged = true
+  isOpen          = true
+  switchedAt      = now
+  curAttempts     = 0
+  curFailures     = 0
+  prevAttempts    = 0
+  prevFailures    = 0
+  sampleTill      = now + samplePeriodMs
+  circuitSwitched = true
 end
 
 --------------------------------------------------------------------------------
@@ -135,7 +134,7 @@ end
 local circuitState
 if isOpen then
   if now > switchedAt + cooldownPeriodMs then
-    circuitState = HALF_OPEN
+    circuitState = OPEN_HALF
   else
     circuitState = OPEN
   end
@@ -159,11 +158,11 @@ redis.call("HSET", epKey,
   "sample_till", sampleTill
 )
 
-if stateChanged then
+if circuitSwitched then
   redis.call("HSET", epKey,
     "is_open", isOpen and 1 or 0,
     "switched_at", switchedAt
   )
 end
 
-return { circuitState, stateChanged and 1 or 0 }
+return { circuitState, circuitSwitched and 1 or 0 }
