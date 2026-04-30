@@ -118,6 +118,15 @@ async function deliverRecord(
   clientId: string,
 ): Promise<{ success: boolean; dlq: boolean }> {
   const correlationId = extractCorrelationId(message);
+  const receiveCount = Number(record.attributes.ApproximateReceiveCount);
+
+  logger.info("Processing delivery record", {
+    correlationId,
+    receiveCount,
+    firstReceivedAt: new Date(
+      Number(record.attributes.ApproximateFirstReceiveTimestamp),
+    ).toISOString(),
+  });
 
   const maxRetryDurationMs =
     target.delivery?.maxRetryDurationSeconds === undefined
@@ -147,7 +156,7 @@ async function deliverRecord(
     message.targetId,
     correlationId,
     record.messageId,
-    Number(record.attributes.ApproximateReceiveCount),
+    receiveCount,
   );
   const deliveryStart = Date.now();
   const result = await deliverPayload(target, payloadJson, signature, agent);
@@ -171,7 +180,6 @@ async function deliverRecord(
   }
 
   if (result.outcome === OUTCOME_RATE_LIMITED) {
-    const receiveCount = Number(record.attributes.ApproximateReceiveCount);
     recordDeliveryRateLimited(clientId, message.targetId, correlationId);
     await handleRateLimitedRecord(
       record,
@@ -183,7 +191,6 @@ async function deliverRecord(
     return { success: true, dlq: false };
   }
 
-  const receiveCount = Number(record.attributes.ApproximateReceiveCount);
   const backoffSec = jitteredBackoffSeconds(receiveCount);
   recordDeliveryFailure(
     clientId,
