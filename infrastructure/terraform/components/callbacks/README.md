@@ -43,6 +43,7 @@
 
 | Name | Source | Version |
 |------|--------|---------|
+| <a name="module_callback_clients"></a> [callback\_clients](#module\_callback\_clients) | ../../modules/callback-clients | n/a |
 | <a name="module_client_config_bucket"></a> [client\_config\_bucket](#module\_client\_config\_bucket) | https://github.com/NHSDigital/nhs-notify-shared-modules/releases/download/3.0.7/terraform-s3bucket.zip | n/a |
 | <a name="module_client_destination"></a> [client\_destination](#module\_client\_destination) | ../../modules/client-destination | n/a |
 | <a name="module_client_transform_filter_lambda"></a> [client\_transform\_filter\_lambda](#module\_client\_transform\_filter\_lambda) | https://github.com/NHSDigital/nhs-notify-shared-modules/releases/download/3.0.7/terraform-lambda.zip | n/a |
@@ -54,7 +55,6 @@
 | Name | Description |
 |------|-------------|
 | <a name="output_deployment"></a> [deployment](#output\_deployment) | Deployment details used for post-deployment scripts |
-| <a name="output_eventbus_name"></a> [eventbus\_name](#output\_eventbus\_name) | Name of the EventBridge event bus for callback events |
 | <a name="output_mock_webhook_lambda_log_group_name"></a> [mock\_webhook\_lambda\_log\_group\_name](#output\_mock\_webhook\_lambda\_log\_group\_name) | CloudWatch log group name for mock webhook lambda (for integration test queries) |
 <!-- vale on -->
 <!-- markdownlint-enable -->

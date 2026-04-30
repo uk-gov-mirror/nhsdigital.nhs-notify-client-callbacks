@@ -15,19 +15,6 @@ output "deployment" {
 }
 
 ##
-# EventBridge Event Bus Outputs
-##
-
-output "eventbus_name" {
-  description = "Name of the EventBridge event bus for callback events"
-  value = {
-    name = aws_cloudwatch_event_bus.main.name
-    arn  = aws_cloudwatch_event_bus.main.arn
-  }
-}
-
-
-##
 # Mock Webhook Lambda Outputs (test/dev environments only).
 ##
 
