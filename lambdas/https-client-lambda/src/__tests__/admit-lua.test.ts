@@ -65,7 +65,7 @@ function runAdmit(
 
 describe("admit.lua", () => {
   describe("rate limiting", () => {
-    it("rate-limits on a fresh endpoint with no prior state", () => {
+    it("allows one initial probe token on a fresh endpoint with no prior state", () => {
       const store = createRedisStore();
       const now = 1_000_000;
 
@@ -74,12 +74,12 @@ describe("admit.lua", () => {
         targetRateLimit: 10,
       });
 
-      expect(consumedTokens).toBe(0);
-      expect(reason).toBe("rate_limited");
+      expect(consumedTokens).toBe(1);
+      expect(reason).toBe("some_allowed");
       expect(effectiveRate).toBeCloseTo(1 / 60, 5);
     });
 
-    it("generates a probe token on the second call after enough elapsed time", () => {
+    it("generates an additional probe token on a subsequent call after enough elapsed time", () => {
       const store = createRedisStore();
 
       runAdmit(store, { now: 1_000_000, targetRateLimit: 10 });
