@@ -299,13 +299,20 @@ describe("processRecords", () => {
     expect(mockChangeVisibility).toHaveBeenCalledTimes(1);
   });
 
-  it("throws when CLIENT_ID is not set", async () => {
+  it("sends all records to DLQ when CLIENT_ID is not set", async () => {
     const saved = process.env.CLIENT_ID;
     delete process.env.CLIENT_ID;
 
-    await expect(processRecords([makeRecord()])).rejects.toThrow(
-      "CLIENT_ID is required",
-    );
+    const record1 = makeRecord({ messageId: "msg-1" });
+    const record2 = makeRecord({ messageId: "msg-2" });
+
+    const failures = await processRecords([record1, record2]);
+
+    expect(failures).toEqual([]);
+    expect(mockSendToDlq).toHaveBeenCalledWith(record1.body);
+    expect(mockSendToDlq).toHaveBeenCalledWith(record2.body);
+    expect(mockSendToDlq).toHaveBeenCalledTimes(2);
+    expect(mockDeliverPayload).not.toHaveBeenCalled();
 
     process.env.CLIENT_ID = saved;
   });

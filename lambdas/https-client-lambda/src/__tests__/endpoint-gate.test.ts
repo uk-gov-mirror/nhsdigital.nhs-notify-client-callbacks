@@ -256,7 +256,10 @@ describe("recordResult", () => {
       defaultConfig,
     );
 
-    expect(result).toEqual({ circuitState: "open_half", circuitSwitched: false });
+    expect(result).toEqual({
+      circuitState: "open_half",
+      circuitSwitched: false,
+    });
   });
 
   it("falls back to EVAL on NOSCRIPT error", async () => {

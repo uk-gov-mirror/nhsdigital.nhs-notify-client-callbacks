@@ -125,16 +125,21 @@ export function recordAdmissionDenied(
 ): void {
   if (reason === "circuit_open") {
     emitCircuitBlocked(targetId, correlationIds.length);
+    logger.warn("Circuit blocked", {
+      clientId,
+      targetId,
+      deniedCount: correlationIds.length,
+      correlationIds,
+    });
   } else {
     emitClientRateLimited(targetId, correlationIds.length);
+    logger.warn("Client rate limited", {
+      clientId,
+      targetId,
+      deniedCount: correlationIds.length,
+      correlationIds,
+    });
   }
-  logger.warn("Admission denied", {
-    clientId,
-    targetId,
-    reason,
-    deniedCount: correlationIds.length,
-    correlationIds,
-  });
 }
 
 export function recordDeliveryDuration(

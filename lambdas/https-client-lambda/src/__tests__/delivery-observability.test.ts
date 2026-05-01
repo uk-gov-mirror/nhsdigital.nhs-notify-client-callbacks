@@ -235,11 +235,10 @@ describe("delivery-observability", () => {
 
     expect(emitClientRateLimited).toHaveBeenCalledWith("target-1", 2);
     expect(logger.warn).toHaveBeenCalledWith(
-      "Admission denied",
+      "Client rate limited",
       expect.objectContaining({
         clientId: "client-1",
         targetId: "target-1",
-        reason: "rate_limited",
         deniedCount: 2,
         correlationIds: ["msg-a", "msg-b"],
       }),
@@ -256,11 +255,10 @@ describe("delivery-observability", () => {
 
     expect(emitCircuitBlocked).toHaveBeenCalledWith("target-1", 1);
     expect(logger.warn).toHaveBeenCalledWith(
-      "Admission denied",
+      "Circuit blocked",
       expect.objectContaining({
         clientId: "client-1",
         targetId: "target-1",
-        reason: "circuit_open",
         deniedCount: 1,
         correlationIds: ["msg-a"],
       }),

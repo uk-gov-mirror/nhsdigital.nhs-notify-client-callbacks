@@ -361,7 +361,9 @@ export async function processRecords(
 ): Promise<SQSBatchItemFailure[]> {
   const { CLIENT_ID } = process.env;
   if (!CLIENT_ID) {
-    throw new Error("CLIENT_ID is required");
+    logger.error("CLIENT_ID is required — sending all records to DLQ");
+    await Promise.all(records.map((record) => sendToDlq(record.body)));
+    return [];
   }
 
   resetMetrics();
