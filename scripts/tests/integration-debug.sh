@@ -149,8 +149,6 @@ log_filter_args() {
     # CloudWatch filter patterns treat quoted strings as exact phrases.
     printf '%s\n' --filter-pattern "\"$escaped_log_filter\""
   fi
-
-  printf '%s\n' "${args[@]}"
   return 0
 }
 
