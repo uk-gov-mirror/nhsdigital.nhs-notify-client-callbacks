@@ -262,7 +262,7 @@ describe("Delivery Resilience", () => {
       const circuitOpenCount = await countLogEntries(
         ctx.cwLogs,
         httpsClientLogGroup,
-        `{ $.msg = "Admission denied" && $.reason = "circuit_open" }`,
+        `{ $.msg = "Circuit blocked" }`,
         ctx.startTime,
         1,
       );
