@@ -172,7 +172,7 @@ describe("Delivery Resilience", () => {
       const rateLimitedCount = await countLogEntries(
         ctx.cwLogs,
         httpsClientLogGroup,
-        `{ $.msg = "Admission denied" && $.reason = "rate_limited" }`,
+        `{ $.msg = "Client rate limited" }`,
         ctx.startTime,
         1,
       );
