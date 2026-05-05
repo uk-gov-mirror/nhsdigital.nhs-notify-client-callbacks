@@ -11,7 +11,7 @@ export function deriveQueueUrls(
 
   return [
     inboundQueueUrl,
-    `${baseUrl}inbound-event-dlq-queue`,
+    `${baseUrl}inbound-event-dlq`,
     ...clientIds.flatMap((id) => [
       `${baseUrl}${id}-delivery-queue`,
       `${baseUrl}${id}-delivery-dlq-queue`,
@@ -23,18 +23,9 @@ export async function purgeQueues(
   client: SQSClient,
   queueUrls: string[],
 ): Promise<void> {
-  const results = await Promise.allSettled(
+  await Promise.all(
     queueUrls.map((url) =>
       client.send(new PurgeQueueCommand({ QueueUrl: url })),
     ),
   );
-
-  for (const result of results) {
-    if (result.status === "rejected") {
-      const error = result.reason as { name?: string };
-      if (error.name !== "QueueDoesNotExist") {
-        throw result.reason as Error;
-      }
-    }
-  }
 }

@@ -288,6 +288,28 @@ describe("processRecords", () => {
     expect(mockChangeVisibility).toHaveBeenCalledTimes(1);
   });
 
+  it("caps visibility delay at SQS maximum (12 hours) for admission-denied batch", async () => {
+    mockAdmit.mockResolvedValue({
+      allowed: false,
+      reason: "rate_limited",
+      retryAfterMs: 60_000,
+      effectiveRate: 10,
+    });
+
+    const record = makeRecord({
+      attributes: {
+        ApproximateReceiveCount: "1000",
+        SentTimestamp: "0",
+        SenderId: "sender",
+        ApproximateFirstReceiveTimestamp: "0",
+      },
+    });
+
+    await processRecords([record]);
+
+    expect(mockChangeVisibility).toHaveBeenCalledWith("receipt-1", 43_200);
+  });
+
   it("changes visibility once for transient failure", async () => {
     mockDeliverPayload.mockResolvedValue({
       outcome: "transient_failure",
@@ -380,8 +402,7 @@ describe("processRecords", () => {
 
     expect(failures).toEqual([{ itemIdentifier: "msg-1" }]);
     const visibilityDelay = mockChangeVisibility.mock.calls[0]![1] as number;
-    expect(visibilityDelay).toBeGreaterThanOrEqual(2);
-    expect(visibilityDelay).toBeLessThanOrEqual(6);
+    expect(visibilityDelay).toBe(2);
     expect(mockSendToDlq).not.toHaveBeenCalled();
     expect(mockDeliverPayload).not.toHaveBeenCalled();
   });
@@ -398,8 +419,7 @@ describe("processRecords", () => {
 
     expect(failures).toEqual([{ itemIdentifier: "msg-1" }]);
     const visibilityDelay = mockChangeVisibility.mock.calls[0]![1] as number;
-    expect(visibilityDelay).toBeGreaterThanOrEqual(30);
-    expect(visibilityDelay).toBeLessThanOrEqual(34);
+    expect(visibilityDelay).toBe(30);
     expect(mockSendToDlq).not.toHaveBeenCalled();
     expect(mockDeliverPayload).not.toHaveBeenCalled();
   });

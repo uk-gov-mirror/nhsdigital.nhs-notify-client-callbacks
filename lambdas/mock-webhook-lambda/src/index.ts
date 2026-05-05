@@ -57,43 +57,183 @@ function isClientCallbackPayload(
   });
 }
 
+type EventWithContextFields = APIGatewayProxyEvent & {
+  rawPath?: string;
+  requestContext?: {
+    http?: { method?: string };
+    elb?: { targetGroupArn: string };
+  };
+};
+
+function normalizeHeaders(
+  event: APIGatewayProxyEvent,
+): Record<string, string | undefined> {
+  return Object.fromEntries(
+    Object.entries(event.headers).map(([k, v]) => [String(k).toLowerCase(), v]),
+  ) as Record<string, string | undefined>;
+}
+
+function resolveMtlsStatus(
+  headers: Record<string, string | undefined>,
+  isAlbInvocation: boolean,
+): boolean {
+  if (!isAlbInvocation) {
+    return false;
+  }
+
+  const clientCertPresent = Boolean(headers["x-amzn-mtls-clientcert"]);
+  const certResult = verifyClientCertificate(headers["x-amzn-mtls-clientcert"]);
+
+  if (certResult.valid) {
+    logger.info("mTLS client certificate verified", {
+      fingerprint: headers["x-amzn-mtls-clientcert-fingerprint"] ?? "",
+      isMtls: true,
+    });
+    return true;
+  }
+
+  logger.info("Mock webhook invoked without mTLS", {
+    isMtls: false,
+    clientCertPresent,
+    reason: certResult.reason,
+  });
+  return false;
+}
+
+function authenticateApiKey(headers: Record<string, string | undefined>): {
+  error: APIGatewayProxyResult | undefined;
+} {
+  const expectedApiKey = process.env.API_KEY;
+  const providedApiKey = headers["x-api-key"];
+
+  if (!expectedApiKey || providedApiKey !== expectedApiKey) {
+    logger.error("Unauthorized: invalid or missing x-api-key");
+    return {
+      error: {
+        statusCode: 401,
+        body: JSON.stringify({ message: "Unauthorized" }),
+      },
+    };
+  }
+
+  return { error: undefined };
+}
+
+type ParseResult = {
+  payload: ClientCallbackPayload | undefined;
+  error: APIGatewayProxyResult | undefined;
+};
+
+function parseError(response: APIGatewayProxyResult): ParseResult {
+  return { payload: undefined, error: response };
+}
+
+function parseAndValidateBody(body: string | null): ParseResult {
+  if (!body) {
+    logger.error("No event body received");
+    return parseError({
+      statusCode: 400,
+      body: JSON.stringify({ message: "No body" }),
+    });
+  }
+
+  try {
+    const parsed = JSON.parse(body) as unknown;
+    logger.info("Mock webhook parsed payload", { parsedPayload: parsed });
+
+    if (!isClientCallbackPayload(parsed)) {
+      logger.error("Invalid message structure - missing or invalid data array");
+      return parseError({
+        statusCode: 400,
+        body: JSON.stringify({ message: "Invalid message structure" }),
+      });
+    }
+
+    if (parsed.data.length !== 1) {
+      logger.error("Expected exactly 1 callback item in data array", {
+        receivedCount: parsed.data.length,
+      });
+      return parseError({
+        statusCode: 400,
+        body: JSON.stringify({
+          message: `Expected exactly 1 callback item, got ${parsed.data.length}`,
+        }),
+      });
+    }
+
+    return { payload: parsed, error: undefined };
+  } catch (error) {
+    if (error instanceof SyntaxError) {
+      logger.error("Invalid JSON body", { error: error.message });
+      return parseError({
+        statusCode: 400,
+        body: JSON.stringify({ message: "Invalid JSON body" }),
+      });
+    }
+
+    logger.error("Failed to process callback", {
+      error: error instanceof Error ? error.message : String(error),
+    });
+    return parseError({
+      statusCode: 500,
+      body: JSON.stringify({ message: "Internal server error" }),
+    });
+  }
+}
+
+function checkForcedStatusResponse(
+  messageId: string,
+  correlationId: string,
+): { response: APIGatewayProxyResult | undefined } {
+  const timedMatch = /^force-(\d{3})-until-(\d+)-/.exec(messageId);
+  if (timedMatch) {
+    const statusCode = Number(timedMatch[1]);
+    const until = Number(timedMatch[2]);
+    if (Date.now() < until) {
+      logger.info("Timed forced status code response", {
+        correlationId,
+        messageId,
+        statusCode,
+        until,
+      });
+      return {
+        response: {
+          statusCode,
+          body: JSON.stringify({ message: `Forced status ${statusCode}` }),
+        },
+      };
+    }
+    return { response: undefined };
+  }
+
+  const permanentMatch = /^force-(\d{3})-/.exec(messageId);
+  if (permanentMatch) {
+    const statusCode = Number(permanentMatch[1]);
+    logger.info("Forced status code response", {
+      correlationId,
+      messageId,
+      statusCode,
+    });
+    return {
+      response: {
+        statusCode,
+        body: JSON.stringify({ message: `Forced status ${statusCode}` }),
+      },
+    };
+  }
+
+  return { response: undefined };
+}
+
 async function buildResponse(
   event: APIGatewayProxyEvent,
 ): Promise<APIGatewayProxyResult> {
-  const eventWithContextFields = event as APIGatewayProxyEvent & {
-    rawPath?: string;
-    requestContext?: {
-      http?: { method?: string };
-      elb?: { targetGroupArn: string };
-    };
-  };
-  const headers = Object.fromEntries(
-    Object.entries(event.headers).map(([k, v]) => [String(k).toLowerCase(), v]),
-  ) as Record<string, string | undefined>;
-
+  const eventWithContextFields = event as EventWithContextFields;
+  const headers = normalizeHeaders(event);
   const path = event.path ?? eventWithContextFields.rawPath;
-
   const isAlbInvocation = Boolean(eventWithContextFields.requestContext?.elb);
   const clientCertPresent = Boolean(headers["x-amzn-mtls-clientcert"]);
-  let isMtls = false;
-  if (isAlbInvocation) {
-    const certResult = verifyClientCertificate(
-      headers["x-amzn-mtls-clientcert"],
-    );
-    isMtls = certResult.valid;
-    if (isMtls) {
-      logger.info("mTLS client certificate verified", {
-        fingerprint: headers["x-amzn-mtls-clientcert-fingerprint"] ?? "",
-        isMtls: true,
-      });
-    } else {
-      logger.info("Mock webhook invoked without mTLS", {
-        isMtls: false,
-        clientCertPresent,
-        reason: certResult.reason,
-      });
-    }
-  }
+  const isMtls = resolveMtlsStatus(headers, isAlbInvocation);
 
   logger.info("Mock webhook invoked", {
     path,
@@ -106,104 +246,43 @@ async function buildResponse(
     payload: event.body,
   });
 
-  const expectedApiKey = process.env.API_KEY;
-  const providedApiKey = headers["x-api-key"];
-
-  if (!expectedApiKey || providedApiKey !== expectedApiKey) {
-    logger.error("Unauthorized: invalid or missing x-api-key");
-    return {
-      statusCode: 401,
-      body: JSON.stringify({ message: "Unauthorized" }),
-    };
+  const authResult = authenticateApiKey(headers);
+  if (authResult.error) {
+    return authResult.error;
   }
 
-  if (!event.body) {
-    logger.error("No event body received");
-
-    return {
-      statusCode: 400,
-      body: JSON.stringify({ message: "No body" }),
-    };
+  const bodyResult = parseAndValidateBody(event.body);
+  if (bodyResult.error) {
+    return bodyResult.error;
   }
 
-  try {
-    const parsed = JSON.parse(event.body) as unknown;
+  const [item] = bodyResult.payload!.data;
+  const correlationId = item.meta.idempotencyKey;
+  const { messageId } = item.attributes;
 
-    logger.info("Mock webhook parsed payload", { parsedPayload: parsed });
-
-    if (!isClientCallbackPayload(parsed)) {
-      logger.error("Invalid message structure - missing or invalid data array");
-
-      return {
-        statusCode: 400,
-        body: JSON.stringify({ message: "Invalid message structure" }),
-      };
-    }
-
-    if (parsed.data.length !== 1) {
-      logger.error("Expected exactly 1 callback item in data array", {
-        receivedCount: parsed.data.length,
-      });
-
-      return {
-        statusCode: 400,
-        body: JSON.stringify({
-          message: `Expected exactly 1 callback item, got ${parsed.data.length}`,
-        }),
-      };
-    }
-
-    const [item] = parsed.data;
-    const correlationId = item.meta.idempotencyKey;
-    const { messageId } = item.attributes;
-    const forcedStatusMatch = /^force-(\d{3})-/.exec(messageId);
-    if (forcedStatusMatch) {
-      const statusCode = Number(forcedStatusMatch[1]);
-      logger.info("Forced status code response", {
-        correlationId,
-        messageId,
-        statusCode,
-      });
-      return {
-        statusCode,
-        body: JSON.stringify({ message: `Forced status ${statusCode}` }),
-      };
-    }
-
-    logger.info("Callback received", {
-      correlationId,
-      messageId,
-      callbackType: item.type,
-      path,
-      isMtls,
-      apiKey: providedApiKey,
-      signature: headers["x-hmac-sha256-signature"] ?? "",
-      payload: JSON.stringify(item),
-    });
-
-    return {
-      statusCode: 200,
-      body: JSON.stringify({ message: "Callback received" }),
-    };
-  } catch (error) {
-    if (error instanceof SyntaxError) {
-      logger.error("Invalid JSON body", { error: error.message });
-
-      return {
-        statusCode: 400,
-        body: JSON.stringify({ message: "Invalid JSON body" }),
-      };
-    }
-
-    logger.error("Failed to process callback", {
-      error: error instanceof Error ? error.message : String(error),
-    });
-
-    return {
-      statusCode: 500,
-      body: JSON.stringify({ message: "Internal server error" }),
-    };
+  const { response: forcedResponse } = checkForcedStatusResponse(
+    messageId,
+    correlationId,
+  );
+  if (forcedResponse) {
+    return forcedResponse;
   }
+
+  logger.info("Callback received", {
+    correlationId,
+    messageId,
+    callbackType: item.type,
+    path,
+    isMtls,
+    apiKey: headers["x-api-key"],
+    signature: headers["x-hmac-sha256-signature"] ?? "",
+    payload: JSON.stringify(item),
+  });
+
+  return {
+    statusCode: 200,
+    body: JSON.stringify({ message: "Callback received" }),
+  };
 }
 
 export async function handler(

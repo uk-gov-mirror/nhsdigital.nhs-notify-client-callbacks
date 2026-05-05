@@ -12,6 +12,7 @@ import { defaultSleep, runPerformanceTest } from "runner";
 
 import { generatePhaseLoad } from "sqs";
 import { deriveQueueUrls, purgeQueues } from "purge";
+import { getQueueDepths } from "sqs-stats";
 import { dumpRateLimitState, flushElastiCache } from "elasticache";
 import { verifyMockWebhook } from "webhook-verify";
 import {
@@ -26,6 +27,7 @@ jest.mock("cloudwatch");
 jest.mock("purge");
 jest.mock("elasticache");
 jest.mock("webhook-verify");
+jest.mock("sqs-stats");
 
 const mockGeneratePhaseLoad = jest.mocked(generatePhaseLoad);
 const mockQueryMetricsSnapshot = jest.mocked(queryMetricsSnapshot);
@@ -41,6 +43,7 @@ const mockPurgeQueues = jest.mocked(purgeQueues);
 const mockFlushElastiCache = jest.mocked(flushElastiCache);
 const mockDumpRateLimitState = jest.mocked(dumpRateLimitState);
 const mockVerifyMockWebhook = jest.mocked(verifyMockWebhook);
+const mockGetQueueDepths = jest.mocked(getQueueDepths);
 
 const immediateSleep = jest.fn().mockResolvedValue(undefined);
 
@@ -117,6 +120,16 @@ beforeEach(() => {
   mockVerifyMockWebhook.mockResolvedValue({
     receivedCallbacks: 0,
     verified: false,
+  });
+  mockGetQueueDepths.mockResolvedValue({
+    timestampMs: Date.now(),
+    queues: [
+      {
+        queueUrl: "https://sqs.example.invalid/inbound-event-queue",
+        visible: 100,
+        notVisible: 10,
+      },
+    ],
   });
   immediateSleep.mockResolvedValue(undefined);
 });
@@ -557,6 +570,22 @@ describe("runPerformanceTest", () => {
     expect(mockPurgeQueues).toHaveBeenCalledTimes(2);
   });
 
+  it("skips both purges when skipPurge is true", async () => {
+    mockQueryMetricsSnapshot.mockResolvedValue(null);
+
+    await runPerformanceTest(
+      deps,
+      scenario,
+      "test-skip-purge",
+      immediateSleep,
+      undefined,
+      undefined,
+      true,
+    );
+
+    expect(mockPurgeQueues).not.toHaveBeenCalled();
+  });
+
   it("flushes ElastiCache before and after when deps are provided", async () => {
     mockQueryMetricsSnapshot.mockResolvedValue(null);
     const elastiCacheDeps = {
@@ -574,7 +603,7 @@ describe("runPerformanceTest", () => {
       elastiCacheDeps,
     );
 
-    expect(mockFlushElastiCache).toHaveBeenCalledTimes(2);
+    expect(mockFlushElastiCache).toHaveBeenCalledTimes(1);
     expect(mockFlushElastiCache).toHaveBeenCalledWith(elastiCacheDeps);
   });
 
@@ -681,6 +710,37 @@ describe("runPerformanceTest", () => {
 
     expect(mockVerifyMockWebhook).not.toHaveBeenCalled();
     expect(result.webhookVerification).toBeUndefined();
+  });
+
+  it("samples queue depths during polling and at final snapshot", async () => {
+    mockQueryMetricsSnapshot.mockResolvedValue(null);
+
+    await runPerformanceTest(
+      deps,
+      scenario,
+      "test-queue-depths",
+      immediateSleep,
+    );
+
+    expect(mockGetQueueDepths).toHaveBeenCalledTimes(2); // one mid-test, one final
+    expect(mockGetQueueDepths).toHaveBeenCalledWith(deps.sqsClient, [
+      "https://sqs.example.invalid/inbound-event-queue",
+    ]);
+  });
+
+  it("uses the provided cloudWatchSettlingMs instead of the default", async () => {
+    mockQueryMetricsSnapshot.mockResolvedValue(null);
+
+    await runPerformanceTest(
+      deps,
+      scenario,
+      "test-settling",
+      immediateSleep,
+      undefined,
+      5000,
+    );
+
+    expect(immediateSleep).toHaveBeenCalledWith(5000);
   });
 });
 

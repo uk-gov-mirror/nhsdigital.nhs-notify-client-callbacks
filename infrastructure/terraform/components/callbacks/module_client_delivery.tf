@@ -21,8 +21,8 @@ module "client_delivery" {
 
   applications_map_parameter_name = local.applications_map_parameter_name
 
-  lambda_s3_bucket      = local.acct.s3_buckets["lambda_function_artefacts"]["id"]
-  lambda_code_base_path = local.aws_lambda_functions_dir_path
+  delivery_lambda_s3_bucket      = local.acct.s3_buckets["lambda_function_artefacts"]["id"]
+  delivery_lambda_code_base_path = local.aws_lambda_functions_dir_path
 
   force_lambda_code_deploy = var.force_lambda_code_deploy
   log_level                = var.log_level
@@ -41,7 +41,12 @@ module "client_delivery" {
   mtls_ca_s3_key      = local.mtls_ca_s3_key   # gitleaks:allow
 
   token_bucket_burst_capacity = var.token_bucket_burst_capacity
+  cb_cooldown_period_ms       = var.cb_cooldown_period_ms
+  cb_recovery_period_ms       = var.cb_recovery_period_ms
 
-  vpc_subnet_ids           = try(local.acct.private_subnets[local.bc_name], [])
-  lambda_security_group_id = aws_security_group.https_client_lambda.id
+  delivery_lambda_batch_size          = var.delivery_lambda_batch_size
+  delivery_lambda_batching_window_sec = var.delivery_lambda_batching_window_sec
+
+  vpc_subnet_ids                    = try(local.acct.private_subnets[local.bc_name], [])
+  delivery_lambda_security_group_id = aws_security_group.https_client_lambda.id
 }

@@ -82,7 +82,7 @@ data "aws_iam_policy_document" "https_client_lambda" {
   }
 
   dynamic "statement" {
-    for_each = var.lambda_security_group_id != "" ? [1] : []
+    for_each = var.delivery_lambda_security_group_id != "" ? [1] : []
     content {
       sid    = "VPCNetworkInterfacePermissions"
       effect = "Allow"

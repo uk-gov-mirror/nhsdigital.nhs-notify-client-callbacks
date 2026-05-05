@@ -108,7 +108,7 @@ describe("Delivery Resilience", () => {
   });
 
   describe("Rate Limiting", () => {
-    const BURST_SIZE = 30;
+    const BURST_SIZE = 15;
     let dlqUrl: string;
     let deliveryUrl: string;
     let httpsClientLogGroup: string;

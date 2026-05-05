@@ -93,7 +93,23 @@ data "aws_iam_policy_document" "perf_runner_lambda" {
 
     resources = [
       module.sqs_inbound_event.sqs_queue_arn,
-      "${module.sqs_inbound_event.sqs_queue_arn}-dlq",
+      module.sqs_inbound_event.sqs_dlq_arn,
+      "arn:aws:sqs:${var.region}:${var.aws_account_id}:${local.csi}-*-delivery-queue",
+      "arn:aws:sqs:${var.region}:${var.aws_account_id}:${local.csi}-*-delivery-dlq-queue",
+    ]
+  }
+
+  statement {
+    sid    = "SQSGetQueueAttributes"
+    effect = "Allow"
+
+    actions = [
+      "sqs:GetQueueAttributes",
+    ]
+
+    resources = [
+      module.sqs_inbound_event.sqs_queue_arn,
+      module.sqs_inbound_event.sqs_dlq_arn,
       "arn:aws:sqs:${var.region}:${var.aws_account_id}:${local.csi}-*-delivery-queue",
       "arn:aws:sqs:${var.region}:${var.aws_account_id}:${local.csi}-*-delivery-dlq-queue",
     ]

@@ -75,12 +75,12 @@ variable "applications_map_parameter_name" {
   description = "SSM Parameter Store path for the clientId-to-applicationData map"
 }
 
-variable "lambda_s3_bucket" {
+variable "delivery_lambda_s3_bucket" {
   type        = string
   description = "S3 bucket for Lambda function artefacts"
 }
 
-variable "lambda_code_base_path" {
+variable "delivery_lambda_code_base_path" {
   type        = string
   description = "Base path to Lambda source code directories"
 }
@@ -115,19 +115,25 @@ variable "log_subscription_role_arn" {
   default     = ""
 }
 
-variable "lambda_batch_size" {
+variable "delivery_lambda_batch_size" {
   type        = number
   description = "Number of SQS messages per Lambda invocation"
-  default     = 10
+  default     = 100
 }
 
-variable "lambda_memory" {
+variable "delivery_lambda_batching_window_sec" {
+  type        = number
+  description = "Maximum time in seconds to wait for a full batch before invoking Lambda. Allows the delivery queue to fill to batch_size, improving Lambda concurrency utilisation."
+  default     = 1
+}
+
+variable "delivery_lambda_memory" {
   type        = number
   description = "Lambda memory allocation in MB"
   default     = 256
 }
 
-variable "lambda_timeout" {
+variable "delivery_lambda_timeout" {
   type        = number
   description = "Lambda timeout in seconds"
   default     = 30
@@ -205,8 +211,20 @@ variable "vpc_subnet_ids" {
   default     = []
 }
 
-variable "lambda_security_group_id" {
+variable "delivery_lambda_security_group_id" {
   type        = string
   description = "Security group ID for the Lambda function"
   default     = ""
+}
+
+variable "cb_cooldown_period_ms" {
+  type        = number
+  description = "Full block duration after circuit opens, before half-open probes begin (ms)"
+  default     = 120000
+}
+
+variable "cb_recovery_period_ms" {
+  type        = number
+  description = "Linear ramp-up duration after circuit closes (ms)"
+  default     = 600000
 }

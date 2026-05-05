@@ -30,7 +30,7 @@ describe("deriveQueueUrls", () => {
 
     expect(urls).toEqual([
       "https://sqs.eu-west-2.amazonaws.com/123456789/nhs-dev-callbacks-inbound-event-queue",
-      "https://sqs.eu-west-2.amazonaws.com/123456789/nhs-dev-callbacks-inbound-event-dlq-queue",
+      "https://sqs.eu-west-2.amazonaws.com/123456789/nhs-dev-callbacks-inbound-event-dlq",
       "https://sqs.eu-west-2.amazonaws.com/123456789/nhs-dev-callbacks-perf-client-1-delivery-queue",
       "https://sqs.eu-west-2.amazonaws.com/123456789/nhs-dev-callbacks-perf-client-1-delivery-dlq-queue",
       "https://sqs.eu-west-2.amazonaws.com/123456789/nhs-dev-callbacks-perf-client-2-delivery-queue",
@@ -61,7 +61,7 @@ describe("deriveQueueUrls", () => {
 
     expect(urls).toEqual([
       "https://sqs.eu-west-2.amazonaws.com/123456789/nhs-dev-callbacks-inbound-event-queue",
-      "https://sqs.eu-west-2.amazonaws.com/123456789/nhs-dev-callbacks-inbound-event-dlq-queue",
+      "https://sqs.eu-west-2.amazonaws.com/123456789/nhs-dev-callbacks-inbound-event-dlq",
       "https://sqs.eu-west-2.amazonaws.com/123456789/nhs-dev-callbacks-perf-client-1-delivery-queue",
       "https://sqs.eu-west-2.amazonaws.com/123456789/nhs-dev-callbacks-perf-client-1-delivery-dlq-queue",
     ]);
@@ -88,20 +88,8 @@ describe("purgeQueues", () => {
     expect(mockSend).toHaveBeenCalledTimes(2);
   });
 
-  it("ignores QueueDoesNotExist errors gracefully", async () => {
-    const nonExistentError = Object.assign(new Error("Queue does not exist"), {
-      name: "QueueDoesNotExist",
-    });
-    mockSend.mockRejectedValueOnce(nonExistentError);
-
-    await expect(
-      purgeQueues(mockSqsClient, ["https://sqs.example.invalid/missing"]),
-    ).resolves.toBeUndefined();
-  });
-
-  it("rethrows non-QueueDoesNotExist errors", async () => {
-    const otherError = new Error("Access denied");
-    mockSend.mockRejectedValueOnce(otherError);
+  it("throws when a purge fails", async () => {
+    mockSend.mockRejectedValueOnce(new Error("Access denied"));
 
     await expect(
       purgeQueues(mockSqsClient, ["https://sqs.example.invalid/queue"]),

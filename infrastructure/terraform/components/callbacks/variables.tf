@@ -102,7 +102,7 @@ variable "pipe_log_level" {
 
 variable "pipe_sqs_input_batch_size" {
   type    = number
-  default = 1
+  default = 10
 }
 
 variable "pipe_sqs_max_batch_window" {
@@ -212,4 +212,28 @@ variable "token_bucket_burst_capacity" {
   type        = number
   description = "Token bucket burst capacity used by the rate limiter"
   default     = 2250
+}
+
+variable "cb_cooldown_period_ms" {
+  type        = number
+  description = "Full block duration after circuit opens, before half-open probes begin (ms)"
+  default     = 120000
+}
+
+variable "cb_recovery_period_ms" {
+  type        = number
+  description = "Linear ramp-up duration after circuit closes (ms)"
+  default     = 600000
+}
+
+variable "delivery_lambda_batch_size" {
+  type        = number
+  description = "Number of SQS messages per delivery Lambda invocation"
+  default     = 100
+}
+
+variable "delivery_lambda_batching_window_sec" {
+  type        = number
+  description = "Maximum time in seconds to wait for a full batch before invoking the delivery Lambda"
+  default     = 1
 }

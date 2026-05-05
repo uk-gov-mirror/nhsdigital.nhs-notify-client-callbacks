@@ -11,8 +11,10 @@ import type {
   Scenario,
   WebhookVerificationResult,
 } from "types";
+import { Logger } from "@nhs-notify-client-callbacks/logger";
 import { generatePhaseLoad } from "sqs";
 import { deriveQueueUrls, purgeQueues } from "purge";
+import { getQueueDepths } from "sqs-stats";
 import { dumpRateLimitState, flushElastiCache } from "elasticache";
 import { verifyMockWebhook } from "webhook-verify";
 import {
@@ -21,6 +23,8 @@ import {
   queryMetricsSnapshot,
   queryPerClientRateTimeline,
 } from "cloudwatch";
+
+const logger = new Logger();
 
 const CLOUDWATCH_SETTLING_MS = 60_000;
 
@@ -82,12 +86,55 @@ async function collectSnapshots(
   return cbStartSec;
 }
 
+async function collectPerClientRateTimelines(
+  deps: RunnerDeps,
+  scenario: Scenario,
+  startSec: number,
+  endSec: number,
+): Promise<PerClientRateTimeline[]> {
+  if (!deps.deliveryLogGroupPrefix) {
+    return [];
+  }
+
+  const clientIds = [...new Set(scenario.eventMix.map((e) => e.clientId))];
+  const timelinePromises = clientIds.map(async (clientId) => {
+    const logGroupName = `${deps.deliveryLogGroupPrefix}${clientId}`;
+    const entries = await queryPerClientRateTimeline(
+      deps.cloudWatchClient,
+      logGroupName,
+      startSec,
+      endSec,
+    );
+    return { clientId, entries };
+  });
+  const timelines = await Promise.all(timelinePromises);
+  return timelines.filter((t) => t.entries.length > 0);
+}
+
+async function collectWebhookVerification(
+  deps: RunnerDeps,
+  startSec: number,
+  endSec: number,
+): Promise<WebhookVerificationResult | undefined> {
+  if (!deps.mockWebhookLogGroup) {
+    return undefined;
+  }
+  return verifyMockWebhook(
+    deps.cloudWatchClient,
+    deps.mockWebhookLogGroup,
+    startSec,
+    endSec,
+  );
+}
+
 export async function runPerformanceTest(
   deps: RunnerDeps,
   scenario: Scenario,
   testId: string,
   sleepFn: (ms: number) => Promise<void> = defaultSleep,
   elastiCacheDeps?: ElastiCacheDeps,
+  cloudWatchSettlingMs: number = CLOUDWATCH_SETTLING_MS,
+  skipPurge = false,
 ): Promise<PerformanceResult> {
   if (scenario.eventMix.length === 0) {
     throw new Error("scenario.eventMix must contain at least one entry");
@@ -109,8 +156,15 @@ export async function runPerformanceTest(
   const testStartMs = Date.now();
 
   const queueUrls = deriveQueueUrls(deps.queueUrl, scenario);
-  await purgeQueues(deps.sqsClient, queueUrls);
+
+  if (skipPurge) {
+    logger.info("Skipping queue purge", { queueUrls });
+  } else {
+    logger.info("Purging queues", { queueUrls });
+    await purgeQueues(deps.sqsClient, queueUrls);
+  }
   if (elastiCacheDeps) {
+    logger.info("Clearing rate limit and circuit breaker state");
     await flushElastiCache(elastiCacheDeps);
   }
 
@@ -148,6 +202,9 @@ export async function runPerformanceTest(
         lastCbSnapshotSec,
         out,
       );
+      logger.info("Sampling queue depths", { queueUrls });
+      const depthSample = await getQueueDepths(deps.sqsClient, queueUrls);
+      logger.info("Queue depth sample", { queues: depthSample.queues });
 
       if (!stopPolling) {
         await sleepFn(scenario.metricsIntervalSecs * 1000);
@@ -157,20 +214,35 @@ export async function runPerformanceTest(
 
   const pollPromise = pollLoop();
 
-  for (const phase of scenario.phases) {
+  for (const [index, phase] of scenario.phases.entries()) {
+    logger.info("Starting phase", {
+      index,
+      targetEps: phase.targetEps,
+      durationSecs: phase.durationSecs,
+    });
     const result = await generatePhaseLoad(
       deps.sqsClient,
       deps.queueUrl,
       phase,
-      scenario.eventMix,
+      phase.eventMix ?? scenario.eventMix,
     );
+    logger.info("Phase complete", {
+      index,
+      targetEps: result.targetEps,
+      achievedEps: result.achievedEps,
+      sent: result.sent,
+      durationMs: result.durationMs,
+    });
     phaseResults.push(result);
   }
 
   stopPolling = true;
   await pollPromise;
 
-  await sleepFn(CLOUDWATCH_SETTLING_MS);
+  logger.info("Waiting for CloudWatch logs to settle", {
+    settlingMs: cloudWatchSettlingMs,
+  });
+  await sleepFn(cloudWatchSettlingMs);
 
   const finalStartSec = Math.floor(testStartMs / 1000);
   const finalEndSec = Math.floor(Date.now() / 1000);
@@ -183,45 +255,33 @@ export async function runPerformanceTest(
     lastCbSnapshotSec,
     out,
   );
+  logger.info("Sampling queue depths", { queueUrls });
+  const finalDepthSample = await getQueueDepths(deps.sqsClient, queueUrls);
+  logger.info("Final queue depth sample", { queues: finalDepthSample.queues });
 
-  const perClientRateTimelines: PerClientRateTimeline[] = [];
+  const perClientRateTimelines = await collectPerClientRateTimelines(
+    deps,
+    scenario,
+    finalStartSec,
+    finalEndSec,
+  );
 
-  if (deps.deliveryLogGroupPrefix) {
-    const clientIds = [...new Set(scenario.eventMix.map((e) => e.clientId))];
-    const timelinePromises = clientIds.map(async (clientId) => {
-      const logGroupName = `${deps.deliveryLogGroupPrefix}${clientId}`;
-      const entries = await queryPerClientRateTimeline(
-        deps.cloudWatchClient,
-        logGroupName,
-        finalStartSec,
-        finalEndSec,
-      );
-      return { clientId, entries };
-    });
-    const timelines = await Promise.all(timelinePromises);
-    perClientRateTimelines.push(
-      ...timelines.filter((t) => t.entries.length > 0),
-    );
-  }
-
-  let webhookVerification: WebhookVerificationResult | undefined;
-  if (deps.mockWebhookLogGroup) {
-    webhookVerification = await verifyMockWebhook(
-      deps.cloudWatchClient,
-      deps.mockWebhookLogGroup,
-      finalStartSec,
-      finalEndSec,
-    );
-  }
+  const webhookVerification = await collectWebhookVerification(
+    deps,
+    finalStartSec,
+    finalEndSec,
+  );
 
   let rateLimitStateAfter: EndpointRateLimitState[] | undefined;
   if (elastiCacheDeps) {
     rateLimitStateAfter = await dumpRateLimitState(elastiCacheDeps);
   }
 
-  await purgeQueues(deps.sqsClient, queueUrls);
-  if (elastiCacheDeps) {
-    await flushElastiCache(elastiCacheDeps);
+  if (skipPurge) {
+    logger.info("Skipping final queue purge", { queueUrls });
+  } else {
+    await purgeQueues(deps.sqsClient, queueUrls);
+    logger.info("Final queue purge complete", { queueUrls });
   }
 
   return {

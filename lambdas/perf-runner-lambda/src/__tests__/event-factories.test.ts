@@ -25,6 +25,25 @@ describe("createMessageStatusEvent", () => {
     expect(a.id).not.toBe(b.id);
     expect(a.data.messageId).not.toBe(b.data.messageId);
   });
+
+  it("prefixes messageId with force-{code}- when forcedStatusCode is set", () => {
+    const event = createMessageStatusEvent("perf-client-1", "DELIVERED", 500);
+
+    expect(event.data.messageId).toMatch(/^force-500-[0-9a-f-]+$/);
+  });
+
+  it("prefixes messageId with force-{code}-until-{timestamp}- when both forced fields are set", () => {
+    const until = Date.now() + 60_000;
+    const event = createMessageStatusEvent(
+      "perf-client-1",
+      "DELIVERED",
+      500,
+      until,
+    );
+
+    const prefix = `force-500-until-${until}-`;
+    expect(event.data.messageId.startsWith(prefix)).toBe(true);
+  });
 });
 
 describe("createChannelStatusEvent", () => {
@@ -38,6 +57,25 @@ describe("createChannelStatusEvent", () => {
     expect(event.data.channelStatus).toBe("DELIVERED");
     expect(event.data.messageId).toBeTruthy();
     expect(event.id).toBeTruthy();
+  });
+
+  it("prefixes messageId with force-{code}- when forcedStatusCode is set", () => {
+    const event = createChannelStatusEvent("perf-client-2", "DELIVERED", 503);
+
+    expect(event.data.messageId).toMatch(/^force-503-[0-9a-f-]+$/);
+  });
+
+  it("prefixes messageId with force-{code}-until-{timestamp}- when both forced fields are set", () => {
+    const until = Date.now() + 60_000;
+    const event = createChannelStatusEvent(
+      "perf-client-2",
+      "DELIVERED",
+      503,
+      until,
+    );
+
+    const prefix = `force-503-until-${until}-`;
+    expect(event.data.messageId.startsWith(prefix)).toBe(true);
   });
 });
 
@@ -64,5 +102,20 @@ describe("createEvent", () => {
 
     expect(event.type).toBe(EventTypes.CHANNEL_STATUS_PUBLISHED);
     expect(event.data.clientId).toBe("perf-client-2");
+  });
+
+  it("forwards forcedStatusCode and forcedStatusCodeUntilMs from the mix entry", () => {
+    const until = Date.now() + 60_000;
+    const event = createEvent({
+      weight: 1,
+      factory: "messageStatus",
+      clientId: "perf-client-1",
+      messageStatus: "DELIVERED",
+      forcedStatusCode: 500,
+      forcedStatusCodeUntilMs: until,
+    });
+
+    const prefix = `force-500-until-${until}-`;
+    expect(event.data.messageId.startsWith(prefix)).toBe(true);
   });
 });

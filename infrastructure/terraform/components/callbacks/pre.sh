@@ -6,16 +6,22 @@ script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=_paths.sh
 source "${script_dir}/_paths.sh"
 
-# Resolve deploy_mock_clients and deploy_perf_runner from tfvars; base_path/group/region/environment are in scope from terraform.sh
+# Resolve tfvar overrides
+tfvar_value() {
+  local key="$1" file="$2"
+  # Extract the value after '=', stripping surrounding whitespace and quotes
+  grep -E "^\s*${key}\s*=" "${file}" | tail -1 | sed 's/.*=\s*//;s/\s*$//;s/^"//;s/"$//'
+}
+
 deploy_mock_clients="false"
 deploy_perf_runner="false"
 for _tfvar_file in \
   "${base_path}/etc/group_${group}.tfvars" \
   "${base_path}/etc/env_${region}_${environment}.tfvars"; do
-  if [[ -f "${_tfvar_file}" ]]; then
-    _val=$(grep -E '^\s*deploy_mock_clients\s*=' "${_tfvar_file}" | tail -1 | sed 's/.*=\s*//;s/\s*$//')
+  if [ -f "${_tfvar_file}" ]; then
+    _val=$(tfvar_value deploy_mock_clients "${_tfvar_file}")
     [ -n "${_val}" ] && deploy_mock_clients="${_val}"
-    _val=$(grep -E '^\s*deploy_perf_runner\s*=' "${_tfvar_file}" | tail -1 | sed 's/.*=\s*//;s/\s*$//')
+    _val=$(tfvar_value deploy_perf_runner "${_tfvar_file}")
     [ -n "${_val}" ] && deploy_perf_runner="${_val}"
   fi
 done

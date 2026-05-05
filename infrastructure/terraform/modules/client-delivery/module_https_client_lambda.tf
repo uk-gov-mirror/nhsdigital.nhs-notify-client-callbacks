@@ -18,14 +18,14 @@ module "https_client_lambda" {
     body = data.aws_iam_policy_document.https_client_lambda.json
   }
 
-  function_s3_bucket      = var.lambda_s3_bucket
-  function_code_base_path = var.lambda_code_base_path
+  function_s3_bucket      = var.delivery_lambda_s3_bucket
+  function_code_base_path = var.delivery_lambda_code_base_path
   function_code_dir       = "https-client-lambda/dist"
   function_include_common = true
   handler_function_name   = "handler"
   runtime                 = "nodejs22.x"
-  memory                  = var.lambda_memory
-  timeout                 = var.lambda_timeout
+  memory                  = var.delivery_lambda_memory
+  timeout                 = var.delivery_lambda_timeout
   log_level               = var.log_level
 
   force_lambda_code_deploy = var.force_lambda_code_deploy
@@ -53,19 +53,22 @@ module "https_client_lambda" {
     MTLS_CERT_S3_KEY                      = var.mtls_cert_s3_key # gitleaks:allow
     QUEUE_URL                             = module.sqs_delivery.sqs_queue_url
     TOKEN_BUCKET_BURST_CAPACITY           = tostring(var.token_bucket_burst_capacity)
+    CB_COOLDOWN_PERIOD_MS                 = tostring(var.cb_cooldown_period_ms)
+    CB_RECOVERY_PERIOD_MS                 = tostring(var.cb_recovery_period_ms)
   }
 
-  vpc_config = var.lambda_security_group_id != "" ? {
+  vpc_config = var.delivery_lambda_security_group_id != "" ? {
     subnet_ids         = var.vpc_subnet_ids
-    security_group_ids = [var.lambda_security_group_id]
+    security_group_ids = [var.delivery_lambda_security_group_id]
   } : null
 }
 
 resource "aws_lambda_event_source_mapping" "sqs_delivery" {
-  event_source_arn = module.sqs_delivery.sqs_queue_arn
-  function_name    = module.https_client_lambda.function_arn
-  batch_size       = var.lambda_batch_size
-  enabled          = true
+  event_source_arn                   = module.sqs_delivery.sqs_queue_arn
+  function_name                      = module.https_client_lambda.function_arn
+  batch_size                         = var.delivery_lambda_batch_size
+  maximum_batching_window_in_seconds = var.delivery_lambda_batching_window_sec
+  enabled                            = true
 
   function_response_types = ["ReportBatchItemFailures"]
 }

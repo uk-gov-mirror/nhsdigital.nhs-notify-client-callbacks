@@ -36,7 +36,7 @@
       },
       "invocationEndpoint": "https://REPLACED_BY_TERRAFORM",
       "invocationMethod": "POST",
-      "invocationRateLimit": 300,
+      "invocationRateLimit": 100,
       "targetId": "target-39dbd795-5909-40ab-95b2-4e88b11a2813",
       "type": "API"
     }

@@ -10,6 +10,8 @@ export type MessageStatusMixEntry = {
   factory: "messageStatus";
   clientId: string;
   messageStatus: MessageStatus;
+  forcedStatusCode?: number;
+  forcedStatusCodeUntilMs?: number;
 };
 
 export type ChannelStatusMixEntry = {
@@ -17,6 +19,8 @@ export type ChannelStatusMixEntry = {
   factory: "channelStatus";
   clientId: string;
   channelStatus: ChannelStatus;
+  forcedStatusCode?: number;
+  forcedStatusCodeUntilMs?: number;
 };
 
 export type EventMixEntry = MessageStatusMixEntry | ChannelStatusMixEntry;
@@ -24,6 +28,7 @@ export type EventMixEntry = MessageStatusMixEntry | ChannelStatusMixEntry;
 export type Phase = {
   durationSecs: number;
   targetEps: number;
+  eventMix?: EventMixEntry[];
 };
 
 export type Scenario = {
@@ -97,6 +102,15 @@ export type WebhookVerificationResult = {
   verified: boolean;
 };
 
+export type QueueDepthSample = {
+  timestampMs: number;
+  queues: {
+    queueUrl: string;
+    visible: number;
+    notVisible: number;
+  }[];
+};
+
 export type PerformanceResult = {
   testId: string;
   scenario: Scenario;
@@ -114,7 +128,9 @@ export type PerformanceResult = {
 
 export type PerfRunnerPayload = {
   testId: string;
-  scenario?: Scenario;
+  scenario: Scenario;
+  cloudWatchSettlingMs?: number;
+  skipPurge?: boolean;
 };
 
 export type RunnerDeps = {

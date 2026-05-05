@@ -43,11 +43,12 @@ import { flushMetrics, resetMetrics } from "services/delivery-metrics";
 type RedisClientType = Awaited<ReturnType<typeof getRedisClient>>;
 
 const DEFAULT_MAX_RETRY_DURATION_MS = 7_200_000; // 2 hours
-const DEFAULT_CONCURRENCY_LIMIT = 5;
+const DEFAULT_CONCURRENCY_LIMIT = 10;
 const BURST_MULTIPLIER = 5;
 const MAX_BURST_CAPACITY = Number(
   process.env.TOKEN_BUCKET_BURST_CAPACITY ?? "2250",
 );
+const SQS_MAX_VISIBILITY_TIMEOUT_SEC = 43_200; // 12 hours
 
 const gateConfig: EndpointGateConfig = {
   // Max tokens the bucket can hold — absorbs short traffic bursts without throttling
@@ -118,6 +119,15 @@ async function deliverRecord(
   clientId: string,
 ): Promise<{ success: boolean; dlq: boolean }> {
   const correlationId = extractCorrelationId(message);
+  const receiveCount = Number(record.attributes.ApproximateReceiveCount);
+
+  logger.info("Processing delivery record", {
+    correlationId,
+    receiveCount,
+    firstReceivedAt: new Date(
+      Number(record.attributes.ApproximateFirstReceiveTimestamp),
+    ).toISOString(),
+  });
 
   const maxRetryDurationMs =
     target.delivery?.maxRetryDurationSeconds === undefined
@@ -147,7 +157,7 @@ async function deliverRecord(
     message.targetId,
     correlationId,
     record.messageId,
-    Number(record.attributes.ApproximateReceiveCount),
+    receiveCount,
   );
   const deliveryStart = Date.now();
   const result = await deliverPayload(target, payloadJson, signature, agent);
@@ -171,7 +181,6 @@ async function deliverRecord(
   }
 
   if (result.outcome === OUTCOME_RATE_LIMITED) {
-    const receiveCount = Number(record.attributes.ApproximateReceiveCount);
     recordDeliveryRateLimited(clientId, message.targetId, correlationId);
     await handleRateLimitedRecord(
       record,
@@ -183,7 +192,6 @@ async function deliverRecord(
     return { success: true, dlq: false };
   }
 
-  const receiveCount = Number(record.attributes.ApproximateReceiveCount);
   const backoffSec = jitteredBackoffSeconds(receiveCount);
   recordDeliveryFailure(
     clientId,
@@ -209,14 +217,17 @@ async function handleBatchDenied(
   reason: string,
   retryAfterMs: number,
 ): Promise<TargetBatchResult> {
-  const delaySec = Math.ceil(retryAfterMs / 1000);
+  const baseDelaySec = Math.max(1, Math.ceil(retryAfterMs / 1000));
   const correlationIds = batch.messages.map((m) => extractCorrelationId(m));
   recordAdmissionDenied(clientId, batch.targetId, reason, correlationIds);
   const failures: SQSBatchItemFailure[] = [];
   for (const record of batch.records) {
-    // eslint-disable-next-line sonarjs/pseudo-random -- jitter for backoff, not security-sensitive
-    const jitterSec = Math.floor(Math.random() * 5);
-    await changeVisibility(record.receiptHandle, delaySec + jitterSec);
+    const receiveCount = Number(record.attributes.ApproximateReceiveCount);
+    const delaySec = Math.min(
+      receiveCount * baseDelaySec,
+      SQS_MAX_VISIBILITY_TIMEOUT_SEC,
+    );
+    await changeVisibility(record.receiptHandle, delaySec);
     failures.push({ itemIdentifier: record.messageId });
   }
   return { failures, deliveredCount: 0, dlqCount: 0 };
@@ -264,23 +275,30 @@ async function processTargetBatch(
   const failures: SQSBatchItemFailure[] = [];
   let processingFailures = 0;
 
-  const deliveryResults = await pMap(
-    admitted,
-    async (
+  const admittedPairs = admitted.map(
+    (record, i): { record: SQSRecord; message: CallbackDeliveryMessage } => ({
       record,
-      index,
-    ): Promise<{ record: SQSRecord; success: boolean; dlq: boolean }> => {
+      message: admittedMessages[i], // eslint-disable-line security/detect-object-injection -- i is the numeric index from .map(), not user input
+    }),
+  );
+
+  const deliveryResults = await pMap(
+    admittedPairs,
+    async ({
+      message,
+      record,
+    }): Promise<{ record: SQSRecord; success: boolean; dlq: boolean }> => {
       try {
         const outcome = await deliverRecord(
           record,
-          admittedMessages[index],
+          message,
           target,
           applicationId,
           clientId,
         );
         return { record, success: outcome.success, dlq: outcome.dlq };
       } catch (error) {
-        const correlationId = extractCorrelationId(admittedMessages[index]);
+        const correlationId = extractCorrelationId(message);
         logger.error("Failed to process record", {
           messageId: record.messageId,
           correlationId,
@@ -348,7 +366,9 @@ async function processTargetBatch(
       rejectedCorrelationIds,
     );
     for (const record of rejected) {
-      await changeVisibility(record.receiptHandle, 1);
+      const receiveCount = Number(record.attributes.ApproximateReceiveCount);
+      const delaySec = receiveCount * 1;
+      await changeVisibility(record.receiptHandle, delaySec);
       failures.push({ itemIdentifier: record.messageId });
     }
   }

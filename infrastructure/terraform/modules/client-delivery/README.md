@@ -11,11 +11,20 @@ No requirements.
 |------|-------------|------|---------|:--------:|
 | <a name="input_applications_map_parameter_name"></a> [applications\_map\_parameter\_name](#input\_applications\_map\_parameter\_name) | SSM Parameter Store path for the clientId-to-applicationData map | `string` | n/a | yes |
 | <a name="input_aws_account_id"></a> [aws\_account\_id](#input\_aws\_account\_id) | Account ID | `string` | n/a | yes |
+| <a name="input_cb_cooldown_period_ms"></a> [cb\_cooldown\_period\_ms](#input\_cb\_cooldown\_period\_ms) | Full block duration after circuit opens, before half-open probes begin (ms) | `number` | `120000` | no |
+| <a name="input_cb_recovery_period_ms"></a> [cb\_recovery\_period\_ms](#input\_cb\_recovery\_period\_ms) | Linear ramp-up duration after circuit closes (ms) | `number` | `600000` | no |
 | <a name="input_client_bus_name"></a> [client\_bus\_name](#input\_client\_bus\_name) | EventBridge bus name for subscription rules | `string` | n/a | yes |
 | <a name="input_client_config_bucket"></a> [client\_config\_bucket](#input\_client\_config\_bucket) | S3 bucket name containing client subscription configuration | `string` | n/a | yes |
 | <a name="input_client_config_bucket_arn"></a> [client\_config\_bucket\_arn](#input\_client\_config\_bucket\_arn) | S3 bucket ARN containing client subscription configuration | `string` | n/a | yes |
 | <a name="input_client_id"></a> [client\_id](#input\_client\_id) | Unique identifier for this client | `string` | n/a | yes |
 | <a name="input_component"></a> [component](#input\_component) | Component name | `string` | n/a | yes |
+| <a name="input_delivery_lambda_batch_size"></a> [delivery\_lambda\_batch\_size](#input\_delivery\_lambda\_batch\_size) | Number of SQS messages per Lambda invocation | `number` | `100` | no |
+| <a name="input_delivery_lambda_batching_window_sec"></a> [delivery\_lambda\_batching\_window\_sec](#input\_delivery\_lambda\_batching\_window\_sec) | Maximum time in seconds to wait for a full batch before invoking Lambda. Allows the delivery queue to fill to batch\_size, improving Lambda concurrency utilisation. | `number` | `1` | no |
+| <a name="input_delivery_lambda_code_base_path"></a> [delivery\_lambda\_code\_base\_path](#input\_delivery\_lambda\_code\_base\_path) | Base path to Lambda source code directories | `string` | n/a | yes |
+| <a name="input_delivery_lambda_memory"></a> [delivery\_lambda\_memory](#input\_delivery\_lambda\_memory) | Lambda memory allocation in MB | `number` | `256` | no |
+| <a name="input_delivery_lambda_s3_bucket"></a> [delivery\_lambda\_s3\_bucket](#input\_delivery\_lambda\_s3\_bucket) | S3 bucket for Lambda function artefacts | `string` | n/a | yes |
+| <a name="input_delivery_lambda_security_group_id"></a> [delivery\_lambda\_security\_group\_id](#input\_delivery\_lambda\_security\_group\_id) | Security group ID for the Lambda function | `string` | `""` | no |
+| <a name="input_delivery_lambda_timeout"></a> [delivery\_lambda\_timeout](#input\_delivery\_lambda\_timeout) | Lambda timeout in seconds | `number` | `30` | no |
 | <a name="input_elasticache_cache_name"></a> [elasticache\_cache\_name](#input\_elasticache\_cache\_name) | ElastiCache cache name for SigV4 token presigning | `string` | `""` | no |
 | <a name="input_elasticache_endpoint"></a> [elasticache\_endpoint](#input\_elasticache\_endpoint) | ElastiCache Serverless endpoint URL | `string` | `""` | no |
 | <a name="input_elasticache_iam_username"></a> [elasticache\_iam\_username](#input\_elasticache\_iam\_username) | IAM username for ElastiCache authentication | `string` | `""` | no |
@@ -24,12 +33,6 @@ No requirements.
 | <a name="input_force_lambda_code_deploy"></a> [force\_lambda\_code\_deploy](#input\_force\_lambda\_code\_deploy) | Force Lambda code redeployment even when commit tag matches | `bool` | `false` | no |
 | <a name="input_group"></a> [group](#input\_group) | The name of the tfscaffold group | `string` | `null` | no |
 | <a name="input_kms_key_arn"></a> [kms\_key\_arn](#input\_kms\_key\_arn) | KMS Key ARN for encryption at rest | `string` | n/a | yes |
-| <a name="input_lambda_batch_size"></a> [lambda\_batch\_size](#input\_lambda\_batch\_size) | Number of SQS messages per Lambda invocation | `number` | `10` | no |
-| <a name="input_lambda_code_base_path"></a> [lambda\_code\_base\_path](#input\_lambda\_code\_base\_path) | Base path to Lambda source code directories | `string` | n/a | yes |
-| <a name="input_lambda_memory"></a> [lambda\_memory](#input\_lambda\_memory) | Lambda memory allocation in MB | `number` | `256` | no |
-| <a name="input_lambda_s3_bucket"></a> [lambda\_s3\_bucket](#input\_lambda\_s3\_bucket) | S3 bucket for Lambda function artefacts | `string` | n/a | yes |
-| <a name="input_lambda_security_group_id"></a> [lambda\_security\_group\_id](#input\_lambda\_security\_group\_id) | Security group ID for the Lambda function | `string` | `""` | no |
-| <a name="input_lambda_timeout"></a> [lambda\_timeout](#input\_lambda\_timeout) | Lambda timeout in seconds | `number` | `30` | no |
 | <a name="input_log_destination_arn"></a> [log\_destination\_arn](#input\_log\_destination\_arn) | Firehose destination ARN for log forwarding | `string` | `""` | no |
 | <a name="input_log_level"></a> [log\_level](#input\_log\_level) | Log level for the Lambda function | `string` | `"INFO"` | no |
 | <a name="input_log_retention_in_days"></a> [log\_retention\_in\_days](#input\_log\_retention\_in\_days) | CloudWatch log retention period in days | `number` | `0` | no |
