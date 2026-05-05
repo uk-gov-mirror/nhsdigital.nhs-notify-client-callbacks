@@ -7,7 +7,7 @@ import type {
 } from "@nhs-notify-client-callbacks/models";
 import { validateStatusPublishEvent } from "services/validators/event-validator";
 import { transformEvent } from "services/transformers/event-transformer";
-import { extractCorrelationId } from "services/logger";
+import { extractCorrelationId } from "@nhs-notify-client-callbacks/logger";
 import { ValidationError, getEventError } from "services/error-handler";
 import type { ObservabilityService } from "services/observability";
 import type { ConfigLoader } from "services/config-loader";

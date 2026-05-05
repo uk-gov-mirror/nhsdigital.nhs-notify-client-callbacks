@@ -2,7 +2,7 @@ import {
   logCallbackGenerated,
   logCallbackSigned,
 } from "services/callback-logger";
-import type { Logger } from "services/logger";
+import type { Logger } from "@nhs-notify-client-callbacks/logger";
 import {
   type ClientCallbackPayload,
   EventTypes,

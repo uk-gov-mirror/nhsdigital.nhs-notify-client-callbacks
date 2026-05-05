@@ -11,7 +11,7 @@ import {
   ValidationError,
   formatValidationIssuePath,
 } from "services/error-handler";
-import { extractCorrelationId } from "services/logger";
+import { extractCorrelationId } from "@nhs-notify-client-callbacks/logger";
 
 const NHSNotifyExtensionsSchema = z.object({
   traceparent: z.string().min(1),

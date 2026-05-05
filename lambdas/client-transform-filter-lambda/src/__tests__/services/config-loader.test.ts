@@ -4,15 +4,6 @@ import { ConfigSubscriptionCache } from "@nhs-notify-client-callbacks/config-sub
 import { ConfigLoader } from "services/config-loader";
 import { ConfigValidationError } from "services/validators/config-validator";
 
-jest.mock("services/logger", () => ({
-  logger: {
-    debug: jest.fn(),
-    info: jest.fn(),
-    warn: jest.fn(),
-    error: jest.fn(),
-  },
-}));
-
 jest.mock("@nhs-notify-client-callbacks/logger", () => ({
   logger: {
     debug: jest.fn(),

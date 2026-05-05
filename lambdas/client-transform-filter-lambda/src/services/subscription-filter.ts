@@ -8,7 +8,7 @@ import { EventTypes } from "@nhs-notify-client-callbacks/models";
 import { matchesChannelStatusSubscription } from "services/filters/channel-status-filter";
 import { matchesMessageStatusSubscription } from "services/filters/message-status-filter";
 import { TransformationError } from "services/error-handler";
-import { logger } from "services/logger";
+import { logger } from "@nhs-notify-client-callbacks/logger";
 
 type FilterResult = {
   matched: boolean;

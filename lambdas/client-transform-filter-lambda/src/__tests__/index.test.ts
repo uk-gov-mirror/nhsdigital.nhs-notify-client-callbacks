@@ -7,7 +7,7 @@ import type {
   MessageStatusData,
   StatusPublishEvent,
 } from "@nhs-notify-client-callbacks/models";
-import type { Logger } from "services/logger";
+import type { Logger } from "@nhs-notify-client-callbacks/logger";
 import type { CallbackMetrics } from "services/metrics";
 import type { ConfigLoader } from "services/config-loader";
 import { ObservabilityService } from "services/observability";
@@ -547,7 +547,7 @@ describe("createHandler default wiring", () => {
         CallbackMetrics: state.CallbackMetrics,
       }));
 
-      jest.doMock("services/logger", () => ({
+      jest.doMock("@nhs-notify-client-callbacks/logger", () => ({
         Logger: state.LoggerCtor,
       }));
 
@@ -592,7 +592,7 @@ describe("createHandler default wiring", () => {
     expect(result).toEqual(["ok"]);
 
     jest.unmock("services/metrics");
-    jest.unmock("services/logger");
+    jest.unmock("@nhs-notify-client-callbacks/logger");
     jest.unmock("services/observability");
     jest.unmock("handler");
   });

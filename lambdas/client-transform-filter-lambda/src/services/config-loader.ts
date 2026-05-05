@@ -1,6 +1,6 @@
 import type { ConfigSubscriptionCache } from "@nhs-notify-client-callbacks/config-subscription-cache";
 import type { ClientSubscriptionConfiguration } from "@nhs-notify-client-callbacks/models";
-import { logger } from "services/logger";
+import { logger } from "@nhs-notify-client-callbacks/logger";
 import { wrapUnknownError } from "services/error-handler";
 import { ConfigValidationError } from "services/validators/config-validator";
 

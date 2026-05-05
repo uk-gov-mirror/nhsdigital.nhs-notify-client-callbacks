@@ -1,5 +1,5 @@
 import type { SQSRecord } from "aws-lambda";
-import { Logger } from "services/logger";
+import { Logger } from "@nhs-notify-client-callbacks/logger";
 import { CallbackMetrics, createMetricLogger } from "services/metrics";
 import { ObservabilityService } from "services/observability";
 import { ConfigLoaderService } from "services/config-loader-service";

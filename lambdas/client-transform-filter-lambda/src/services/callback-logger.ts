@@ -4,7 +4,7 @@ import {
   EventTypes,
   type MessageStatusAttributes,
 } from "@nhs-notify-client-callbacks/models";
-import type { Logger } from "services/logger";
+import type { Logger } from "@nhs-notify-client-callbacks/logger";
 
 function isMessageStatusAttributes(
   attributes: MessageStatusAttributes | ChannelStatusAttributes,

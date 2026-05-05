@@ -6,7 +6,7 @@ import { EventTypes } from "@nhs-notify-client-callbacks/models";
 import { createMessageStatusConfig } from "__tests__/helpers/client-subscription-fixtures";
 import { matchesMessageStatusSubscription } from "services/filters/message-status-filter";
 
-jest.mock("services/logger", () => ({
+jest.mock("@nhs-notify-client-callbacks/logger", () => ({
   logger: {
     debug: jest.fn(),
     info: jest.fn(),

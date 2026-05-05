@@ -4,7 +4,7 @@ import type {
   ClientSubscriptionConfiguration,
   StatusPublishEvent,
 } from "@nhs-notify-client-callbacks/models";
-import { logger } from "services/logger";
+import { logger } from "@nhs-notify-client-callbacks/logger";
 
 const isChannelStatusSubscription = (
   subscription: ClientSubscriptionConfiguration["subscriptions"][number],
