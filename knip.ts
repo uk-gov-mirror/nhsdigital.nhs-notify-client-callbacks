@@ -2,11 +2,14 @@ import type { KnipConfig } from "knip";
 
 const config: KnipConfig = {
   ignoreExportsUsedInFile: true,
+  // Exclude vendored Terraform module content from all Knip analysis.
+  ignore: ["**/.terraform/**"],
   // Files inherited from the repository template that are not used in this repo.
   ignoreFiles: [
     "docs/adr/assets/ADR-003/examples/nodejs/main.ts",
     "docs/assets/js/nhs-notify.js",
     "scripts/maintenance/merge.js",
+    "**/.terraform/**"
   ],
   workspaces: {
     ".": {
