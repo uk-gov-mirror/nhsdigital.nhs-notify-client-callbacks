@@ -6,7 +6,7 @@ resource "random_password" "mock_application_id" {
 
 resource "aws_s3_object" "applications_map" {
   count        = var.deploy_mock_clients ? 1 : 0
-  bucket       = var.applications_map_s3_bucket
+  bucket       = local.applications_map_s3_bucket
   key          = local.applications_map_s3_key
   content      = jsonencode({ for client_id, client in local.config_clients : client_id => try(client.applicationId, client_id) })
   content_type = "application/json"

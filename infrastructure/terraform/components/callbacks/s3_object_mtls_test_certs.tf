@@ -2,7 +2,7 @@ locals {
   mtls_test_certs_s3_prefix = "${var.environment}/callbacks/mtls-test"
   mtls_test_cert_s3_key     = "${local.mtls_test_certs_s3_prefix}/client-bundle.pem"
   mtls_test_ca_s3_key       = "${local.mtls_test_certs_s3_prefix}/ca.pem"
-  mtls_cert_s3_bucket       = var.mtls_cert_s3_bucket
+  mtls_cert_s3_bucket       = local.acct.additional_s3_buckets["client-callbacks_certs"].name
   mtls_cert_s3_key          = var.deploy_mock_clients ? local.mtls_test_cert_s3_key : var.mtls_cert_s3_key # gitleaks:allow
   mtls_ca_s3_key            = var.deploy_mock_clients ? local.mtls_test_ca_s3_key : var.mtls_ca_s3_key     # gitleaks:allow
 }
@@ -99,7 +99,7 @@ resource "tls_locally_signed_cert" "mock_server" {
 
 resource "aws_s3_object" "mtls_test_client_bundle" {
   count   = var.deploy_mock_clients ? 1 : 0
-  bucket  = var.mtls_cert_s3_bucket
+  bucket  = local.mtls_cert_s3_bucket
   key     = local.mtls_test_cert_s3_key # gitleaks:allow
   content = "${tls_locally_signed_cert.test_client[0].cert_pem}${tls_private_key.test_client[0].private_key_pem}"
 
@@ -110,7 +110,7 @@ resource "aws_s3_object" "mtls_test_client_bundle" {
 
 resource "aws_s3_object" "mtls_test_ca" {
   count   = var.deploy_mock_clients ? 1 : 0
-  bucket  = var.mtls_cert_s3_bucket
+  bucket  = local.mtls_cert_s3_bucket
   key     = local.mtls_test_ca_s3_key # gitleaks:allow
   content = tls_self_signed_cert.test_ca[0].cert_pem
 

@@ -16,11 +16,11 @@ module "client_delivery" {
   subscriptions        = local.client_subscriptions[each.key]
   subscription_targets = local.client_subscription_targets[each.key]
 
-  client_config_bucket     = var.client_config_s3_bucket
+  client_config_bucket     = local.client_config_s3_bucket
   client_config_bucket_arn = local.client_config_bucket_arn
   client_config_key_prefix = "${var.environment}/client_subscriptions/"
 
-  applications_map_s3_bucket = var.applications_map_s3_bucket
+  applications_map_s3_bucket = local.applications_map_s3_bucket
   applications_map_s3_key    = local.applications_map_s3_key
 
   delivery_lambda_s3_bucket      = local.acct.s3_buckets["lambda_function_artefacts"]["id"]

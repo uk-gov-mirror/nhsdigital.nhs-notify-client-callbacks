@@ -172,22 +172,6 @@ variable "message_root_uri" {
   description = "The root URI used for constructing message links in callback payloads"
 }
 
-variable "client_config_s3_bucket" {
-  type        = string
-  description = "S3 bucket for client subscription configuration"
-}
-
-variable "applications_map_s3_bucket" {
-  type        = string
-  description = "S3 bucket containing the applications map JSON"
-}
-
-variable "mtls_cert_s3_bucket" {
-  type        = string
-  description = "S3 bucket containing the mTLS client certificate bundle"
-  default     = ""
-}
-
 variable "mtls_cert_s3_key" {
   type        = string
   description = "S3 key for the mTLS client certificate PEM bundle"

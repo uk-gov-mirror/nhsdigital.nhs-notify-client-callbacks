@@ -68,5 +68,7 @@ locals {
 
   applications_map_s3_key = "${var.environment}/applications-map.json"
 
-  client_config_bucket_arn = "arn:aws:s3:::${var.client_config_s3_bucket}"
+  client_config_s3_bucket    = local.acct.additional_s3_buckets["client-callbacks_client-configs"].name
+  applications_map_s3_bucket = local.acct.additional_s3_buckets["client-callbacks_apps-map"].name
+  client_config_bucket_arn   = local.acct.additional_s3_buckets["client-callbacks_client-configs"].arn
 }
