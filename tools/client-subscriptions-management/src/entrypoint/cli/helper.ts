@@ -4,9 +4,9 @@ import type {
 } from "@nhs-notify-client-callbacks/models";
 import {
   createRepository as createRepositoryFromOptions,
-  createSsmApplicationsMapRepository as createSsmApplicationsMapRepositoryFromOptions,
+  createS3ApplicationsMapRepository as createS3ApplicationsMapRepositoryFromOptions,
+  resolveApplicationsMapLocation as resolveApplicationsMapLocationFromAws,
   resolveBucketName,
-  resolveParameterName as resolveParameterNameFromAws,
   resolveProfile,
   resolveRegion,
 } from "src/aws";
@@ -145,28 +145,41 @@ export const writeOptions = {
   },
 };
 
-export type SsmCliArgs = CommonCliArgs & {
-  "parameter-name"?: string;
+export type ApplicationsMapCliArgs = CommonCliArgs & {
+  "applications-map-bucket"?: string;
+  "applications-map-key"?: string;
 };
 
-export const parameterNameOption = {
-  "parameter-name": {
+export const applicationsMapOptions = {
+  "applications-map-bucket": {
     type: "string" as const,
     demandOption: false as const,
     description:
-      "Explicit SSM parameter name for the applications map (overrides derived name)",
+      "Explicit S3 bucket name for the applications map (overrides derived name)",
+  },
+  "applications-map-key": {
+    type: "string" as const,
+    demandOption: false as const,
+    description:
+      "Explicit S3 key for the applications map (overrides derived key)",
   },
 };
 
-export const createSsmApplicationsMapRepository = (argv: SsmCliArgs) => {
+export const createS3ApplicationsMapRepository = async (
+  argv: ApplicationsMapCliArgs,
+) => {
   const region = resolveRegion(argv.region);
   const profile = resolveProfile(argv.profile);
-  const parameterName = resolveParameterNameFromAws({
-    parameterName: argv["parameter-name"],
+  const { bucket, key } = await resolveApplicationsMapLocationFromAws({
+    bucketName: argv["applications-map-bucket"],
+    key: argv["applications-map-key"],
     environment: argv.environment,
+    region,
+    profile,
   });
-  return createSsmApplicationsMapRepositoryFromOptions({
-    parameterName,
+  return createS3ApplicationsMapRepositoryFromOptions({
+    bucket,
+    key,
     region,
     profile,
   });

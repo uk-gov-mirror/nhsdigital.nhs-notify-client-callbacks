@@ -15,10 +15,11 @@
 
 | Name | Description | Type | Default | Required |
 |------|-------------|------|---------|:--------:|
-| <a name="input_applications_map_parameter_name"></a> [applications\_map\_parameter\_name](#input\_applications\_map\_parameter\_name) | SSM Parameter Store path for the clientId-to-applicationData map, where applicationData is currently only the applicationId | `string` | `null` | no |
+| <a name="input_applications_map_s3_bucket"></a> [applications\_map\_s3\_bucket](#input\_applications\_map\_s3\_bucket) | S3 bucket containing the applications map JSON | `string` | n/a | yes |
 | <a name="input_aws_account_id"></a> [aws\_account\_id](#input\_aws\_account\_id) | The AWS Account ID (numeric) | `string` | n/a | yes |
 | <a name="input_cb_cooldown_period_ms"></a> [cb\_cooldown\_period\_ms](#input\_cb\_cooldown\_period\_ms) | Full block duration after circuit opens, before half-open probes begin (ms) | `number` | `120000` | no |
 | <a name="input_cb_recovery_period_ms"></a> [cb\_recovery\_period\_ms](#input\_cb\_recovery\_period\_ms) | Linear ramp-up duration after circuit closes (ms) | `number` | `600000` | no |
+| <a name="input_client_config_s3_bucket"></a> [client\_config\_s3\_bucket](#input\_client\_config\_s3\_bucket) | S3 bucket for client subscription configuration | `string` | n/a | yes |
 | <a name="input_component"></a> [component](#input\_component) | The variable encapsulating the name of this component | `string` | `"callbacks"` | no |
 | <a name="input_default_tags"></a> [default\_tags](#input\_default\_tags) | A map of default tags to apply to all taggable resources within the component | `map(string)` | `{}` | no |
 | <a name="input_delivery_lambda_batch_size"></a> [delivery\_lambda\_batch\_size](#input\_delivery\_lambda\_batch\_size) | Number of SQS messages per delivery Lambda invocation | `number` | `100` | no |
@@ -48,7 +49,6 @@
 | <a name="input_pipe_sqs_max_batch_window"></a> [pipe\_sqs\_max\_batch\_window](#input\_pipe\_sqs\_max\_batch\_window) | n/a | `number` | `2` | no |
 | <a name="input_project"></a> [project](#input\_project) | The name of the tfscaffold project | `string` | n/a | yes |
 | <a name="input_region"></a> [region](#input\_region) | The AWS Region | `string` | n/a | yes |
-| <a name="input_s3_enable_force_destroy"></a> [s3\_enable\_force\_destroy](#input\_s3\_enable\_force\_destroy) | Whether to enable force destroy for the S3 buckets created in this module | `bool` | `false` | no |
 | <a name="input_sqs_inbound_event_max_receive_count"></a> [sqs\_inbound\_event\_max\_receive\_count](#input\_sqs\_inbound\_event\_max\_receive\_count) | n/a | `number` | `3` | no |
 | <a name="input_sqs_inbound_event_visibility_timeout_seconds"></a> [sqs\_inbound\_event\_visibility\_timeout\_seconds](#input\_sqs\_inbound\_event\_visibility\_timeout\_seconds) | n/a | `number` | `60` | no |
 | <a name="input_token_bucket_burst_capacity"></a> [token\_bucket\_burst\_capacity](#input\_token\_bucket\_burst\_capacity) | Token bucket burst capacity used by the rate limiter | `number` | `2250` | no |
@@ -56,12 +56,10 @@
 
 | Name | Source | Version |
 |------|--------|---------|
-| <a name="module_client_config_bucket"></a> [client\_config\_bucket](#module\_client\_config\_bucket) | https://github.com/NHSDigital/nhs-notify-shared-modules/releases/download/3.0.7/terraform-s3bucket.zip | n/a |
 | <a name="module_client_delivery"></a> [client\_delivery](#module\_client\_delivery) | ../../modules/client-delivery | n/a |
 | <a name="module_client_transform_filter_lambda"></a> [client\_transform\_filter\_lambda](#module\_client\_transform\_filter\_lambda) | https://github.com/NHSDigital/nhs-notify-shared-modules/releases/download/3.0.7/terraform-lambda.zip | n/a |
 | <a name="module_kms"></a> [kms](#module\_kms) | https://github.com/NHSDigital/nhs-notify-shared-modules/releases/download/3.0.7/terraform-kms.zip | n/a |
 | <a name="module_mock_webhook_lambda"></a> [mock\_webhook\_lambda](#module\_mock\_webhook\_lambda) | https://github.com/NHSDigital/nhs-notify-shared-modules/releases/download/3.0.7/terraform-lambda.zip | n/a |
-| <a name="module_mtls_test_certs_bucket"></a> [mtls\_test\_certs\_bucket](#module\_mtls\_test\_certs\_bucket) | https://github.com/NHSDigital/nhs-notify-shared-modules/releases/download/3.0.7/terraform-s3bucket.zip | n/a |
 | <a name="module_perf_runner_lambda"></a> [perf\_runner\_lambda](#module\_perf\_runner\_lambda) | https://github.com/NHSDigital/nhs-notify-shared-modules/releases/download/3.0.7/terraform-lambda.zip | n/a |
 | <a name="module_sqs_inbound_event"></a> [sqs\_inbound\_event](#module\_sqs\_inbound\_event) | https://github.com/NHSDigital/nhs-notify-shared-modules/releases/download/3.0.7/terraform-sqs.zip | n/a |
 ## Outputs

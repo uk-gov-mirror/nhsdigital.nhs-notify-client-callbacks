@@ -63,7 +63,8 @@ fi
 
 ACCOUNT_ID="$(aws sts get-caller-identity --profile "$AWS_PROFILE" --query Account --output text)"
 
-PREFIX="nhs-${ENVIRONMENT}-callbacks"
+PREFIX="nhs-${ENVIRONMENT}-cb"
+CLIENT_PREFIX="nhs-${ENVIRONMENT}-cbc"
 PIPE_NAME="${PREFIX}-main"
 
 print_section() {
@@ -106,8 +107,8 @@ show_queue_counts() {
 
 action_queue_status() {
   require_client_id
-  show_queue_counts "Client Delivery Queue - Message Counts" "${PREFIX}-${CLIENT_ID}-delivery-queue"
-  show_queue_counts "Client Delivery DLQ - Message Counts" "${PREFIX}-${CLIENT_ID}-delivery-dlq-queue"
+  show_queue_counts "Client Delivery Queue - Message Counts" "${CLIENT_PREFIX}-${CLIENT_ID}-delivery-queue"
+  show_queue_counts "Client Delivery DLQ - Message Counts" "${CLIENT_PREFIX}-${CLIENT_ID}-delivery-dlq-queue"
   show_queue_counts "Inbound Event Queue - Message Counts" "${PREFIX}-inbound-event-queue"
   show_queue_counts "Inbound Event DLQ - Message Counts" "${PREFIX}-inbound-event-dlq"
 }
@@ -136,8 +137,8 @@ peek_queue_message() {
 
 action_queue_peek() {
   require_client_id
-  peek_queue_message "Client Delivery Queue - Message Peek" "${PREFIX}-${CLIENT_ID}-delivery-queue"
-  peek_queue_message "Client Delivery DLQ - Message Peek" "${PREFIX}-${CLIENT_ID}-delivery-dlq-queue"
+  peek_queue_message "Client Delivery Queue - Message Peek" "${CLIENT_PREFIX}-${CLIENT_ID}-delivery-queue"
+  peek_queue_message "Client Delivery DLQ - Message Peek" "${CLIENT_PREFIX}-${CLIENT_ID}-delivery-dlq-queue"
   peek_queue_message "Inbound Event Queue - Message Peek" "${PREFIX}-inbound-event-queue"
   peek_queue_message "Inbound Event DLQ - Message Peek" "${PREFIX}-inbound-event-dlq"
   return 0
@@ -185,7 +186,7 @@ action_tail_https_client() {
 
   print_section "HTTPS Client Lambda Logs"
   aws logs tail \
-    "/aws/lambda/${PREFIX}-https-client-${CLIENT_ID}" \
+    "/aws/lambda/${CLIENT_PREFIX}-https-client-${CLIENT_ID}" \
     --region "$REGION" \
     --profile "$AWS_PROFILE" \
     --since "$LOG_SINCE" \

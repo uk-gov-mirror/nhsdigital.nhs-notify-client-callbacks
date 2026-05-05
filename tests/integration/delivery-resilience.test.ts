@@ -117,7 +117,7 @@ describe("Delivery Resilience", () => {
       const { clientId } = getClientConfig("clientRateLimit");
       dlqUrl = ctx.clientDlqUrl(clientId);
       deliveryUrl = ctx.clientDeliveryUrl(clientId);
-      httpsClientLogGroup = ctx.logGroup(`https-client-${clientId}`);
+      httpsClientLogGroup = ctx.clientLogGroup(`https-client-${clientId}`);
       await purgeQueues(ctx.sqs, [dlqUrl, deliveryUrl]);
     });
 
@@ -190,7 +190,7 @@ describe("Delivery Resilience", () => {
       const { clientId } = getClientConfig("clientCircuitBreaker");
       dlqUrl = ctx.clientDlqUrl(clientId);
       deliveryUrl = ctx.clientDeliveryUrl(clientId);
-      httpsClientLogGroup = ctx.logGroup(`https-client-${clientId}`);
+      httpsClientLogGroup = ctx.clientLogGroup(`https-client-${clientId}`);
       await purgeQueues(ctx.sqs, [dlqUrl, deliveryUrl]);
     });
 

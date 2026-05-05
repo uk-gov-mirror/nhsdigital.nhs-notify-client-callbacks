@@ -3,7 +3,7 @@ import type { ClientCallbackPayload } from "@nhs-notify-client-callbacks/models"
 import pMap from "p-map";
 import { logger } from "@nhs-notify-client-callbacks/logger";
 import { loadTargetConfig } from "services/config-loader";
-import { getApplicationId } from "services/ssm-applications-map";
+import { getApplicationId } from "services/applications-map";
 import { signPayload } from "services/payload-signer";
 import { buildAgent } from "services/delivery/tls-agent-factory";
 import {

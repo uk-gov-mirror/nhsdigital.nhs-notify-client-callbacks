@@ -43,15 +43,15 @@ data "aws_iam_policy_document" "https_client_lambda" {
   }
 
   statement {
-    sid    = "SSMGetApplicationsMap"
+    sid    = "S3ApplicationsMapReadAccess"
     effect = "Allow"
 
     actions = [
-      "ssm:GetParameter",
+      "s3:GetObject",
     ]
 
     resources = [
-      "arn:aws:ssm:${var.region}:${var.aws_account_id}:parameter${var.applications_map_parameter_name}",
+      "arn:aws:s3:::${var.applications_map_s3_bucket}/${var.applications_map_s3_key}",
     ]
   }
 
@@ -64,7 +64,7 @@ data "aws_iam_policy_document" "https_client_lambda" {
     ]
 
     resources = [
-      "${var.client_config_bucket_arn}/client_subscriptions/*",
+      "${var.client_config_bucket_arn}/${var.client_config_key_prefix}*",
     ]
   }
 

@@ -137,6 +137,7 @@ export type RunnerDeps = {
   sqsClient: SQSClient;
   cloudWatchClient: CloudWatchLogsClient;
   queueUrl: string;
+  deliveryQueueUrlPrefix?: string;
   logGroupName: string;
   deliveryLogGroupPrefix?: string;
   mockWebhookLogGroup?: string;

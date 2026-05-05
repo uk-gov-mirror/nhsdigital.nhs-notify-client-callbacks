@@ -9,13 +9,15 @@ No requirements.
 
 | Name | Description | Type | Default | Required |
 |------|-------------|------|---------|:--------:|
-| <a name="input_applications_map_parameter_name"></a> [applications\_map\_parameter\_name](#input\_applications\_map\_parameter\_name) | SSM Parameter Store path for the clientId-to-applicationData map | `string` | n/a | yes |
+| <a name="input_applications_map_s3_bucket"></a> [applications\_map\_s3\_bucket](#input\_applications\_map\_s3\_bucket) | S3 bucket containing the applications map JSON | `string` | n/a | yes |
+| <a name="input_applications_map_s3_key"></a> [applications\_map\_s3\_key](#input\_applications\_map\_s3\_key) | S3 key for the applications map JSON file | `string` | n/a | yes |
 | <a name="input_aws_account_id"></a> [aws\_account\_id](#input\_aws\_account\_id) | Account ID | `string` | n/a | yes |
 | <a name="input_cb_cooldown_period_ms"></a> [cb\_cooldown\_period\_ms](#input\_cb\_cooldown\_period\_ms) | Full block duration after circuit opens, before half-open probes begin (ms) | `number` | `120000` | no |
 | <a name="input_cb_recovery_period_ms"></a> [cb\_recovery\_period\_ms](#input\_cb\_recovery\_period\_ms) | Linear ramp-up duration after circuit closes (ms) | `number` | `600000` | no |
 | <a name="input_client_bus_name"></a> [client\_bus\_name](#input\_client\_bus\_name) | EventBridge bus name for subscription rules | `string` | n/a | yes |
 | <a name="input_client_config_bucket"></a> [client\_config\_bucket](#input\_client\_config\_bucket) | S3 bucket name containing client subscription configuration | `string` | n/a | yes |
 | <a name="input_client_config_bucket_arn"></a> [client\_config\_bucket\_arn](#input\_client\_config\_bucket\_arn) | S3 bucket ARN containing client subscription configuration | `string` | n/a | yes |
+| <a name="input_client_config_key_prefix"></a> [client\_config\_key\_prefix](#input\_client\_config\_key\_prefix) | S3 key prefix for client subscription configuration files | `string` | `"client_subscriptions/"` | no |
 | <a name="input_client_id"></a> [client\_id](#input\_client\_id) | Unique identifier for this client | `string` | n/a | yes |
 | <a name="input_component"></a> [component](#input\_component) | Component name | `string` | n/a | yes |
 | <a name="input_delivery_lambda_batch_size"></a> [delivery\_lambda\_batch\_size](#input\_delivery\_lambda\_batch\_size) | Number of SQS messages per Lambda invocation | `number` | `100` | no |

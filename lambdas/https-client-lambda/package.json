@@ -3,7 +3,6 @@
     "@aws-crypto/sha256-js": "catalog:aws",
     "@aws-sdk/client-s3": "catalog:aws",
     "@aws-sdk/client-sqs": "catalog:aws",
-    "@aws-sdk/client-ssm": "catalog:aws",
     "@aws-sdk/credential-providers": "catalog:aws",
     "@smithy/signature-v4": "catalog:aws",
     "@nhs-notify-client-callbacks/config-subscription-cache": "workspace:*",
@@ -16,6 +15,7 @@
     "p-map": "catalog:app"
   },
   "devDependencies": {
+    "@smithy/types": "catalog:aws",
     "@tsconfig/node22": "catalog:tools",
     "@types/aws-lambda": "catalog:tools",
     "@types/jest": "catalog:test",

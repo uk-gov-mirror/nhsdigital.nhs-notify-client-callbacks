@@ -118,7 +118,7 @@ describe("Metrics", () => {
 
     beforeAll(() => {
       const { clientId } = getClientConfig("clientSingleTarget");
-      httpsClientLogGroup = ctx.logGroup(`https-client-${clientId}`);
+      httpsClientLogGroup = ctx.clientLogGroup(`https-client-${clientId}`);
     });
 
     it("should emit DeliveryAttempt, DeliverySuccess and DeliveryDurationMs on successful delivery", async () => {

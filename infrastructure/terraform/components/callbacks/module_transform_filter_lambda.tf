@@ -5,7 +5,7 @@ module "client_transform_filter_lambda" {
   description   = "Lambda function that transforms and filters events coming to through the eventpipe"
 
   aws_account_id = var.aws_account_id
-  component      = var.component
+  component      = local.component
   environment    = var.environment
   project        = var.project
   region         = var.region
@@ -37,9 +37,9 @@ module "client_transform_filter_lambda" {
 
   lambda_env_vars = {
     ENVIRONMENT                           = var.environment
-    METRICS_NAMESPACE                     = "nhs-notify-client-callbacks"
-    CLIENT_SUBSCRIPTION_CONFIG_BUCKET     = module.client_config_bucket.bucket
-    CLIENT_SUBSCRIPTION_CONFIG_PREFIX     = "client_subscriptions/"
+    METRICS_NAMESPACE                     = "nhs-notify-cb"
+    CLIENT_SUBSCRIPTION_CONFIG_BUCKET     = var.client_config_s3_bucket
+    CLIENT_SUBSCRIPTION_CONFIG_PREFIX     = "${var.environment}/client_subscriptions/"
     CLIENT_SUBSCRIPTION_CACHE_TTL_SECONDS = "60"
     MESSAGE_ROOT_URI                      = var.message_root_uri
   }

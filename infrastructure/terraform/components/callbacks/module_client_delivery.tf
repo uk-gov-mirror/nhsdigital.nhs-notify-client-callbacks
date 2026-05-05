@@ -5,7 +5,7 @@ module "client_delivery" {
   project        = var.project
   aws_account_id = var.aws_account_id
   region         = var.region
-  component      = var.component
+  component      = "cbc"
   environment    = var.environment
   group          = var.group
 
@@ -16,10 +16,12 @@ module "client_delivery" {
   subscriptions        = local.client_subscriptions[each.key]
   subscription_targets = local.client_subscription_targets[each.key]
 
-  client_config_bucket     = module.client_config_bucket.bucket
-  client_config_bucket_arn = module.client_config_bucket.arn
+  client_config_bucket     = var.client_config_s3_bucket
+  client_config_bucket_arn = local.client_config_bucket_arn
+  client_config_key_prefix = "${var.environment}/client_subscriptions/"
 
-  applications_map_parameter_name = local.applications_map_parameter_name
+  applications_map_s3_bucket = var.applications_map_s3_bucket
+  applications_map_s3_key    = local.applications_map_s3_key
 
   delivery_lambda_s3_bucket      = local.acct.s3_buckets["lambda_function_artefacts"]["id"]
   delivery_lambda_code_base_path = local.aws_lambda_functions_dir_path
@@ -34,7 +36,7 @@ module "client_delivery" {
 
   elasticache_endpoint     = aws_elasticache_serverless_cache.delivery_state.endpoint[0].address
   elasticache_cache_name   = aws_elasticache_serverless_cache.delivery_state.name
-  elasticache_iam_username = "${var.project}-${var.environment}-${var.component}-elasticache-user"
+  elasticache_iam_username = "${var.project}-${var.environment}-${local.component}-elasticache-user"
 
   mtls_cert_s3_bucket = local.mtls_cert_s3_bucket
   mtls_cert_s3_key    = local.mtls_cert_s3_key # gitleaks:allow

@@ -12,7 +12,7 @@ const mockFormatApplicationsMap = jest.fn();
 
 jest.mock("src/entrypoint/cli/helper", () => ({
   ...jest.requireActual("src/entrypoint/cli/helper"),
-  createSsmApplicationsMapRepository: jest.fn(),
+  createS3ApplicationsMapRepository: jest.fn(),
 }));
 
 jest.mock("src/format", () => ({
@@ -21,8 +21,8 @@ jest.mock("src/format", () => ({
     mockFormatApplicationsMap(...args),
 }));
 
-const mockCreateSsmApplicationsMapRepository =
-  helper.createSsmApplicationsMapRepository as jest.Mock;
+const mockCreateS3ApplicationsMapRepository =
+  helper.createS3ApplicationsMapRepository as jest.Mock;
 
 describe("applications-map-add CLI", () => {
   const originalCliConsoleState = captureCliConsoleState();
@@ -34,8 +34,10 @@ describe("applications-map-add CLI", () => {
     "client-1",
     "--application-id",
     "app-1",
-    "--parameter-name",
-    "/nhs/dev/callbacks/applications-map",
+    "--applications-map-bucket",
+    "test-bucket",
+    "--applications-map-key",
+    "dev/applications-map.json",
   ];
 
   const resultMap = new Map([["client-1", "app-1"]]);
@@ -45,8 +47,8 @@ describe("applications-map-add CLI", () => {
     mockAddApplication.mockResolvedValue(resultMap);
     mockFormatApplicationsMap.mockReset();
     mockFormatApplicationsMap.mockReturnValue("masked-map-output");
-    mockCreateSsmApplicationsMapRepository.mockReset();
-    mockCreateSsmApplicationsMapRepository.mockReturnValue({
+    mockCreateS3ApplicationsMapRepository.mockReset();
+    mockCreateS3ApplicationsMapRepository.mockResolvedValue({
       addApplication: mockAddApplication,
     });
     resetCliConsoleState();
@@ -59,11 +61,12 @@ describe("applications-map-add CLI", () => {
   it("adds application and logs output", async () => {
     await cli.main(baseArgs);
 
-    expect(mockCreateSsmApplicationsMapRepository).toHaveBeenCalledWith(
+    expect(mockCreateS3ApplicationsMapRepository).toHaveBeenCalledWith(
       expect.objectContaining({
         "client-id": "client-1",
         "application-id": "app-1",
-        "parameter-name": "/nhs/dev/callbacks/applications-map",
+        "applications-map-bucket": "test-bucket",
+        "applications-map-key": "dev/applications-map.json",
       }),
     );
     expect(mockAddApplication).toHaveBeenCalledWith("client-1", "app-1", false);
@@ -85,7 +88,7 @@ describe("applications-map-add CLI", () => {
     await cli.main(baseArgs);
 
     expect(console.log).not.toHaveBeenCalledWith(
-      "Dry run — no changes written to SSM.",
+      "Dry run — no changes written to S3.",
     );
   });
 
@@ -94,13 +97,13 @@ describe("applications-map-add CLI", () => {
 
     expect(mockAddApplication).toHaveBeenCalledWith("client-1", "app-1", true);
     expect(console.log).toHaveBeenCalledWith(
-      "Dry run — no changes written to SSM.",
+      "Dry run — no changes written to S3.",
     );
   });
 
   it("handles errors in wrapped CLI", async () => {
     expect.hasAssertions();
-    mockCreateSsmApplicationsMapRepository.mockReturnValue({
+    mockCreateS3ApplicationsMapRepository.mockResolvedValue({
       addApplication: jest.fn().mockRejectedValue(new Error("Boom")),
     });
 

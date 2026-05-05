@@ -1,38 +1,48 @@
 import {
-  GetParameterCommand,
-  PutParameterCommand,
-  type SSMClient,
-} from "@aws-sdk/client-ssm";
-import SsmApplicationsMapRepository from "src/repository/ssm-applications-map";
+  GetObjectCommand,
+  PutObjectCommand,
+  type S3Client,
+} from "@aws-sdk/client-s3";
+import type { SdkStream } from "@smithy/types";
+import S3ApplicationsMapRepository from "src/repository/s3-applications-map";
+
+const mockBody = (content: string) =>
+  ({
+    transformToString: jest.fn().mockResolvedValue(content),
+  }) as unknown as SdkStream<ReadableStream>;
 
 const createRepository = (send: jest.Mock = jest.fn()) => {
-  const client = { send } as unknown as SSMClient;
+  const client = { send } as unknown as S3Client;
   return {
-    repository: new SsmApplicationsMapRepository(client, "/test/param"),
+    repository: new S3ApplicationsMapRepository(
+      client,
+      "test-bucket",
+      "test/applications-map.json",
+    ),
     send,
   };
 };
 
-describe("SsmApplicationsMapRepository", () => {
+describe("S3ApplicationsMapRepository", () => {
   describe("getApplication", () => {
     it("returns the application ID for an existing client", async () => {
       const { repository, send } = createRepository();
       send.mockResolvedValueOnce({
-        Parameter: {
-          Value: JSON.stringify({ "client-1": "app-1", "client-2": "app-2" }),
-        },
+        Body: mockBody(
+          JSON.stringify({ "client-1": "app-1", "client-2": "app-2" }),
+        ),
       });
 
       const result = await repository.getApplication("client-1");
 
-      expect(send).toHaveBeenCalledWith(expect.any(GetParameterCommand));
+      expect(send).toHaveBeenCalledWith(expect.any(GetObjectCommand));
       expect(result).toBe("app-1");
     });
 
     it("returns undefined when the client is not in the map", async () => {
       const { repository, send } = createRepository();
       send.mockResolvedValueOnce({
-        Parameter: { Value: JSON.stringify({ "other-client": "app-1" }) },
+        Body: mockBody(JSON.stringify({ "other-client": "app-1" })),
       });
 
       const result = await repository.getApplication("client-1");
@@ -40,10 +50,10 @@ describe("SsmApplicationsMapRepository", () => {
       expect(result).toBeUndefined();
     });
 
-    it("returns undefined when parameter does not exist", async () => {
+    it("returns undefined when object does not exist", async () => {
       const { repository, send } = createRepository();
       const error = Object.assign(new Error("not found"), {
-        name: "ParameterNotFound",
+        name: "NoSuchKey",
       });
       send.mockRejectedValueOnce(error);
 
@@ -52,16 +62,16 @@ describe("SsmApplicationsMapRepository", () => {
       expect(result).toBeUndefined();
     });
 
-    it("returns undefined when parameter has no value", async () => {
+    it("returns undefined when object body is empty", async () => {
       const { repository, send } = createRepository();
-      send.mockResolvedValueOnce({ Parameter: {} });
+      send.mockResolvedValueOnce({ Body: undefined });
 
       const result = await repository.getApplication("client-1");
 
       expect(result).toBeUndefined();
     });
 
-    it("rethrows unexpected SSM errors", async () => {
+    it("rethrows unexpected S3 errors", async () => {
       const { repository, send } = createRepository();
       send.mockRejectedValueOnce(
         Object.assign(new Error("Network failure"), { name: "NetworkError" }),
@@ -78,16 +88,14 @@ describe("SsmApplicationsMapRepository", () => {
       const { repository, send } = createRepository();
       send
         .mockResolvedValueOnce({
-          Parameter: {
-            Value: JSON.stringify({ "existing-client": "existing-app" }),
-          },
+          Body: mockBody(JSON.stringify({ "existing-client": "existing-app" })),
         })
         .mockResolvedValueOnce({});
 
       const result = await repository.addApplication("client-1", "app-1");
 
-      expect(send).toHaveBeenNthCalledWith(1, expect.any(GetParameterCommand));
-      expect(send).toHaveBeenNthCalledWith(2, expect.any(PutParameterCommand));
+      expect(send).toHaveBeenNthCalledWith(1, expect.any(GetObjectCommand));
+      expect(send).toHaveBeenNthCalledWith(2, expect.any(PutObjectCommand));
       expect(result).toEqual(
         new Map([
           ["existing-client", "existing-app"],
@@ -96,10 +104,10 @@ describe("SsmApplicationsMapRepository", () => {
       );
     });
 
-    it("starts from empty map when parameter does not exist", async () => {
+    it("starts from empty map when object does not exist", async () => {
       const { repository, send } = createRepository();
       const error = Object.assign(new Error("not found"), {
-        name: "ParameterNotFound",
+        name: "NoSuchKey",
       });
       send.mockRejectedValueOnce(error).mockResolvedValueOnce({});
 
@@ -109,9 +117,9 @@ describe("SsmApplicationsMapRepository", () => {
       expect(send).toHaveBeenCalledTimes(2);
     });
 
-    it("starts from empty map when parameter has no value", async () => {
+    it("starts from empty map when object body is empty", async () => {
       const { repository, send } = createRepository();
-      send.mockResolvedValueOnce({ Parameter: {} }).mockResolvedValueOnce({});
+      send.mockResolvedValueOnce({ Body: undefined }).mockResolvedValueOnce({});
 
       const result = await repository.addApplication("client-1", "app-1");
 
@@ -122,7 +130,7 @@ describe("SsmApplicationsMapRepository", () => {
       const { repository, send } = createRepository();
       send
         .mockResolvedValueOnce({
-          Parameter: { Value: JSON.stringify({ "client-1": "old-app" }) },
+          Body: mockBody(JSON.stringify({ "client-1": "old-app" })),
         })
         .mockResolvedValueOnce({});
 
@@ -134,7 +142,7 @@ describe("SsmApplicationsMapRepository", () => {
     it("skips the put when dry-run is true", async () => {
       const { repository, send } = createRepository();
       send.mockResolvedValueOnce({
-        Parameter: { Value: JSON.stringify({}) },
+        Body: mockBody(JSON.stringify({})),
       });
 
       const result = await repository.addApplication("client-1", "app-1", true);
@@ -143,7 +151,7 @@ describe("SsmApplicationsMapRepository", () => {
       expect(result).toEqual(new Map([["client-1", "app-1"]]));
     });
 
-    it("rethrows unexpected SSM errors", async () => {
+    it("rethrows unexpected S3 errors", async () => {
       const { repository, send } = createRepository();
       send.mockRejectedValueOnce(
         Object.assign(new Error("Network failure"), { name: "NetworkError" }),

@@ -172,16 +172,14 @@ variable "message_root_uri" {
   description = "The root URI used for constructing message links in callback payloads"
 }
 
-variable "applications_map_parameter_name" {
+variable "client_config_s3_bucket" {
   type        = string
-  default     = null
-  description = "SSM Parameter Store path for the clientId-to-applicationData map, where applicationData is currently only the applicationId"
+  description = "S3 bucket for client subscription configuration"
 }
 
-variable "s3_enable_force_destroy" {
-  type        = bool
-  description = "Whether to enable force destroy for the S3 buckets created in this module"
-  default     = false
+variable "applications_map_s3_bucket" {
+  type        = string
+  description = "S3 bucket containing the applications map JSON"
 }
 
 variable "mtls_cert_s3_bucket" {

@@ -1,67 +1,8 @@
-module "mtls_test_certs_bucket" {
-  count  = var.deploy_mock_clients ? 1 : 0
-  source = "https://github.com/NHSDigital/nhs-notify-shared-modules/releases/download/3.0.7/terraform-s3bucket.zip"
-
-  name = "mtls-test-certs"
-
-  aws_account_id = var.aws_account_id
-  component      = var.component
-  environment    = var.environment
-  project        = var.project
-  region         = var.region
-
-  default_tags = merge(
-    local.default_tags,
-    {
-      Description = "mTLS test certificate material for non-production callback delivery"
-    }
-  )
-
-  kms_key_arn        = module.kms.key_arn
-  force_destroy      = var.s3_enable_force_destroy
-  versioning         = false
-  object_ownership   = "BucketOwnerPreferred"
-  bucket_key_enabled = true
-
-  policy_documents = [
-    data.aws_iam_policy_document.mtls_test_certs_bucket[0].json
-  ]
-}
-
-data "aws_iam_policy_document" "mtls_test_certs_bucket" {
-  count = var.deploy_mock_clients ? 1 : 0
-
-  statement {
-    sid    = "DenyInsecureTransport"
-    effect = "Deny"
-
-    principals {
-      type        = "*"
-      identifiers = ["*"]
-    }
-
-    actions = [
-      "s3:*",
-    ]
-
-    resources = [
-      "arn:aws:s3:::${var.project}-${var.aws_account_id}-${var.region}-${var.environment}-${var.component}-mtls-test-certs",
-      "arn:aws:s3:::${var.project}-${var.aws_account_id}-${var.region}-${var.environment}-${var.component}-mtls-test-certs/*"
-    ]
-
-    condition {
-      test     = "Bool"
-      variable = "aws:SecureTransport"
-      values   = ["false"]
-    }
-  }
-}
-
 locals {
-  mtls_test_certs_s3_prefix = "callbacks/mtls-test"
+  mtls_test_certs_s3_prefix = "${var.environment}/callbacks/mtls-test"
   mtls_test_cert_s3_key     = "${local.mtls_test_certs_s3_prefix}/client-bundle.pem"
   mtls_test_ca_s3_key       = "${local.mtls_test_certs_s3_prefix}/ca.pem"
-  mtls_cert_s3_bucket       = var.deploy_mock_clients ? module.mtls_test_certs_bucket[0].bucket : var.mtls_cert_s3_bucket
+  mtls_cert_s3_bucket       = var.mtls_cert_s3_bucket
   mtls_cert_s3_key          = var.deploy_mock_clients ? local.mtls_test_cert_s3_key : var.mtls_cert_s3_key # gitleaks:allow
   mtls_ca_s3_key            = var.deploy_mock_clients ? local.mtls_test_ca_s3_key : var.mtls_ca_s3_key     # gitleaks:allow
 }
@@ -158,20 +99,22 @@ resource "tls_locally_signed_cert" "mock_server" {
 
 resource "aws_s3_object" "mtls_test_client_bundle" {
   count   = var.deploy_mock_clients ? 1 : 0
-  bucket  = module.mtls_test_certs_bucket[0].id
+  bucket  = var.mtls_cert_s3_bucket
   key     = local.mtls_test_cert_s3_key # gitleaks:allow
   content = "${tls_locally_signed_cert.test_client[0].cert_pem}${tls_private_key.test_client[0].private_key_pem}"
 
+  kms_key_id             = module.kms.key_arn
   server_side_encryption = "aws:kms"
   content_type           = "application/x-pem-file"
 }
 
 resource "aws_s3_object" "mtls_test_ca" {
   count   = var.deploy_mock_clients ? 1 : 0
-  bucket  = module.mtls_test_certs_bucket[0].id
+  bucket  = var.mtls_cert_s3_bucket
   key     = local.mtls_test_ca_s3_key # gitleaks:allow
   content = tls_self_signed_cert.test_ca[0].cert_pem
 
+  kms_key_id             = module.kms.key_arn
   server_side_encryption = "aws:kms"
   content_type           = "application/x-pem-file"
 }

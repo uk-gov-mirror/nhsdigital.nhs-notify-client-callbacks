@@ -11,11 +11,11 @@ const mockGetApplication = jest.fn();
 
 jest.mock("src/entrypoint/cli/helper", () => ({
   ...jest.requireActual("src/entrypoint/cli/helper"),
-  createSsmApplicationsMapRepository: jest.fn(),
+  createS3ApplicationsMapRepository: jest.fn(),
 }));
 
-const mockCreateSsmApplicationsMapRepository =
-  helper.createSsmApplicationsMapRepository as jest.Mock;
+const mockCreateS3ApplicationsMapRepository =
+  helper.createS3ApplicationsMapRepository as jest.Mock;
 
 describe("applications-map-get CLI", () => {
   const originalCliConsoleState = captureCliConsoleState();
@@ -25,14 +25,16 @@ describe("applications-map-get CLI", () => {
     "script",
     "--client-id",
     "client-1",
-    "--parameter-name",
-    "/nhs/dev/callbacks/applications-map",
+    "--applications-map-bucket",
+    "test-bucket",
+    "--applications-map-key",
+    "dev/applications-map.json",
   ];
 
   beforeEach(() => {
     mockGetApplication.mockReset();
-    mockCreateSsmApplicationsMapRepository.mockReset();
-    mockCreateSsmApplicationsMapRepository.mockReturnValue({
+    mockCreateS3ApplicationsMapRepository.mockReset();
+    mockCreateS3ApplicationsMapRepository.mockResolvedValue({
       getApplication: mockGetApplication,
     });
     resetCliConsoleState();
@@ -47,10 +49,11 @@ describe("applications-map-get CLI", () => {
 
     await cli.main(baseArgs);
 
-    expect(mockCreateSsmApplicationsMapRepository).toHaveBeenCalledWith(
+    expect(mockCreateS3ApplicationsMapRepository).toHaveBeenCalledWith(
       expect.objectContaining({
         "client-id": "client-1",
-        "parameter-name": "/nhs/dev/callbacks/applications-map",
+        "applications-map-bucket": "test-bucket",
+        "applications-map-key": "dev/applications-map.json",
       }),
     );
     expect(mockGetApplication).toHaveBeenCalledWith("client-1");

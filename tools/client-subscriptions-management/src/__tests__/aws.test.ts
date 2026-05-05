@@ -1,8 +1,10 @@
 import {
+  deriveAccountEnv,
+  deriveApplicationsMapBucketName,
+  deriveApplicationsMapKey,
   deriveBucketName,
-  deriveParameterName,
+  resolveApplicationsMapLocation,
   resolveBucketName,
-  resolveParameterName,
   resolveProfile,
   resolveRegion,
 } from "src/aws";
@@ -24,20 +26,18 @@ describe("aws", () => {
   it("derives bucket name from environment using STS account ID", async () => {
     await expect(
       resolveBucketName({ environment: "dev", region: "eu-west-2" }),
-    ).resolves.toBe(
-      "nhs-123456789012-eu-west-2-dev-callbacks-subscription-config",
-    );
+    ).resolves.toBe("nhs-123456789012-eu-west-2-dev-acct-clie-client-configs");
   });
 
   it("uses default region eu-west-2 when region is not provided", async () => {
     await expect(resolveBucketName({ environment: "dev" })).resolves.toBe(
-      "nhs-123456789012-eu-west-2-dev-callbacks-subscription-config",
+      "nhs-123456789012-eu-west-2-dev-acct-clie-client-configs",
     );
   });
 
   it("derives bucket name correctly", () => {
     expect(deriveBucketName("123456789012", "dev", "eu-west-2")).toBe(
-      "nhs-123456789012-eu-west-2-dev-callbacks-subscription-config",
+      "nhs-123456789012-eu-west-2-dev-acct-clie-client-configs",
     );
   });
 
@@ -81,37 +81,60 @@ describe("aws", () => {
     expect(resolveRegion(undefined, {} as NodeJS.ProcessEnv)).toBeUndefined();
   });
 
-  it("derives parameter name from environment", () => {
-    expect(deriveParameterName("dev")).toBe(
-      "/nhs/dev/callbacks/applications-map",
-    );
-  });
-
-  it("resolves parameter name from explicit argument", () => {
-    expect(resolveParameterName({ parameterName: "/custom/path" })).toBe(
-      "/custom/path",
-    );
-  });
-
-  it("derives parameter name from environment argument", () => {
-    expect(resolveParameterName({ environment: "dev" })).toBe(
-      "/nhs/dev/callbacks/applications-map",
-    );
-  });
-
-  it("derives parameter name from ENVIRONMENT env var", () => {
+  it("derives applications map bucket name", () => {
     expect(
-      resolveParameterName({
-        env: { ENVIRONMENT: "staging" } as NodeJS.ProcessEnv,
-      }),
-    ).toBe("/nhs/staging/callbacks/applications-map");
+      deriveApplicationsMapBucketName("123456789012", "dev", "eu-west-2"),
+    ).toBe("nhs-123456789012-eu-west-2-dev-acct-clie-apps-map");
   });
 
-  it("throws when no parameter name can be resolved", () => {
-    expect(() =>
-      resolveParameterName({ env: {} as NodeJS.ProcessEnv }),
-    ).toThrow(
-      "Environment is required to derive parameter name. Please provide via --environment or ENVIRONMENT env var.",
+  it("derives applications map key from environment", () => {
+    expect(deriveApplicationsMapKey("dev")).toBe("dev/applications-map.json");
+  });
+
+  it("resolves applications map location from explicit arguments", async () => {
+    await expect(
+      resolveApplicationsMapLocation({
+        bucketName: "my-bucket",
+        key: "my-key.json",
+      }),
+    ).resolves.toEqual({ bucket: "my-bucket", key: "my-key.json" });
+  });
+
+  it("derives applications map location from environment", async () => {
+    await expect(
+      resolveApplicationsMapLocation({
+        environment: "dev",
+        region: "eu-west-2",
+      }),
+    ).resolves.toEqual({
+      bucket: "nhs-123456789012-eu-west-2-dev-acct-clie-apps-map",
+      key: "dev/applications-map.json",
+    });
+  });
+
+  it("throws when no environment for applications map location", async () => {
+    await expect(
+      resolveApplicationsMapLocation({
+        env: {} as NodeJS.ProcessEnv,
+      } as Parameters<typeof resolveApplicationsMapLocation>[0]),
+    ).rejects.toThrow(
+      "Environment is required to derive applications map location",
     );
+  });
+
+  describe("deriveAccountEnv", () => {
+    it("maps 'main' to 'main'", () => {
+      expect(deriveAccountEnv("main")).toBe("main");
+    });
+
+    it("maps 'nonprod' to 'nonprod'", () => {
+      expect(deriveAccountEnv("nonprod")).toBe("nonprod");
+    });
+
+    it("maps any other environment to 'dev'", () => {
+      expect(deriveAccountEnv("dev")).toBe("dev");
+      expect(deriveAccountEnv("abxy0")).toBe("dev");
+      expect(deriveAccountEnv("feature-test")).toBe("dev");
+    });
   });
 });

@@ -18,9 +18,16 @@ cd "${repo_root}"
 
 rm -f "${clients_dir}"/*.json
 
-bucket_name="nhs-${AWS_ACCOUNT_ID}-${AWS_REGION}-${ENVIRONMENT}-callbacks-subscription-config"
+# Map ENVIRONMENT to the account-level bucket environment prefix.
+case "${ENVIRONMENT}" in
+  main)    acct_env="main" ;;
+  nonprod) acct_env="nonprod" ;;
+  *)       acct_env="dev" ;;
+esac
 
-s3_prefix="client_subscriptions/"
+bucket_name="nhs-${AWS_ACCOUNT_ID}-${AWS_REGION}-${acct_env}-acct-clie-client-configs"
+
+s3_prefix="${ENVIRONMENT}/client_subscriptions/"
 
 echo "Seeding client configs from s3://${bucket_name}/${s3_prefix} for ${ENVIRONMENT}/${AWS_REGION}"
 

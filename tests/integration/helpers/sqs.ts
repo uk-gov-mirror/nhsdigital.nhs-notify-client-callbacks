@@ -34,7 +34,8 @@ function buildReceiveMessageInput(
 }
 
 function buildQueueUrl(
-  { accountId, component, environment, project, region }: DeploymentDetails,
+  { accountId, environment, project, region }: DeploymentDetails,
+  component: string,
   name: string,
   options?: { appendQueueSuffix?: boolean },
 ): string {
@@ -49,14 +50,22 @@ export function buildMockClientDlqQueueUrl(
   deploymentDetails: DeploymentDetails,
   clientId: string,
 ): string {
-  return buildQueueUrl(deploymentDetails, `${clientId}-delivery-dlq`);
+  return buildQueueUrl(
+    deploymentDetails,
+    deploymentDetails.clientComponent,
+    `${clientId}-delivery-dlq`,
+  );
 }
 
 export function buildMockClientDeliveryQueueUrl(
   deploymentDetails: DeploymentDetails,
   clientId: string,
 ): string {
-  return buildQueueUrl(deploymentDetails, `${clientId}-delivery`);
+  return buildQueueUrl(
+    deploymentDetails,
+    deploymentDetails.clientComponent,
+    `${clientId}-delivery`,
+  );
 }
 
 export async function sendSqsEvent<T>(

@@ -1,28 +1,28 @@
 import type { Argv } from "yargs";
 import {
+  type ApplicationsMapCliArgs,
   type CliCommand,
   type ClientCliArgs,
-  type SsmCliArgs,
+  applicationsMapOptions,
   clientIdOption,
   commonOptions,
-  createSsmApplicationsMapRepository,
-  parameterNameOption,
+  createS3ApplicationsMapRepository,
   runCommand,
 } from "src/entrypoint/cli/helper";
 
-type ApplicationsMapGetArgs = ClientCliArgs & SsmCliArgs;
+type ApplicationsMapGetArgs = ClientCliArgs & ApplicationsMapCliArgs;
 
 export const builder = (yargs: Argv) =>
   yargs.options({
     ...commonOptions,
     ...clientIdOption,
-    ...parameterNameOption,
+    ...applicationsMapOptions,
   });
 
 export const handler: CliCommand<ApplicationsMapGetArgs>["handler"] = async (
   argv,
 ) => {
-  const repository = createSsmApplicationsMapRepository(argv);
+  const repository = await createS3ApplicationsMapRepository(argv);
   const applicationId = await repository.getApplication(argv["client-id"]);
 
   if (applicationId) {

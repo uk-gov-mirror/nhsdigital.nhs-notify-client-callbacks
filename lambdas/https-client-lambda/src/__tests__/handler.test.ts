@@ -20,7 +20,7 @@ jest.mock("services/config-loader", () => ({
 }));
 
 const mockGetApplicationId = jest.fn();
-jest.mock("services/ssm-applications-map", () => ({
+jest.mock("services/applications-map", () => ({
   getApplicationId: (...args: unknown[]) => mockGetApplicationId(...args),
 }));
 

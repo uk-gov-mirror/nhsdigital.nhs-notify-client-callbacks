@@ -30,7 +30,7 @@ fi
 AWS_REGION="${AWS_REGION:-eu-west-2}"
 LOG_LEVEL="${LOG_LEVEL:-debug}"
 NODE_OPTIONS="${NODE_OPTIONS:---experimental-vm-modules}"
-COMPONENT="callbacks"
+COMPONENT="cb"
 PROJECT="nhs"
 
 if ! aws sts get-caller-identity --profile "$AWS_PROFILE" >/dev/null 2>&1; then

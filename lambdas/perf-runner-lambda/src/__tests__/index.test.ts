@@ -51,12 +51,13 @@ beforeEach(() => {
   jest.clearAllMocks();
   mockRunPerformanceTest.mockResolvedValue(mockResult);
   process.env.INBOUND_QUEUE_URL = "https://sqs.example.invalid/queue";
+  process.env.DELIVERY_QUEUE_URL_PREFIX =
+    "https://sqs.example.invalid/nhs-dev-cbc-";
   process.env.TRANSFORM_FILTER_LOG_GROUP =
-    "/aws/lambda/nhs-dev-callbacks-client-transform-filter";
+    "/aws/lambda/nhs-dev-cb-client-transform-filter";
   process.env.DELIVERY_LOG_GROUP_PREFIX =
-    "/aws/lambda/nhs-dev-callbacks-https-client-";
-  process.env.MOCK_WEBHOOK_LOG_GROUP =
-    "/aws/lambda/nhs-dev-callbacks-mock-webhook";
+    "/aws/lambda/nhs-dev-cbc-https-client-";
+  process.env.MOCK_WEBHOOK_LOG_GROUP = "/aws/lambda/nhs-dev-cb-mock-webhook";
   process.env.ELASTICACHE_ENDPOINT = "cache.example.invalid";
   process.env.ELASTICACHE_CACHE_NAME = "test-cache";
   process.env.ELASTICACHE_IAM_USERNAME = "test-user";
@@ -71,9 +72,10 @@ describe("handler", () => {
     expect(mockRunPerformanceTest).toHaveBeenCalledWith(
       expect.objectContaining({
         queueUrl: "https://sqs.example.invalid/queue",
-        logGroupName: "/aws/lambda/nhs-dev-callbacks-client-transform-filter",
-        deliveryLogGroupPrefix: "/aws/lambda/nhs-dev-callbacks-https-client-",
-        mockWebhookLogGroup: "/aws/lambda/nhs-dev-callbacks-mock-webhook",
+        deliveryQueueUrlPrefix: "https://sqs.example.invalid/nhs-dev-cbc-",
+        logGroupName: "/aws/lambda/nhs-dev-cb-client-transform-filter",
+        deliveryLogGroupPrefix: "/aws/lambda/nhs-dev-cbc-https-client-",
+        mockWebhookLogGroup: "/aws/lambda/nhs-dev-cb-mock-webhook",
       }),
       testScenario,
       "test-id",
@@ -183,7 +185,7 @@ describe("handler", () => {
 
     expect(mockRunPerformanceTest).toHaveBeenCalledWith(
       expect.objectContaining({
-        mockWebhookLogGroup: "/aws/lambda/nhs-dev-callbacks-mock-webhook",
+        mockWebhookLogGroup: "/aws/lambda/nhs-dev-cb-mock-webhook",
       }),
       expect.anything(),
       "webhook-test",

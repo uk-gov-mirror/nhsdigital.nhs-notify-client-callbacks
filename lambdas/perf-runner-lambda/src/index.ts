@@ -17,6 +17,7 @@ export async function handler(
 
   const region = process.env.AWS_REGION ?? "eu-west-2";
   const queueUrl = process.env.INBOUND_QUEUE_URL;
+  const deliveryQueueUrlPrefix = process.env.DELIVERY_QUEUE_URL_PREFIX;
   const logGroupName = process.env.TRANSFORM_FILTER_LOG_GROUP;
   const deliveryLogGroupPrefix = process.env.DELIVERY_LOG_GROUP_PREFIX;
   const mockWebhookLogGroup = process.env.MOCK_WEBHOOK_LOG_GROUP;
@@ -55,6 +56,7 @@ export async function handler(
         sqsClient,
         cloudWatchClient,
         queueUrl,
+        deliveryQueueUrlPrefix,
         logGroupName,
         deliveryLogGroupPrefix,
         mockWebhookLogGroup,

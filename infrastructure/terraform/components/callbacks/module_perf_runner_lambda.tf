@@ -6,7 +6,7 @@ module "perf_runner_lambda" {
   description   = "Lambda function that executes performance tests against the client callbacks pipeline from within AWS"
 
   aws_account_id = var.aws_account_id
-  component      = var.component
+  component      = local.component
   environment    = var.environment
   project        = var.project
   region         = var.region
@@ -38,12 +38,13 @@ module "perf_runner_lambda" {
   lambda_env_vars = {
     ENVIRONMENT                = var.environment
     INBOUND_QUEUE_URL          = module.sqs_inbound_event.sqs_queue_url
+    DELIVERY_QUEUE_URL_PREFIX  = "https://sqs.${var.region}.amazonaws.com/${var.aws_account_id}/${local.client_csi}-"
     TRANSFORM_FILTER_LOG_GROUP = module.client_transform_filter_lambda.cloudwatch_log_group_name
-    DELIVERY_LOG_GROUP_PREFIX  = "/aws/lambda/${local.csi}-https-client-"
+    DELIVERY_LOG_GROUP_PREFIX  = "/aws/lambda/${local.client_csi}-https-client-"
     MOCK_WEBHOOK_LOG_GROUP     = var.deploy_mock_clients ? module.mock_webhook_lambda[0].cloudwatch_log_group_name : ""
     ELASTICACHE_ENDPOINT       = aws_elasticache_serverless_cache.delivery_state.endpoint[0].address
     ELASTICACHE_CACHE_NAME     = aws_elasticache_serverless_cache.delivery_state.name
-    ELASTICACHE_IAM_USERNAME   = "${var.project}-${var.environment}-${var.component}-elasticache-user"
+    ELASTICACHE_IAM_USERNAME   = "${var.project}-${var.environment}-${local.component}-elasticache-user"
   }
 
   vpc_config = {
@@ -94,8 +95,8 @@ data "aws_iam_policy_document" "perf_runner_lambda" {
     resources = [
       module.sqs_inbound_event.sqs_queue_arn,
       module.sqs_inbound_event.sqs_dlq_arn,
-      "arn:aws:sqs:${var.region}:${var.aws_account_id}:${local.csi}-*-delivery-queue",
-      "arn:aws:sqs:${var.region}:${var.aws_account_id}:${local.csi}-*-delivery-dlq-queue",
+      "arn:aws:sqs:${var.region}:${var.aws_account_id}:${local.client_csi}-*-delivery-queue",
+      "arn:aws:sqs:${var.region}:${var.aws_account_id}:${local.client_csi}-*-delivery-dlq-queue",
     ]
   }
 
@@ -110,8 +111,8 @@ data "aws_iam_policy_document" "perf_runner_lambda" {
     resources = [
       module.sqs_inbound_event.sqs_queue_arn,
       module.sqs_inbound_event.sqs_dlq_arn,
-      "arn:aws:sqs:${var.region}:${var.aws_account_id}:${local.csi}-*-delivery-queue",
-      "arn:aws:sqs:${var.region}:${var.aws_account_id}:${local.csi}-*-delivery-dlq-queue",
+      "arn:aws:sqs:${var.region}:${var.aws_account_id}:${local.client_csi}-*-delivery-queue",
+      "arn:aws:sqs:${var.region}:${var.aws_account_id}:${local.client_csi}-*-delivery-dlq-queue",
     ]
   }
 
@@ -127,7 +128,7 @@ data "aws_iam_policy_document" "perf_runner_lambda" {
     resources = concat(
       [
         "arn:aws:logs:${var.region}:${var.aws_account_id}:log-group:${module.client_transform_filter_lambda.cloudwatch_log_group_name}:*",
-        "arn:aws:logs:${var.region}:${var.aws_account_id}:log-group:/aws/lambda/${local.csi}-https-client-*",
+        "arn:aws:logs:${var.region}:${var.aws_account_id}:log-group:/aws/lambda/${local.client_csi}-https-client-*",
       ],
       var.deploy_mock_clients ? [
         "arn:aws:logs:${var.region}:${var.aws_account_id}:log-group:${module.mock_webhook_lambda[0].cloudwatch_log_group_name}:*",

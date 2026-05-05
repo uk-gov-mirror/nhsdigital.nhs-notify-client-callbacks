@@ -25,7 +25,6 @@
   },
   "dependencies": {
     "@aws-sdk/client-s3": "catalog:aws",
-    "@aws-sdk/client-ssm": "catalog:aws",
     "@aws-sdk/client-sts": "catalog:aws",
     "@aws-sdk/credential-providers": "catalog:aws",
     "@nhs-notify-client-callbacks/models": "workspace:*",
@@ -35,6 +34,7 @@
     "zod": "catalog:app"
   },
   "devDependencies": {
+    "@smithy/types": "catalog:aws",
     "@types/jest": "catalog:test",
     "@types/node": "catalog:tools",
     "@types/yargs": "catalog:tools",

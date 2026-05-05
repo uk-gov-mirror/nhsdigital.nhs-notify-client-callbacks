@@ -44,7 +44,7 @@ describe("createMetricsLogger", () => {
   });
 
   it("should throw if ENVIRONMENT is not set", () => {
-    process.env.METRICS_NAMESPACE = "nhs-notify-client-callbacks-metrics";
+    process.env.METRICS_NAMESPACE = "nhs-notify-cb";
 
     expect(() => createMetricLogger()).toThrow(
       "ENVIRONMENT environment variable is not set",
@@ -61,7 +61,7 @@ describe("createMetricsLogger", () => {
   });
 
   it("should use ENVIRONMENT environment variable", () => {
-    process.env.METRICS_NAMESPACE = "nhs-notify-client-callbacks-metrics";
+    process.env.METRICS_NAMESPACE = "nhs-notify-cb";
     process.env.ENVIRONMENT = "production";
 
     createMetricLogger();

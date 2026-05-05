@@ -2,7 +2,7 @@ module "sqs_inbound_event" {
   source = "https://github.com/NHSDigital/nhs-notify-shared-modules/releases/download/3.0.7/terraform-sqs.zip"
 
   aws_account_id = var.aws_account_id
-  component      = var.component
+  component      = local.component
   environment    = var.environment
   project        = var.project
   region         = var.region
@@ -33,7 +33,7 @@ data "aws_iam_policy_document" "sqs_inbound_event" {
     ]
 
     resources = [
-      "arn:aws:sqs:${var.region}:${var.aws_account_id}:${var.project}-${var.environment}-${var.component}-inbound-event-queue"
+      "arn:aws:sqs:${var.region}:${var.aws_account_id}:${var.project}-${var.environment}-${local.component}-inbound-event-queue"
     ]
 
     condition {

@@ -25,6 +25,7 @@ export type TestContext = {
   clientDlqUrl(clientId: string): string;
   clientDeliveryUrl(clientId: string): string;
   logGroup(name: string): string;
+  clientLogGroup(name: string): string;
 };
 
 export function createTestContext(): TestContext {
@@ -43,6 +44,8 @@ export function createTestContext(): TestContext {
     clientDeliveryUrl: (clientId) =>
       buildMockClientDeliveryQueueUrl(deployment, clientId),
     logGroup: (name) => buildLambdaLogGroupName(deployment, name),
+    clientLogGroup: (name) =>
+      `/aws/lambda/${deployment.project}-${deployment.environment}-${deployment.clientComponent}-${name}`,
   };
 }
 

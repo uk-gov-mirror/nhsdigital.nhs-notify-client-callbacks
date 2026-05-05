@@ -22,19 +22,39 @@ const scenario: Scenario = {
 };
 
 const inboundQueueUrl =
-  "https://sqs.eu-west-2.amazonaws.com/123456789/nhs-dev-callbacks-inbound-event-queue";
+  "https://sqs.eu-west-2.amazonaws.com/123456789/nhs-dev-cb-inbound-event-queue";
+
+const deliveryQueueUrlPrefix =
+  "https://sqs.eu-west-2.amazonaws.com/123456789/nhs-dev-cbc-";
 
 describe("deriveQueueUrls", () => {
   it("derives all queue URLs from the inbound queue URL and scenario", () => {
+    const urls = deriveQueueUrls(
+      inboundQueueUrl,
+      scenario,
+      deliveryQueueUrlPrefix,
+    );
+
+    expect(urls).toEqual([
+      "https://sqs.eu-west-2.amazonaws.com/123456789/nhs-dev-cb-inbound-event-queue",
+      "https://sqs.eu-west-2.amazonaws.com/123456789/nhs-dev-cb-inbound-event-dlq",
+      "https://sqs.eu-west-2.amazonaws.com/123456789/nhs-dev-cbc-perf-client-1-delivery-queue",
+      "https://sqs.eu-west-2.amazonaws.com/123456789/nhs-dev-cbc-perf-client-1-delivery-dlq-queue",
+      "https://sqs.eu-west-2.amazonaws.com/123456789/nhs-dev-cbc-perf-client-2-delivery-queue",
+      "https://sqs.eu-west-2.amazonaws.com/123456789/nhs-dev-cbc-perf-client-2-delivery-dlq-queue",
+    ]);
+  });
+
+  it("falls back to inbound base URL when no delivery prefix provided", () => {
     const urls = deriveQueueUrls(inboundQueueUrl, scenario);
 
     expect(urls).toEqual([
-      "https://sqs.eu-west-2.amazonaws.com/123456789/nhs-dev-callbacks-inbound-event-queue",
-      "https://sqs.eu-west-2.amazonaws.com/123456789/nhs-dev-callbacks-inbound-event-dlq",
-      "https://sqs.eu-west-2.amazonaws.com/123456789/nhs-dev-callbacks-perf-client-1-delivery-queue",
-      "https://sqs.eu-west-2.amazonaws.com/123456789/nhs-dev-callbacks-perf-client-1-delivery-dlq-queue",
-      "https://sqs.eu-west-2.amazonaws.com/123456789/nhs-dev-callbacks-perf-client-2-delivery-queue",
-      "https://sqs.eu-west-2.amazonaws.com/123456789/nhs-dev-callbacks-perf-client-2-delivery-dlq-queue",
+      "https://sqs.eu-west-2.amazonaws.com/123456789/nhs-dev-cb-inbound-event-queue",
+      "https://sqs.eu-west-2.amazonaws.com/123456789/nhs-dev-cb-inbound-event-dlq",
+      "https://sqs.eu-west-2.amazonaws.com/123456789/nhs-dev-cb-perf-client-1-delivery-queue",
+      "https://sqs.eu-west-2.amazonaws.com/123456789/nhs-dev-cb-perf-client-1-delivery-dlq-queue",
+      "https://sqs.eu-west-2.amazonaws.com/123456789/nhs-dev-cb-perf-client-2-delivery-queue",
+      "https://sqs.eu-west-2.amazonaws.com/123456789/nhs-dev-cb-perf-client-2-delivery-dlq-queue",
     ]);
   });
 
@@ -57,13 +77,17 @@ describe("deriveQueueUrls", () => {
       ],
     };
 
-    const urls = deriveQueueUrls(inboundQueueUrl, duplicateScenario);
+    const urls = deriveQueueUrls(
+      inboundQueueUrl,
+      duplicateScenario,
+      deliveryQueueUrlPrefix,
+    );
 
     expect(urls).toEqual([
-      "https://sqs.eu-west-2.amazonaws.com/123456789/nhs-dev-callbacks-inbound-event-queue",
-      "https://sqs.eu-west-2.amazonaws.com/123456789/nhs-dev-callbacks-inbound-event-dlq",
-      "https://sqs.eu-west-2.amazonaws.com/123456789/nhs-dev-callbacks-perf-client-1-delivery-queue",
-      "https://sqs.eu-west-2.amazonaws.com/123456789/nhs-dev-callbacks-perf-client-1-delivery-dlq-queue",
+      "https://sqs.eu-west-2.amazonaws.com/123456789/nhs-dev-cb-inbound-event-queue",
+      "https://sqs.eu-west-2.amazonaws.com/123456789/nhs-dev-cb-inbound-event-dlq",
+      "https://sqs.eu-west-2.amazonaws.com/123456789/nhs-dev-cbc-perf-client-1-delivery-queue",
+      "https://sqs.eu-west-2.amazonaws.com/123456789/nhs-dev-cbc-perf-client-1-delivery-dlq-queue",
     ]);
   });
 });

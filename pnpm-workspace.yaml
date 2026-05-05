@@ -31,11 +31,11 @@ catalogs:
     "@aws-sdk/client-cloudwatch-logs": "^3.1023.0"
     "@aws-sdk/client-s3": "^3.1024.0"
     "@aws-sdk/client-sqs": "^3.1023.0"
-    "@aws-sdk/client-ssm": "^3.1025.0"
     "@aws-crypto/sha256-js": "^5.2.0"
     "@aws-sdk/client-sts": "^3.1023.0"
     "@aws-sdk/credential-providers": "^3.1023.0"
     "@smithy/signature-v4": "^5.0.0"
+    "@smithy/types": "^4.3.1"
   lint:
     "@eslint/js": "^9.39.4"
     "@stylistic/eslint-plugin": "^5.10.0"

@@ -155,7 +155,11 @@ export async function runPerformanceTest(
 
   const testStartMs = Date.now();
 
-  const queueUrls = deriveQueueUrls(deps.queueUrl, scenario);
+  const queueUrls = deriveQueueUrls(
+    deps.queueUrl,
+    scenario,
+    deps.deliveryQueueUrlPrefix,
+  );
 
   if (skipPurge) {
     logger.info("Skipping queue purge", { queueUrls });
