@@ -41,9 +41,6 @@ const config: KnipConfig = {
     "lambdas/perf-runner-lambda": {
       ignoreDependencies: ["@tsconfig/node22", "@types/aws-lambda"],
     },
-    "src/config-cache": {
-      ignoreDependencies: ["@tsconfig/node22"],
-    },
     "src/config-subscription-cache": {
       ignoreDependencies: ["@tsconfig/node22"],
     },
